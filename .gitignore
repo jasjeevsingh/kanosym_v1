@@ -24,19 +24,37 @@ share/python-wheels/
 MANIFEST
 
 # Virtual environments
-kanosym/backend/venv/
+backend/venv/
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
 
+# Node.js
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
 # IDE
 .vscode/
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # OS
 .DS_Store
@@ -48,12 +66,8 @@ ehthumbs.db
 Thumbs.db
 
 # Logs
+logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
 # Runtime data
 pids
@@ -76,6 +90,10 @@ pids
 # dotenv environment variables file
 .env
 .env.test
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Temporary folders
 tmp/
