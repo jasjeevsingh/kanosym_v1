@@ -131,7 +131,7 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu }: { isDraggin
       className={`bg-zinc-800 text-zinc-100 px-4 py-2 rounded shadow mr-2 cursor-pointer hover:bg-zinc-700 transition select-none ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
     >
-      Sensitivity Test
+      Portfolio Sensitivity Test
     </div>
   );
 }
@@ -145,24 +145,27 @@ function DraggableBlock({ id, onContextMenu }: { id: string; onContextMenu?: (e:
   );
 }
 
-function MainPage({ hasBlock, onEditRequest }: { hasBlock: boolean; onEditRequest: (x: number, y: number) => void }) {
+function MainPage({ hasBlock, onEditRequest, showRunButton, onRunModel }: { hasBlock: boolean; onEditRequest: (e: React.MouseEvent) => void; showRunButton?: boolean; onRunModel?: () => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    onEditRequest(e.clientX, e.clientY);
+    onEditRequest(e);
   };
   return (
     <div
       ref={setNodeRef}
-      className={`h-full w-full bg-zinc-800 text-zinc-100 p-8 flex flex-col items-center justify-center border-2 border-dashed transition ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
+      className={`h-full w-full bg-zinc-800 text-zinc-100 p-8 flex flex-col items-center justify-center border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
     >
       {hasBlock ? (
         <DraggableBlock id="main-block" onContextMenu={handleContextMenu} />
       ) : (
         <>
-          <div className="text-3xl font-bold mb-4">Open Page</div>
-          <div className="text-zinc-400">(Drag the Sensitivity Test block here)</div>
+          <div className="text-3xl font-bold mb-4">Model Building Environment</div>
+          <div className="text-zinc-400">(Drag the blocks here)</div>
         </>
+      )}
+      {showRunButton && onRunModel && (
+        <RunModelButton onClick={onRunModel} />
       )}
     </div>
   );
@@ -171,8 +174,8 @@ function MainPage({ hasBlock, onEditRequest }: { hasBlock: boolean; onEditReques
 function NoiraPanel() {
   return (
     <div className="h-full w-full bg-zinc-900 text-zinc-200 p-4 flex flex-col">
-      <div className="font-bold mb-2">Noira Chat</div>
-      <div className="text-xs text-zinc-400">(placeholder for Noira chat panel)</div>
+      <div className="font-bold mb-2">Noira</div>
+      <div className="text-xs text-zinc-400">(placeholder for Noira chatbot panel)</div>
     </div>
   );
 }
@@ -441,6 +444,17 @@ function SubtleResizableBorder({ onResize, direction, children, show = true, min
   );
 }
 
+function RunModelButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      className="absolute bottom-6 right-8 z-40 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded shadow-lg transition"
+      onClick={onClick}
+    >
+      Run Model
+    </button>
+  );
+}
+
 function App() {
   // blockLocation: 'blockbar' | 'main' | 'dragging'
   const [blockLocation, setBlockLocation] = useState<'blockbar' | 'main'>('blockbar');
@@ -511,8 +525,9 @@ function App() {
     setActiveId(null);
   }
 
-  function handleEditRequest(x: number, y: number) {
-    setContextMenu({ x, y });
+  function handleEditRequest(e: React.MouseEvent) {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
   }
 
   function handleEdit() {
@@ -526,6 +541,10 @@ function App() {
 
   function handleCloseContextMenu() {
     setContextMenu(null);
+  }
+
+  function handleRunModel() {
+    alert('Model run triggered!');
   }
 
   return (
@@ -552,7 +571,12 @@ function App() {
           </SubtleResizableBorder>
           {/* Main Page */}
           <div className="flex-1 min-w-0 relative">
-            <MainPage hasBlock={blockLocation === 'main'} onEditRequest={handleEditRequest} />
+            <MainPage
+              hasBlock={blockLocation === 'main'}
+              onEditRequest={handleEditRequest}
+              showRunButton={blockLocation === 'main'}
+              onRunModel={handleRunModel}
+            />
           </div>
           {/* Noira Panel */}
           <SubtleResizableBorder direction="right" show={showNoira} min={200} max={480} initial={320}>
