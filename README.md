@@ -15,7 +15,7 @@ Before running KANOSYM, ensure you have the following installed:
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd kanosym_v1/kanosym
+cd kanosym_v1
 ```
 
 ### 2. Backend Setup
@@ -33,7 +33,7 @@ source venv/bin/activate
 # venv\Scripts\activate
 
 # Install Python dependencies
-pip install qiskit flask fastapi uvicorn numpy pandas matplotlib seaborn
+
 ```
 
 ### 3. Frontend Setup
