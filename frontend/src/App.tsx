@@ -194,26 +194,89 @@ function DraggableBlock({ id, onContextMenu }: { id: string; onContextMenu?: (e:
   );
 }
 
-function MainPage({ hasBlock, onEditRequest, showRunButton, onRunModel }: { hasBlock: boolean; onEditRequest: (e: React.MouseEvent) => void; showRunButton?: boolean; onRunModel?: () => void }) {
+function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onBlockDrag, onBlockDragEnd, onDeselect }: {
+  hasBlock: boolean;
+  blockPosition: { x: number; y: number } | null;
+  onEditRequest: (e: React.MouseEvent) => void;
+  showRunButton?: boolean;
+  onRunModel?: () => void;
+  isSelected: boolean;
+  onSelect: () => void;
+  onBlockDrag: (dx: number, dy: number) => void;
+  onBlockDragEnd: () => void;
+  onDeselect: () => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     onEditRequest(e);
   };
+  // Drag logic for block
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  function handleMouseDown(e: React.MouseEvent) {
+    if (!isSelected) return;
+    setDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    e.stopPropagation();
+  }
+  function handleMouseMove(e: MouseEvent) {
+    if (dragging && dragStart.current && blockPosition) {
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      onBlockDrag(dx, dy);
+      dragStart.current = { x: e.clientX, y: e.clientY };
+    }
+  }
+  function handleMouseUp() {
+    if (dragging) {
+      setDragging(false);
+      onBlockDragEnd();
+    }
+  }
+  useEffect(() => {
+    if (dragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging]);
+
   return (
     <div
+      id="kanosym-mbe"
       ref={setNodeRef}
-      className={`h-full w-full bg-zinc-800 text-zinc-100 p-8 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
-      style={{ position: 'relative' }}
+      className={`h-full w-full text-zinc-100 p-8 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
+      style={{
+        position: 'relative',
+        backgroundColor: '#27272a',
+        backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
+        backgroundSize: '20px 20px',
+      }}
+      onClick={onDeselect}
     >
-      <div className="flex-1 flex flex-col items-center justify-center">
-        {hasBlock ? (
-          <DraggableBlock id="main-block" onContextMenu={handleContextMenu} />
+      <div id="kanosym-mbe-dropzone" className="flex-1 relative">
+        {hasBlock && blockPosition ? (
+          <div
+            style={{ position: 'absolute', left: blockPosition.x, top: blockPosition.y, cursor: isSelected ? 'grab' : 'pointer', zIndex: 10 }}
+            onClick={e => { e.stopPropagation(); onSelect(); }}
+            onMouseDown={isSelected ? handleMouseDown : undefined}
+          >
+            <div className={`transition border-2 rounded ${isSelected ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
+              <DraggableBlock id="main-block" onContextMenu={handleContextMenu} />
+            </div>
+          </div>
         ) : (
-          <>
+          <div className="flex flex-col items-center justify-center h-full">
             <div className="text-3xl font-bold mb-4">Model Building Environment</div>
             <div className="text-zinc-400">(Drag the blocks here)</div>
-          </>
+          </div>
         )}
       </div>
       {showRunButton && onRunModel && (
@@ -290,7 +353,7 @@ function BlockBar({ hasBlock }: { hasBlock: boolean }) {
   );
 }
 
-function ContextMenu({ x, y, onEdit, onClose }: { x: number; y: number; onEdit: () => void; onClose: () => void }) {
+function ContextMenu({ x, y, onEdit, onDelete, onClose }: { x: number; y: number; onEdit: () => void; onDelete: () => void; onClose: () => void }) {
   // Position the menu, but keep it within the viewport
   const style: React.CSSProperties = {
     position: 'fixed',
@@ -310,6 +373,12 @@ function ContextMenu({ x, y, onEdit, onClose }: { x: number; y: number; onEdit: 
         onClick={e => { e.stopPropagation(); onEdit(); }}
       >
         Edit
+      </button>
+      <button
+        className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-700"
+        onClick={e => { e.stopPropagation(); onDelete(); }}
+      >
+        Delete
       </button>
     </div>
   );
@@ -564,6 +633,7 @@ function App() {
   const [showExplorer, setShowExplorer] = useState(true);
   const [showNoira, setShowNoira] = useState(true);
   const [showBlockBar, setShowBlockBar] = useState(true);
+  const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null);
 
   // Mock file structure
   const mockProjects = [
@@ -591,6 +661,7 @@ function App() {
   const [currentProjectId, setCurrentProjectId] = useState(mockProjects[0].id);
   // Per-project block state
   const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: 'blockbar' | 'main' }>({ [mockProjects[0].id]: 'blockbar' });
+  const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { x: number; y: number } | null }>({});
   const blockLocation = projectBlocks[currentProjectId] || 'blockbar';
   function setBlockLocationForCurrent(loc: 'blockbar' | 'main') {
     setProjectBlocks(prev => ({ ...prev, [currentProjectId]: loc }));
@@ -645,9 +716,51 @@ function App() {
   function handleDragEnd(event: DragEndEvent) {
     if (event.over) {
       if (event.over.id === 'center-dropzone') {
+        const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
+        const dropzoneRect = dropzoneElem?.getBoundingClientRect();
+        let dropX = 200, dropY = 120; // fallback default
+        if (activeId === 'blockbar-block' && dropzoneRect) {
+          let pointerX: number | null = null, pointerY: number | null = null;
+          if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
+            pointerX = Number(event.activatorEvent.clientX);
+            pointerY = Number(event.activatorEvent.clientY);
+          } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
+            pointerX = Number(window.event.clientX);
+            pointerY = Number(window.event.clientY);
+          }
+          if (
+            pointerX !== null && pointerY !== null &&
+            pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
+            pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
+          ) {
+            dropX = pointerX - dropzoneRect.left;
+            dropY = pointerY - dropzoneRect.top;
+          } else {
+            // Snap to center if pointer is not inside dropzone
+            dropX = dropzoneRect.width / 2;
+            dropY = dropzoneRect.height / 2;
+          }
+        } else if (activeId === 'main-block' && dropzoneRect && projectBlockPositions[currentProjectId]) {
+          // If dragging the block within the MBE, add delta to current position
+          const prev = projectBlockPositions[currentProjectId];
+          dropX = prev!.x + (event.delta?.x ?? 0);
+          dropY = prev!.y + (event.delta?.y ?? 0);
+        } else if (dropzoneRect) {
+          // Fallback: center of dropzone
+          dropX = dropzoneRect.width / 2;
+          dropY = dropzoneRect.height / 2;
+        }
+        // Clamp to dropzone bounds if rect is available
+        if (dropzoneRect) {
+          dropX = Math.max(0, Math.min(dropX, dropzoneRect.width));
+          dropY = Math.max(0, Math.min(dropY, dropzoneRect.height));
+        }
         setBlockLocationForCurrent('main');
+        setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: { x: dropX, y: dropY } }));
       } else if (event.over.id === 'blockbar-dropzone') {
         setBlockLocationForCurrent('blockbar');
+        setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+        setSelectedBlockProject(null);
       }
     }
     setActiveId(null);
@@ -675,12 +788,40 @@ function App() {
     alert('Model run triggered!');
   }
 
+  const isBlockSelected = selectedBlockProject === currentProjectId;
+  function handleBlockSelect() {
+    setSelectedBlockProject(currentProjectId);
+  }
+  function handleBlockDrag(dx: number, dy: number) {
+    setProjectBlockPositions(prev => {
+      const pos = prev[currentProjectId];
+      if (!pos) return prev;
+      return { ...prev, [currentProjectId]: { x: pos.x + dx, y: pos.y + dy } };
+    });
+  }
+  function handleBlockDragEnd() {
+    // Could add snap-to-grid or bounds logic here
+  }
+
   // Set minimums to ensure main pane never gets too small
   const minExplorer = 200;
   const minNoira = 260;
   const minMain = 400;
   const [noiraWidth, setNoiraWidth] = useState(320);
   // Remove dynamic max logic and noiraWidth state
+
+  // In App, add a handler to deselect the block
+  function handleBlockDeselect() {
+    setSelectedBlockProject(null);
+  }
+
+  // In App, add a handler for block delete
+  function handleBlockDelete() {
+    setBlockLocationForCurrent('blockbar');
+    setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+    setSelectedBlockProject(null);
+    setContextMenu(null);
+  }
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -717,9 +858,15 @@ function App() {
             {openProjects.length > 0 ? (
               <MainPage
                 hasBlock={blockLocation === 'main'}
+                blockPosition={projectBlockPositions[currentProjectId] || null}
                 onEditRequest={handleEditRequest}
                 showRunButton={blockLocation === 'main'}
                 onRunModel={handleRunModel}
+                isSelected={isBlockSelected}
+                onSelect={handleBlockSelect}
+                onBlockDrag={handleBlockDrag}
+                onBlockDragEnd={handleBlockDragEnd}
+                onDeselect={handleBlockDeselect}
               />
             ) : (
               <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
@@ -752,7 +899,7 @@ function App() {
           {activeId ? <SensitivityTestBlock isDragging /> : null}
         </DragOverlay>
         {contextMenu && (
-          <ContextMenu x={contextMenu.x} y={contextMenu.y} onEdit={handleEdit} onClose={handleCloseContextMenu} />
+          <ContextMenu x={contextMenu.x} y={contextMenu.y} onEdit={handleEdit} onDelete={handleBlockDelete} onClose={handleCloseContextMenu} />
         )}
         {showModal && <FloatingModal onClose={handleModalClose} />}
       </div>
