@@ -10,6 +10,13 @@ import PortfolioInput from './PortfolioInput';
 import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
 
+// Block color scheme by mode (move to top-level scope)
+const blockModeStyles = {
+  classical: 'bg-blue-700 text-white border-blue-400',
+  hybrid: 'bg-purple-700 text-white border-purple-400',
+  quantum: 'bg-teal-700 text-white border-teal-400',
+};
+
 function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, onKsmDoubleClick, projects }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[] }) {
   return (
     <div className="h-full w-full bg-zinc-900 text-zinc-200 flex flex-col overflow-y-auto border-r border-zinc-800" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
@@ -174,10 +181,10 @@ function ResizableSidebar({ children, min = 160, max = 400, initial = 224 }: { c
   );
 }
 
-function SensitivityTestBlock({ isDragging = false, onContextMenu }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void }) {
+function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical' }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
   return (
     <div
-      className={`bg-zinc-800 text-zinc-100 px-4 py-2 rounded shadow mr-2 cursor-pointer hover:bg-zinc-700 transition select-none ${isDragging ? 'opacity-50' : ''}`}
+      className={`px-4 py-2 rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
     >
       Portfolio Sensitivity Test
@@ -185,16 +192,16 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu }: { isDraggin
   );
 }
 
-function DraggableBlock({ id, onContextMenu }: { id: string; onContextMenu?: (e: React.MouseEvent) => void }) {
+function DraggableBlock({ id, onContextMenu, mode = 'classical' }: { id: string; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
-      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} />
+      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} mode={mode} />
     </div>
   );
 }
 
-function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onBlockDrag, onBlockDragEnd, onDeselect }: {
+function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onBlockDrag, onBlockDragEnd, onDeselect, blockMode }: {
   hasBlock: boolean;
   blockPosition: { x: number; y: number } | null;
   onEditRequest: (e: React.MouseEvent) => void;
@@ -205,6 +212,7 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   onBlockDrag: (dx: number, dy: number) => void;
   onBlockDragEnd: () => void;
   onDeselect: () => void;
+  blockMode: 'classical' | 'hybrid' | 'quantum';
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -269,7 +277,7 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
             onMouseDown={isSelected ? handleMouseDown : undefined}
           >
             <div className={`transition border-2 rounded ${isSelected ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
-              <DraggableBlock id="main-block" onContextMenu={handleContextMenu} />
+              <DraggableBlock id="main-block" onContextMenu={handleContextMenu} mode={blockMode} />
             </div>
           </div>
         ) : (
@@ -343,12 +351,40 @@ function NoiraPanel() {
   );
 }
 
-function BlockBar({ hasBlock }: { hasBlock: boolean }) {
+function BlockBar({ hasBlock, mode, setMode }: { hasBlock: boolean; mode: 'classical' | 'hybrid' | 'quantum'; setMode: (m: 'classical' | 'hybrid' | 'quantum') => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'blockbar-dropzone' });
   return (
-    <div ref={setNodeRef} className={`w-full h-full bg-zinc-950 border-t border-zinc-800 flex items-center px-4 ${isOver ? 'bg-zinc-900' : ''}`}>
-      {!hasBlock && <DraggableBlock id="blockbar-block" />}
-      {/* Add more blocks here in the future */}
+    <div ref={setNodeRef} className={`w-full h-full bg-zinc-950 border-t border-zinc-800 flex items-center px-4 ${isOver ? 'bg-zinc-900' : ''}`}>      
+      {!hasBlock && <DraggableBlock id="blockbar-block" mode={mode} />}
+      <div className="flex-1" />
+      <div className="flex gap-2 items-center">
+        <ModeToggle mode={mode} setMode={setMode} />
+      </div>
+    </div>
+  );
+}
+
+function ModeToggle({ mode, setMode }: { mode: 'classical' | 'hybrid' | 'quantum'; setMode: (m: 'classical' | 'hybrid' | 'quantum') => void }) {
+  return (
+    <div className="flex rounded overflow-hidden border border-zinc-700">
+      <button
+        className={`px-3 py-1 text-xs font-bold transition ${mode === 'classical' ? 'bg-blue-700 text-white' : 'bg-zinc-900 text-blue-400 hover:bg-blue-800'}`}
+        onClick={() => setMode('classical')}
+      >
+        Classical
+      </button>
+      <button
+        className={`px-3 py-1 text-xs font-bold transition ${mode === 'hybrid' ? 'bg-purple-700 text-white' : 'bg-zinc-900 text-purple-400 hover:bg-purple-800'}`}
+        onClick={() => setMode('hybrid')}
+      >
+        Hybrid
+      </button>
+      <button
+        className={`px-3 py-1 text-xs font-bold transition ${mode === 'quantum' ? 'bg-teal-700 text-white' : 'bg-zinc-900 text-teal-400 hover:bg-teal-800'}`}
+        onClick={() => setMode('quantum')}
+      >
+        Quantum
+      </button>
     </div>
   );
 }
@@ -384,7 +420,7 @@ function ContextMenu({ x, y, onEdit, onDelete, onClose }: { x: number; y: number
   );
 }
 
-function FloatingModal({ onClose }: { onClose: () => void }) {
+function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode: 'classical' | 'hybrid' | 'quantum' }) {
   const [asset, setAsset] = useState('');
   const [parameter, setParameter] = useState('volatility');
   const [rangeMin, setRangeMin] = useState('');
@@ -398,6 +434,13 @@ function FloatingModal({ onClose }: { onClose: () => void }) {
     onClose();
   }
 
+  const blockTypeLabel =
+    blockMode === 'classical'
+      ? 'Classical Portfolio Sensitivity Test'
+      : blockMode === 'hybrid'
+      ? 'Hybrid Portfolio Sensitivity Test'
+      : 'Quantum Portfolio Sensitivity Test';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white rounded-lg shadow-lg p-8 min-w-[320px] min-h-[180px] relative">
@@ -407,7 +450,7 @@ function FloatingModal({ onClose }: { onClose: () => void }) {
         >
           ×
         </button>
-        <div className="text-lg font-bold mb-4 text-zinc-800">Sensitivity Test Inputs</div>
+        <div className="text-lg font-bold mb-4 text-zinc-800">{blockTypeLabel}</div>
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
             <label className="block text-zinc-700 text-sm mb-1">Asset Name</label>
@@ -635,6 +678,11 @@ function App() {
   const [showBlockBar, setShowBlockBar] = useState(true);
   const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null);
 
+  // Add mode state to App
+  const [mode, setMode] = useState<'classical' | 'hybrid' | 'quantum'>('classical');
+  // Store block mode per project
+  const [projectBlockModes, setProjectBlockModes] = useState<{ [projectId: string]: 'classical' | 'hybrid' | 'quantum' }>({});
+
   // Mock file structure
   const mockProjects = [
     { id: 'proj-1', name: 'Project Alpha' },
@@ -757,9 +805,15 @@ function App() {
         }
         setBlockLocationForCurrent('main');
         setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: { x: dropX, y: dropY } }));
+        setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
       } else if (event.over.id === 'blockbar-dropzone') {
         setBlockLocationForCurrent('blockbar');
         setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+        setProjectBlockModes(prev => {
+          const copy = { ...prev };
+          delete copy[currentProjectId];
+          return copy;
+        });
         setSelectedBlockProject(null);
       }
     }
@@ -819,6 +873,11 @@ function App() {
   function handleBlockDelete() {
     setBlockLocationForCurrent('blockbar');
     setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+    setProjectBlockModes(prev => {
+      const copy = { ...prev };
+      delete copy[currentProjectId];
+      return copy;
+    });
     setSelectedBlockProject(null);
     setContextMenu(null);
   }
@@ -867,6 +926,7 @@ function App() {
                 onBlockDrag={handleBlockDrag}
                 onBlockDragEnd={handleBlockDragEnd}
                 onDeselect={handleBlockDeselect}
+                blockMode={projectBlockModes[currentProjectId] || mode}
               />
             ) : (
               <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
@@ -892,7 +952,7 @@ function App() {
         {/* Block Bar at the bottom */}
         <SubtleResizableBorder direction="bottom" show={showBlockBar} min={48} max={160} initial={64}>
           <div className="h-full border-t border-zinc-800">
-            <BlockBar hasBlock={blockLocation === 'main'} />
+            <BlockBar hasBlock={blockLocation === 'main'} mode={mode} setMode={setMode} />
           </div>
         </SubtleResizableBorder>
         <DragOverlay>
@@ -901,7 +961,7 @@ function App() {
         {contextMenu && (
           <ContextMenu x={contextMenu.x} y={contextMenu.y} onEdit={handleEdit} onDelete={handleBlockDelete} onClose={handleCloseContextMenu} />
         )}
-        {showModal && <FloatingModal onClose={handleModalClose} />}
+        {showModal && <FloatingModal onClose={handleModalClose} blockMode={projectBlockModes[currentProjectId] || mode} />}
       </div>
     </DndContext>
   );
