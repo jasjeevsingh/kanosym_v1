@@ -17,11 +17,11 @@ const blockModeStyles = {
   quantum: 'bg-teal-700 text-white border-teal-400',
 };
 
-function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, onKsmDoubleClick, projects }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[] }) {
+function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, onKsmDoubleClick, projects, onBack, onShowNewProject, onProjectFolderContextMenu }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; onBack: () => void; onShowNewProject: () => void; onProjectFolderContextMenu?: (project: { id: string; name: string }, e: React.MouseEvent) => void }) {
   return (
     <div className="h-full w-full bg-zinc-900 text-zinc-200 flex flex-col overflow-y-auto border-r border-zinc-800" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
-      <div className="font-bold mb-2 flex items-center justify-between px-4 pt-4 text-xs tracking-widest text-zinc-400" style={{ letterSpacing: 1 }}>
-        <span>EXPLORER</span>
+      <div className="flex items-center justify-between px-4 pt-4">
+        <span className="font-bold text-xs tracking-widest text-zinc-400" style={{ letterSpacing: 1 }}>EXPLORER</span>
         <button
           className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded ml-2"
           onClick={onChooseFolder}
@@ -29,9 +29,38 @@ function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, 
           Choose Folder
         </button>
       </div>
-      <div className="text-xs font-bold text-zinc-400 px-2 mb-1 tracking-widest">PROJECTS</div>
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
-        <FileTree nodes={files} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} />
+      {currentPath && (
+        <div className="flex items-center px-4 mt-2 mb-1">
+          <button
+            className="mr-2 text-zinc-400 hover:text-blue-500 text-lg font-bold"
+            title="Back"
+            onClick={onBack}
+          >
+            ←
+          </button>
+          <span className="text-xs text-zinc-400 break-all">{currentPath}</span>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto px-2 pb-2 flex flex-col">
+        {/* Folder contents (if any) */}
+        {files.length > 0 && currentPath && (
+          <FileTree nodes={files} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} onProjectFolderContextMenu={onProjectFolderContextMenu} />
+        )}
+        {/* Projects heading and plus button */}
+        <div className="flex items-center mt-2 mb-1">
+          <span className="text-xs font-bold text-zinc-400 tracking-widest">PROJECTS</span>
+          <button
+            className="ml-auto text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center"
+            title="New Project"
+            onClick={onShowNewProject}
+          >
+            <span className="text-lg font-bold">+</span>
+          </button>
+        </div>
+        {/* Projects list (when not in a folder, or always show) */}
+        {!currentPath && (
+          <FileTree nodes={files} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} onProjectFolderContextMenu={onProjectFolderContextMenu} />
+        )}
       </div>
     </div>
   );
@@ -45,7 +74,7 @@ interface FileNode {
   children?: FileNode[];
 }
 
-function FileTree({ nodes, selected, onSelect, onKsmDoubleClick, projects, level = 0 }: { nodes: FileNode[]; selected: string | null; onSelect: (id: string) => void; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; level?: number }) {
+function FileTree({ nodes, selected, onSelect, onKsmDoubleClick, projects, level = 0, onProjectFolderContextMenu }: { nodes: FileNode[]; selected: string | null; onSelect: (id: string) => void; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; level?: number; onProjectFolderContextMenu?: (project: { id: string; name: string }, e: React.MouseEvent) => void }) {
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   function toggleFolder(id: string) {
@@ -54,48 +83,53 @@ function FileTree({ nodes, selected, onSelect, onKsmDoubleClick, projects, level
 
   return (
     <ul className="pl-0">
-      {nodes.map(node => (
-        <li key={node.id} className="mb-0.5">
-          {node.type === 'folder' ? (
-            <div
-              className={`flex items-center cursor-pointer select-none rounded px-1 py-0.5 hover:bg-zinc-800 ${level === 0 ? 'font-semibold' : ''}`}
-              style={{ paddingLeft: `${level * 16 + 4}px`, minHeight: 22 }}
-              onClick={() => toggleFolder(node.id)}
-            >
-              <span className="mr-1 text-xs" style={{ width: 14, display: 'inline-block', textAlign: 'center' }}>{openFolders[node.id] ? '▼' : '▶'}</span>
-              <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
-                {openFolders[node.id] ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#FFD700" stroke="#B8860B"/></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#F4E2B6" stroke="#B8860B"/></svg>
-                )}
-              </span>
-              <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis">{node.name}</span>
-            </div>
-          ) : (
-            <div
-              className={`flex items-center pl-7 cursor-pointer rounded px-1 py-0.5 ${selected === node.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'} transition`}
-              style={{ paddingLeft: `${level * 16 + 28}px`, minHeight: 22 }}
-              onClick={() => onSelect(node.id)}
-              onDoubleClick={() => {
-                if (node.name.endsWith('.ksm')) {
-                  const projectName = node.name.replace(/\.ksm$/, '');
-                  const project = projects.find((p: { id: string; name: string }) => p.name === projectName);
-                  if (project) onKsmDoubleClick(project.id);
-                }
-              }}
-            >
-              <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="2" fill="#B0BEC5" stroke="#607D8B"/></svg>
-              </span>
-              <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis">{node.name}</span>
-            </div>
-          )}
-          {node.type === 'folder' && openFolders[node.id] && node.children && (
-            <FileTree nodes={node.children} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} level={level + 1} />
-          )}
-        </li>
-      ))}
+      {nodes.map(node => {
+        // Is this a project folder?
+        const project = projects.find(p => node.name === p.name && node.type === 'folder');
+        return (
+          <li key={node.id} className="mb-0.5">
+            {node.type === 'folder' ? (
+              <div
+                className={`flex items-center cursor-pointer select-none rounded px-1 py-0.5 hover:bg-zinc-800 ${level === 0 ? 'font-semibold' : ''}`}
+                style={{ paddingLeft: `${level * 16 + 4}px`, minHeight: 22 }}
+                onClick={() => toggleFolder(node.id)}
+                onContextMenu={project ? (e => { e.preventDefault(); onProjectFolderContextMenu && onProjectFolderContextMenu(project, e); }) : undefined}
+              >
+                <span className="mr-1 text-xs" style={{ width: 14, display: 'inline-block', textAlign: 'center' }}>{openFolders[node.id] ? '▼' : '▶'}</span>
+                <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
+                  {openFolders[node.id] ? (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#FFD700" stroke="#B8860B"/></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#F4E2B6" stroke="#B8860B"/></svg>
+                  )}
+                </span>
+                <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis">{node.name}</span>
+              </div>
+            ) : (
+              <div
+                className={`flex items-center pl-7 cursor-pointer rounded px-1 py-0.5 ${selected === node.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'} transition`}
+                style={{ paddingLeft: `${level * 16 + 28}px`, minHeight: 22 }}
+                onClick={() => onSelect(node.id)}
+                onDoubleClick={() => {
+                  if (node.name.endsWith('.ksm')) {
+                    const projectName = node.name.replace(/\.ksm$/, '');
+                    const project = projects.find((p: { id: string; name: string }) => p.name === projectName);
+                    if (project) onKsmDoubleClick(project.id);
+                  }
+                }}
+              >
+                <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="2" fill="#B0BEC5" stroke="#607D8B"/></svg>
+                </span>
+                <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis">{node.name}</span>
+              </div>
+            )}
+            {node.type === 'folder' && openFolders[node.id] && node.children && (
+              <FileTree nodes={node.children} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} level={level + 1} onProjectFolderContextMenu={onProjectFolderContextMenu} />
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -683,23 +717,24 @@ function App() {
   // Store block mode per project
   const [projectBlockModes, setProjectBlockModes] = useState<{ [projectId: string]: 'classical' | 'hybrid' | 'quantum' }>({});
 
-  // Mock file structure
-  const mockProjects = [
+  // Add state for new project modal
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+
+  // Add state for project delete dialog
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // In App, add state for mockProjects and mockFiles
+  const [mockProjects, setMockProjects] = useState([
     { id: 'proj-1', name: 'Project Alpha' },
     { id: 'proj-2', name: 'Project Beta' },
     { id: 'proj-3', name: 'Project Gamma' },
-  ];
-
-  // Generate mock file tree based on projects
-  const mockFiles: FileNode[] = mockProjects.map(p => ({
-    id: `folder-${p.id}`,
-    name: p.name,
-    type: 'folder',
-    children: [
-      { id: `ksm-${p.id}`, name: `${p.name}.ksm`, type: 'file' },
-      // You can add more files here per project if needed
-    ],
-  }));
+  ]);
+  const [mockFiles, setMockFiles] = useState<FileNode[]>([
+    { id: 'folder-proj-1', name: 'Project Alpha', type: 'folder', children: [ { id: 'ksm-proj-1', name: 'Project Alpha.ksm', type: 'file' } ] },
+    { id: 'folder-proj-2', name: 'Project Beta', type: 'folder', children: [ { id: 'ksm-proj-2', name: 'Project Beta.ksm', type: 'file' } ] },
+    { id: 'folder-proj-3', name: 'Project Gamma', type: 'folder', children: [ { id: 'ksm-proj-3', name: 'Project Gamma.ksm', type: 'file' } ] },
+  ]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fsFiles, setFsFiles] = useState<FileNode[]>([]);
   const [fsPath, setFsPath] = useState<string | null>(null);
@@ -882,6 +917,57 @@ function App() {
     setContextMenu(null);
   }
 
+  // Add handler to create a new project
+  function handleCreateProject() {
+    if (!newProjectName.trim()) return;
+    const name = newProjectName.trim();
+    const id = `proj-${Date.now()}`;
+    const newProject = { id, name };
+    setMockProjects(prev => [...prev, newProject]);
+    setMockFiles(prev => [
+      ...prev,
+      {
+        id: `folder-${id}`,
+        name,
+        type: 'folder',
+        children: [
+          { id: `ksm-${id}`, name: `${name}.ksm`, type: 'file' },
+        ],
+      },
+    ]);
+    setShowNewProjectModal(false);
+    setNewProjectName('');
+  }
+
+  // In App, add handler for project folder context menu
+  const [projectFolderMenu, setProjectFolderMenu] = useState<{ x: number; y: number; project: { id: string; name: string } } | null>(null);
+  function handleProjectFolderContextMenu(project: { id: string; name: string }, e: React.MouseEvent) {
+    setProjectFolderMenu({ x: e.clientX, y: e.clientY, project });
+  }
+  function handleDeleteProjectConfirm() {
+    if (!projectToDelete) return;
+    setMockProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+    setMockFiles(prev => prev.filter(f => f.id !== `folder-${projectToDelete.id}`));
+    // Close tab if open
+    setOpenProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+    setProjectBlocks(prev => {
+      const copy = { ...prev };
+      delete copy[projectToDelete.id];
+      return copy;
+    });
+    setProjectBlockPositions(prev => {
+      const copy = { ...prev };
+      delete copy[projectToDelete.id];
+      return copy;
+    });
+    setProjectBlockModes(prev => {
+      const copy = { ...prev };
+      delete copy[projectToDelete.id];
+      return copy;
+    });
+    setProjectToDelete(null);
+  }
+
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-screen w-screen flex flex-col relative" onClick={handleCloseContextMenu}>
@@ -904,6 +990,9 @@ function App() {
               currentPath={fsPath}
               onKsmDoubleClick={onKsmDoubleClick}
               projects={mockProjects}
+              onBack={() => { setFsFiles([]); setFsPath(null); }}
+              onShowNewProject={() => setShowNewProjectModal(true)}
+              onProjectFolderContextMenu={handleProjectFolderContextMenu}
             />
           </SubtleResizableBorder>
           {/* Main Page */}
@@ -962,6 +1051,88 @@ function App() {
           <ContextMenu x={contextMenu.x} y={contextMenu.y} onEdit={handleEdit} onDelete={handleBlockDelete} onClose={handleCloseContextMenu} />
         )}
         {showModal && <FloatingModal onClose={handleModalClose} blockMode={projectBlockModes[currentProjectId] || mode} />}
+        {showNewProjectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg p-8 min-w-[320px] min-h-[120px] relative">
+              <button
+                className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+                onClick={() => setShowNewProjectModal(false)}
+              >
+                ×
+              </button>
+              <div className="text-lg font-bold mb-4 text-zinc-800">Create New Project</div>
+              <form className="space-y-4" onSubmit={e => { e.preventDefault(); handleCreateProject(); }}>
+                <input
+                  className="w-full border border-zinc-300 rounded px-3 py-2 outline-none focus:border-blue-500"
+                  placeholder="Project Name"
+                  value={newProjectName}
+                  onChange={e => setNewProjectName(e.target.value)}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                    onClick={() => setShowNewProjectModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded bg-green-600 text-white font-bold hover:bg-green-700"
+                    disabled={!newProjectName.trim()}
+                  >
+                    Create
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {projectFolderMenu && (
+          <div
+            style={{ position: 'fixed', left: projectFolderMenu.x, top: projectFolderMenu.y, zIndex: 1000 }}
+            className="bg-white rounded shadow border border-zinc-200 min-w-[140px]"
+            onClick={() => setProjectFolderMenu(null)}
+          >
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-700"
+              onClick={e => { e.stopPropagation(); setProjectToDelete(projectFolderMenu.project); setProjectFolderMenu(null); }}
+            >
+              Delete Project
+            </button>
+          </div>
+        )}
+        {projectToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg p-8 min-w-[320px] min-h-[120px] relative">
+              <button
+                className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+                onClick={() => setProjectToDelete(null)}
+              >
+                ×
+              </button>
+              <div className="text-lg font-bold mb-4 text-zinc-800">Delete Project</div>
+              <div className="mb-4 text-zinc-700">Are you sure you want to delete <span className="font-bold">{projectToDelete.name}</span>? This action cannot be undone.</div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                  onClick={() => setProjectToDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700"
+                  onClick={handleDeleteProjectConfirm}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DndContext>
   );
