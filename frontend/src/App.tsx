@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   DndContext,
   useDraggable,
@@ -10,7 +10,7 @@ import PortfolioInput from './PortfolioInput';
 import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
 
-function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null }) {
+function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, onKsmDoubleClick, projects }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[] }) {
   return (
     <div className="h-full w-full bg-zinc-900 text-zinc-200 flex flex-col overflow-y-auto border-r border-zinc-800" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
       <div className="font-bold mb-2 flex items-center justify-between px-4 pt-4 text-xs tracking-widest text-zinc-400" style={{ letterSpacing: 1 }}>
@@ -22,11 +22,9 @@ function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath }
           Choose Folder
         </button>
       </div>
-      {currentPath && (
-        <div className="text-xs text-zinc-400 mb-2 px-4 break-all">{currentPath}</div>
-      )}
+      <div className="text-xs font-bold text-zinc-400 px-2 mb-1 tracking-widest">PROJECTS</div>
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        <FileTree nodes={files} selected={selected} onSelect={onSelect} />
+        <FileTree nodes={files} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} />
       </div>
     </div>
   );
@@ -40,7 +38,7 @@ interface FileNode {
   children?: FileNode[];
 }
 
-function FileTree({ nodes, selected, onSelect, level = 0 }: { nodes: FileNode[]; selected: string | null; onSelect: (id: string) => void; level?: number }) {
+function FileTree({ nodes, selected, onSelect, onKsmDoubleClick, projects, level = 0 }: { nodes: FileNode[]; selected: string | null; onSelect: (id: string) => void; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; level?: number }) {
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   function toggleFolder(id: string) {
@@ -72,6 +70,13 @@ function FileTree({ nodes, selected, onSelect, level = 0 }: { nodes: FileNode[];
               className={`flex items-center pl-7 cursor-pointer rounded px-1 py-0.5 ${selected === node.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'} transition`}
               style={{ paddingLeft: `${level * 16 + 28}px`, minHeight: 22 }}
               onClick={() => onSelect(node.id)}
+              onDoubleClick={() => {
+                if (node.name.endsWith('.ksm')) {
+                  const projectName = node.name.replace(/\.ksm$/, '');
+                  const project = projects.find((p: { id: string; name: string }) => p.name === projectName);
+                  if (project) onKsmDoubleClick(project.id);
+                }
+              }}
             >
               <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="2" fill="#B0BEC5" stroke="#607D8B"/></svg>
@@ -80,11 +85,55 @@ function FileTree({ nodes, selected, onSelect, level = 0 }: { nodes: FileNode[];
             </div>
           )}
           {node.type === 'folder' && openFolders[node.id] && node.children && (
-            <FileTree nodes={node.children} selected={selected} onSelect={onSelect} level={level + 1} />
+            <FileTree nodes={node.children} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} level={level + 1} />
           )}
         </li>
       ))}
     </ul>
+  );
+}
+
+function ProjectsSidebar({ projects, openProject, currentProjectId }: { projects: { id: string; name: string }[]; openProject: (id: string) => void; currentProjectId: string }) {
+  return (
+    <div className="mb-4">
+      <div className="text-xs font-bold text-zinc-400 px-2 mb-1 tracking-widest">PROJECTS</div>
+      <ul>
+        {projects.map(p => (
+          <li key={p.id}>
+            <button
+              className={`w-full text-left px-3 py-1 rounded text-sm ${currentProjectId === p.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800 text-zinc-200'}`}
+              onClick={() => openProject(p.id)}
+            >
+              {p.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, closeProject }: { openProjects: { id: string; name: string }[]; currentProjectId: string; setCurrentProjectId: (id: string) => void; closeProject: (id: string) => void }) {
+  return (
+    <div className="flex items-end border-b border-zinc-800 bg-zinc-900 px-2" style={{ minHeight: 36 }}>
+      {openProjects.map(p => (
+        <div key={p.id} className={`flex items-center mr-2 ${currentProjectId === p.id ? 'border-b-2 border-blue-500' : ''}`}> 
+          <button
+            className={`px-3 py-1 rounded-t text-sm font-medium ${currentProjectId === p.id ? 'bg-zinc-800 text-blue-500' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
+            onClick={() => setCurrentProjectId(p.id)}
+          >
+            {p.name}
+          </button>
+          <button
+            className="ml-1 text-xs text-zinc-400 hover:text-red-500"
+            onClick={() => closeProject(p.id)}
+            title="Close project"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -154,16 +203,19 @@ function MainPage({ hasBlock, onEditRequest, showRunButton, onRunModel }: { hasB
   return (
     <div
       ref={setNodeRef}
-      className={`h-full w-full bg-zinc-800 text-zinc-100 p-8 flex flex-col items-center justify-center border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
+      className={`h-full w-full bg-zinc-800 text-zinc-100 p-8 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
+      style={{ position: 'relative' }}
     >
-      {hasBlock ? (
-        <DraggableBlock id="main-block" onContextMenu={handleContextMenu} />
-      ) : (
-        <>
-          <div className="text-3xl font-bold mb-4">Model Building Environment</div>
-          <div className="text-zinc-400">(Drag the blocks here)</div>
-        </>
-      )}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        {hasBlock ? (
+          <DraggableBlock id="main-block" onContextMenu={handleContextMenu} />
+        ) : (
+          <>
+            <div className="text-3xl font-bold mb-4">Model Building Environment</div>
+            <div className="text-zinc-400">(Drag the blocks here)</div>
+          </>
+        )}
+      </div>
       {showRunButton && onRunModel && (
         <RunModelButton onClick={onRunModel} />
       )}
@@ -172,10 +224,58 @@ function MainPage({ hasBlock, onEditRequest, showRunButton, onRunModel }: { hasB
 }
 
 function NoiraPanel() {
+  const [messages, setMessages] = useState([
+    { sender: 'noira', text: 'Hi! I am Noira, your modeling assistant. How can I help you today?' },
+    { sender: 'user', text: 'What is a sensitivity test?' },
+    { sender: 'noira', text: 'A sensitivity test lets you see how your model responds to changes in key parameters.' },
+  ]);
+  const [input, setInput] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  function sendMessage() {
+    if (input.trim()) {
+      setMessages(msgs => [...msgs, { sender: 'user', text: input }]);
+      setInput('');
+      // Simulate Noira response (mock)
+      setTimeout(() => {
+        setMessages(msgs => [...msgs, { sender: 'noira', text: 'Noira is thinking... (real AI coming soon!)' }]);
+      }, 800);
+    }
+  }
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   return (
-    <div className="h-full w-full bg-zinc-900 text-zinc-200 p-4 flex flex-col">
-      <div className="font-bold mb-2">Noira</div>
-      <div className="text-xs text-zinc-400">(placeholder for Noira chatbot panel)</div>
+    <div className="h-full w-full bg-zinc-900 text-zinc-200 p-0 flex flex-col" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
+      <div className="font-bold px-4 pt-4 pb-2 text-base">Noira</div>
+      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`rounded-lg px-3 py-2 max-w-[80%] whitespace-pre-line ${msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-100 border border-zinc-700'}`}>{msg.text}</div>
+          </div>
+        ))}
+        <div ref={chatEndRef} />
+      </div>
+      <form
+        className="flex items-center gap-2 p-2 border-t border-zinc-800 bg-zinc-900"
+        onSubmit={e => { e.preventDefault(); sendMessage(); }}
+      >
+        <input
+          className="flex-1 bg-zinc-800 text-zinc-100 rounded px-3 py-2 outline-none border border-zinc-700 focus:border-blue-500"
+          placeholder="Ask Noira..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+        />
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition"
+        >
+          Send
+        </button>
+      </form>
     </div>
   );
 }
@@ -398,7 +498,7 @@ function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira,
   );
 }
 
-function SubtleResizableBorder({ onResize, direction, children, show = true, min = 160, max = 480, initial = 224 }: { onResize?: (w: number) => void; direction: 'left' | 'right' | 'bottom'; children: React.ReactNode; show?: boolean; min?: number; max?: number; initial?: number }) {
+function SubtleResizableBorder({ onResize, direction, children, show = true, min = 200, max = 480, initial = 224 }: { onResize?: (w: number) => void; direction: 'left' | 'right' | 'bottom'; children: React.ReactNode; show?: boolean; min?: number; max?: number; initial?: number }) {
   const [size, setSize] = useState(initial);
   const dragging = useRef(false);
 
@@ -448,6 +548,7 @@ function RunModelButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       className="absolute bottom-6 right-8 z-40 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded shadow-lg transition"
+      style={{ position: 'absolute', bottom: 40, right: 12 }}
       onClick={onClick}
     >
       Run Model
@@ -457,7 +558,6 @@ function RunModelButton({ onClick }: { onClick: () => void }) {
 
 function App() {
   // blockLocation: 'blockbar' | 'main' | 'dragging'
-  const [blockLocation, setBlockLocation] = useState<'blockbar' | 'main'>('blockbar');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -466,30 +566,58 @@ function App() {
   const [showBlockBar, setShowBlockBar] = useState(true);
 
   // Mock file structure
-  const mockFiles: FileNode[] = [
-    {
-      id: 'folder-1',
-      name: 'Portfolio Data',
-      type: 'folder',
-      children: [
-        { id: 'file-1', name: 'portfolio.csv', type: 'file' },
-        { id: 'file-2', name: 'example.json', type: 'file' },
-      ],
-    },
-    {
-      id: 'folder-2',
-      name: 'Results',
-      type: 'folder',
-      children: [
-        { id: 'file-3', name: 'run1.json', type: 'file' },
-        { id: 'file-4', name: 'run2.json', type: 'file' },
-      ],
-    },
-    { id: 'file-5', name: 'README.md', type: 'file' },
+  const mockProjects = [
+    { id: 'proj-1', name: 'Project Alpha' },
+    { id: 'proj-2', name: 'Project Beta' },
+    { id: 'proj-3', name: 'Project Gamma' },
   ];
+
+  // Generate mock file tree based on projects
+  const mockFiles: FileNode[] = mockProjects.map(p => ({
+    id: `folder-${p.id}`,
+    name: p.name,
+    type: 'folder',
+    children: [
+      { id: `ksm-${p.id}`, name: `${p.name}.ksm`, type: 'file' },
+      // You can add more files here per project if needed
+    ],
+  }));
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fsFiles, setFsFiles] = useState<FileNode[]>([]);
   const [fsPath, setFsPath] = useState<string | null>(null);
+
+  // Project tab state
+  const [openProjects, setOpenProjects] = useState([mockProjects[0]]);
+  const [currentProjectId, setCurrentProjectId] = useState(mockProjects[0].id);
+  // Per-project block state
+  const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: 'blockbar' | 'main' }>({ [mockProjects[0].id]: 'blockbar' });
+  const blockLocation = projectBlocks[currentProjectId] || 'blockbar';
+  function setBlockLocationForCurrent(loc: 'blockbar' | 'main') {
+    setProjectBlocks(prev => ({ ...prev, [currentProjectId]: loc }));
+  }
+  // Replace openProject logic with onKsmDoubleClick
+  function onKsmDoubleClick(projectId: string) {
+    if (!openProjects.find(p => p.id === projectId)) {
+      setOpenProjects([...openProjects, mockProjects.find(p => p.id === projectId)!]);
+    }
+    setCurrentProjectId(projectId);
+    setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || 'blockbar' }));
+  }
+  function closeProject(id: string) {
+    const idx = openProjects.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      const newOpen = openProjects.filter(p => p.id !== id);
+      setOpenProjects(newOpen);
+      setProjectBlocks(prev => {
+        const newBlocks = { ...prev };
+        delete newBlocks[id];
+        return newBlocks;
+      });
+      if (currentProjectId === id && newOpen.length > 0) {
+        setCurrentProjectId(newOpen[Math.max(0, idx - 1)].id);
+      }
+    }
+  }
 
   async function handleChooseFolder() {
     if (window.electronAPI && window.electronAPI.chooseFolder) {
@@ -517,9 +645,9 @@ function App() {
   function handleDragEnd(event: DragEndEvent) {
     if (event.over) {
       if (event.over.id === 'center-dropzone') {
-        setBlockLocation('main');
+        setBlockLocationForCurrent('main');
       } else if (event.over.id === 'blockbar-dropzone') {
-        setBlockLocation('blockbar');
+        setBlockLocationForCurrent('blockbar');
       }
     }
     setActiveId(null);
@@ -547,6 +675,13 @@ function App() {
     alert('Model run triggered!');
   }
 
+  // Set minimums to ensure main pane never gets too small
+  const minExplorer = 200;
+  const minNoira = 260;
+  const minMain = 400;
+  const [noiraWidth, setNoiraWidth] = useState(320);
+  // Remove dynamic max logic and noiraWidth state
+
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-screen w-screen flex flex-col relative" onClick={handleCloseContextMenu}>
@@ -560,27 +695,51 @@ function App() {
         />
         <div className="flex flex-1 min-h-0 relative">
           {/* File Explorer */}
-          <SubtleResizableBorder direction="left" show={showExplorer} min={160} max={400} initial={224}>
+          <SubtleResizableBorder direction="left" show={showExplorer} min={minExplorer} max={400} initial={224}>
             <FileExplorer
               files={fsFiles.length > 0 ? fsFiles : mockFiles}
               selected={selectedFile}
               onSelect={setSelectedFile}
               onChooseFolder={handleChooseFolder}
               currentPath={fsPath}
+              onKsmDoubleClick={onKsmDoubleClick}
+              projects={mockProjects}
             />
           </SubtleResizableBorder>
           {/* Main Page */}
-          <div className="flex-1 min-w-0 relative">
-            <MainPage
-              hasBlock={blockLocation === 'main'}
-              onEditRequest={handleEditRequest}
-              showRunButton={blockLocation === 'main'}
-              onRunModel={handleRunModel}
+          <div className="flex-1 min-w-0 relative" style={{ minWidth: minMain }}>
+            <ProjectTabs
+              openProjects={openProjects}
+              currentProjectId={currentProjectId}
+              setCurrentProjectId={setCurrentProjectId}
+              closeProject={closeProject}
             />
+            {openProjects.length > 0 ? (
+              <MainPage
+                hasBlock={blockLocation === 'main'}
+                onEditRequest={handleEditRequest}
+                showRunButton={blockLocation === 'main'}
+                onRunModel={handleRunModel}
+              />
+            ) : (
+              <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
+                <div className="text-2xl font-bold mb-2">Select a project to open</div>
+                <div className="text-zinc-400">Double click a .ksm file in the explorer to get started.</div>
+              </div>
+            )}
           </div>
           {/* Noira Panel */}
-          <SubtleResizableBorder direction="right" show={showNoira} min={200} max={480} initial={320}>
-            <NoiraPanel />
+          <SubtleResizableBorder
+            direction="right"
+            show={showNoira}
+            min={minNoira}
+            max={480}
+            initial={320}
+            onResize={setNoiraWidth}
+          >
+            <div style={{ width: noiraWidth, minWidth: minNoira, maxWidth: 480, height: '100%' }}>
+              <NoiraPanel />
+            </div>
           </SubtleResizableBorder>
         </div>
         {/* Block Bar at the bottom */}
