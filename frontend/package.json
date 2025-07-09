@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron": "electron electron-main.cjs"
+    "electron": "electron electron-main.cjs",
+    "backend": "cd ../backend && python api.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
