@@ -9,6 +9,7 @@ from flask_cors import CORS
 from chat_controller import chat_controller
 import os
 from dotenv import load_dotenv
+from quantum_sensitivity.engine import quantum_sensitivity_test
 
 # Load environment variables
 load_dotenv()
@@ -97,6 +98,65 @@ def perturb_parameters():
 def quantum_analysis():
     """Quantum analysis endpoint (placeholder)"""
     return jsonify({"message": "QAE endpoint - not implemented yet"})
+
+@app.route('/api/quantum_sensitivity_test', methods=['POST'])
+def quantum_sensitivity_test_api():
+    data = request.get_json()
+    portfolio = data.get('portfolio')
+    param = data.get('param')
+    asset = data.get('asset')
+    range_vals = data.get('range')
+    steps = data.get('steps')
+    result = quantum_sensitivity_test(
+        portfolio=portfolio,
+        param=param,
+        asset=asset,
+        range_vals=range_vals,
+        steps=steps
+    )
+    return jsonify(result)
+
+@app.route('/api/classical_sensitivity_test', methods=['POST'])
+def classical_sensitivity_test_api():
+    data = request.get_json()
+    portfolio = data.get('portfolio')
+    param = data.get('param')
+    asset = data.get('asset')
+    range_vals = data.get('range')
+    steps = data.get('steps')
+    # For now, use the same engine but with classical processing
+    result = quantum_sensitivity_test(
+        portfolio=portfolio,
+        param=param,
+        asset=asset,
+        range_vals=range_vals,
+        steps=steps
+    )
+    # Add classical-specific metadata
+    result['processing_mode'] = 'classical'
+    result['description'] = 'Classical Monte Carlo simulation for portfolio sensitivity analysis'
+    return jsonify(result)
+
+@app.route('/api/hybrid_sensitivity_test', methods=['POST'])
+def hybrid_sensitivity_test_api():
+    data = request.get_json()
+    portfolio = data.get('portfolio')
+    param = data.get('param')
+    asset = data.get('asset')
+    range_vals = data.get('range')
+    steps = data.get('steps')
+    # For now, use the same engine but with hybrid processing
+    result = quantum_sensitivity_test(
+        portfolio=portfolio,
+        param=param,
+        asset=asset,
+        range_vals=range_vals,
+        steps=steps
+    )
+    # Add hybrid-specific metadata
+    result['processing_mode'] = 'hybrid'
+    result['description'] = 'Hybrid classical-quantum simulation for portfolio sensitivity analysis'
+    return jsonify(result)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)  # Change to 5001

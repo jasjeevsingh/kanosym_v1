@@ -13,9 +13,9 @@ import NoiraPanel from './NoiraPanel';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
-  classical: 'bg-blue-700 text-white border-blue-400',
+  classical: 'bg-zinc-800 text-white border-zinc-600',
   hybrid: 'bg-purple-700 text-white border-purple-400',
-  quantum: 'bg-teal-700 text-white border-teal-400',
+  quantum: 'bg-blue-700 text-white border-blue-400',
 };
 
 function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, onKsmDoubleClick, projects, onBack, onShowNewProject, onProjectFolderContextMenu }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; onBack: () => void; onShowNewProject: () => void; onProjectFolderContextMenu?: (project: { id: string; name: string }, e: React.MouseEvent) => void }) {
@@ -252,6 +252,7 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     onEditRequest(e);
   };
   // Drag logic for block
@@ -346,7 +347,7 @@ function ModeToggle({ mode, setMode }: { mode: 'classical' | 'hybrid' | 'quantum
   return (
     <div className="flex rounded overflow-hidden border border-zinc-700">
       <button
-        className={`px-3 py-1 text-xs font-bold transition ${mode === 'classical' ? 'bg-blue-700 text-white' : 'bg-zinc-900 text-blue-400 hover:bg-blue-800'}`}
+        className={`px-3 py-1 text-xs font-bold transition ${mode === 'classical' ? 'bg-zinc-700 text-white' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'}`}
         onClick={() => setMode('classical')}
       >
         Classical
@@ -358,7 +359,7 @@ function ModeToggle({ mode, setMode }: { mode: 'classical' | 'hybrid' | 'quantum
         Hybrid
       </button>
       <button
-        className={`px-3 py-1 text-xs font-bold transition ${mode === 'quantum' ? 'bg-teal-700 text-white' : 'bg-zinc-900 text-teal-400 hover:bg-teal-800'}`}
+        className={`px-3 py-1 text-xs font-bold transition ${mode === 'quantum' ? 'bg-blue-700 text-white' : 'bg-zinc-900 text-blue-400 hover:bg-blue-800'}`}
         onClick={() => setMode('quantum')}
       >
         Quantum
@@ -638,7 +639,7 @@ function RunModelButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       className="absolute bottom-6 right-8 z-40 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded shadow-lg transition"
-      style={{ position: 'absolute', bottom: 40, right: 12 }}
+      style={{ position: 'absolute', bottom: 75, right: 10 }}
       onClick={onClick}
     >
       Run Model
@@ -667,6 +668,14 @@ function App() {
 
   // Add state for project delete dialog
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // Add resultsTabs state per project
+  const [resultsTabs, setResultsTabs] = useState<{ [projectId: string]: Array<{ id: string; label: string; data: any }> }>({});
+  const [currentResultsTab, setCurrentResultsTab] = useState<{ [projectId: string]: string | null }>({});
+
+  // Add isRunningModel and projectBlockParams state (mock for now)
+  const [isRunningModel, setIsRunningModel] = useState(false);
+  const [projectBlockParams, setProjectBlockParams] = useState<{ [projectId: string]: any }>({});
 
   // In App, add state for mockProjects and mockFiles
   const [mockProjects, setMockProjects] = useState([
@@ -805,7 +814,7 @@ function App() {
   }
 
   function handleEdit() {
-    setShowModal(true);
+    setShowBlockEditModal(true);
     setContextMenu(null);
   }
 
@@ -817,8 +826,109 @@ function App() {
     setContextMenu(null);
   }
 
-  function handleRunModel() {
-    alert('Model run triggered!');
+  // On Run Model, POST to backend and add results tab
+  async function handleRunModel() {
+    // Gather block params from state (replace with your actual state)
+    const blockParams = projectBlockParams[currentProjectId]; // e.g. { portfolio, param, asset, range, steps }
+    if (!blockParams) return;
+    
+    // Get the current block mode for this project
+    const blockMode = projectBlockModes[currentProjectId] || 'classical';
+    
+    // Determine the appropriate endpoint based on block mode
+    let endpoint;
+    switch (blockMode) {
+      case 'classical':
+        endpoint = 'http://localhost:5001/api/classical_sensitivity_test';
+        break;
+      case 'hybrid':
+        endpoint = 'http://localhost:5001/api/hybrid_sensitivity_test';
+        break;
+      case 'quantum':
+        endpoint = 'http://localhost:5001/api/quantum_sensitivity_test';
+        break;
+      default:
+        endpoint = 'http://localhost:5001/api/classical_sensitivity_test';
+    }
+    
+    setIsRunningModel(true);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blockParams),
+      });
+      const data = await res.json();
+      addResultsTab(currentProjectId, data);
+      setIsRunningModel(false);
+    } catch (err) {
+      setIsRunningModel(false);
+      alert('Error running model');
+    }
+  }
+
+  // Helper to add a results tab
+  function addResultsTab(projectId: string, data: any) {
+    setResultsTabs(prev => {
+      const tabs = prev[projectId] || [];
+      const newId = `results-${Date.now()}`;
+      const newTab = { id: newId, label: `Results ${tabs.length + 1}`, data };
+      return { ...prev, [projectId]: [...tabs, newTab] };
+    });
+    setCurrentResultsTab(prev => ({ ...prev, [projectId]: `results-${Date.now()}` }));
+  }
+
+  // Helper to close a results tab
+  function closeResultsTab(projectId: string, tabId: string) {
+    setResultsTabs(prev => {
+      const tabs = (prev[projectId] || []).filter(tab => tab.id !== tabId);
+      return { ...prev, [projectId]: tabs };
+    });
+    setCurrentResultsTab(prev => {
+      const tabs = resultsTabs[projectId] || [];
+      const idx = tabs.findIndex(tab => tab.id === tabId);
+      let newTabId = null;
+      if (tabs.length > 1) {
+        if (idx > 0) newTabId = tabs[idx - 1].id;
+        else newTabId = tabs[1].id;
+      }
+      return { ...prev, [projectId]: newTabId };
+    });
+  }
+
+  // Render results tab bar and ResultsChart
+  function ResultsTabsBar({ projectId }: { projectId: string }) {
+    const tabs = resultsTabs[projectId] || [];
+    const activeTabId = currentResultsTab[projectId];
+    return (
+      <div className="flex items-end border-b border-zinc-800 bg-zinc-900 px-2" style={{ minHeight: 36 }}>
+        {tabs.map(tab => (
+          <div key={tab.id} className={`flex items-center mr-2 ${activeTabId === tab.id ? 'border-b-2 border-green-500' : ''}`}> 
+            <button
+              className={`px-3 py-1 rounded-t text-sm font-medium ${activeTabId === tab.id ? 'bg-zinc-800 text-green-500' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
+              onClick={() => setCurrentResultsTab(prev => ({ ...prev, [projectId]: tab.id }))}
+            >
+              {tab.label}
+            </button>
+            <button
+              className="ml-1 text-xs text-zinc-400 hover:text-red-500"
+              onClick={() => closeResultsTab(projectId, tab.id)}
+              title="Close results tab"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function ResultsTabContent({ projectId }: { projectId: string }) {
+    const tabs = resultsTabs[projectId] || [];
+    const activeTabId = currentResultsTab[projectId];
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab) return null;
+    return <ResultsChart data={tab.data} />;
   }
 
   const isBlockSelected = selectedBlockProject === currentProjectId;
@@ -912,6 +1022,214 @@ function App() {
     setProjectToDelete(null);
   }
 
+  // Add state for block edit modal
+  const [showBlockEditModal, setShowBlockEditModal] = useState(false);
+
+  // Edit Modal for block parameters
+  function BlockEditModal({ open, onClose, params, onSave }: { open: boolean; onClose: () => void; params: any; onSave: (params: any) => void }) {
+    const [form, setForm] = useState(params || {
+      portfolio: {
+        assets: ['AAPL', 'GOOG', 'MSFT'],
+        weights: [0.4, 0.3, 0.3],
+        volatility: [0.2, 0.18, 0.22],
+        correlation_matrix: [
+          [1, 0.2, 0.1],
+          [0.2, 1, 0.15],
+          [0.1, 0.15, 1],
+        ],
+      },
+      param: 'volatility',
+      asset: 'AAPL',
+      range: [0.15, 0.25],
+      steps: 6,
+    });
+
+    function handleChangePortfolioField(field: string, value: any) {
+      setForm((prev: any) => ({ ...prev, portfolio: { ...prev.portfolio, [field]: value } }));
+    }
+    function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+      const { name, value } = e.target;
+      setForm((prev: any) => ({ ...prev, [name]: name === 'steps' ? Number(value) : value }));
+    }
+    function handleRangeChange(idx: number, value: string) {
+      setForm((prev: any) => {
+        const range = [...prev.range];
+        range[idx] = Number(value);
+        return { ...prev, range };
+      });
+    }
+    function handleAssetChange(idx: number, value: string) {
+      setForm((prev: any) => {
+        const assets = [...prev.portfolio.assets];
+        assets[idx] = value;
+        return { ...prev, portfolio: { ...prev.portfolio, assets } };
+      });
+    }
+    function handleWeightChange(idx: number, value: string) {
+      setForm((prev: any) => {
+        const weights = [...prev.portfolio.weights];
+        weights[idx] = Number(value);
+        return { ...prev, portfolio: { ...prev.portfolio, weights } };
+      });
+    }
+    function handleVolatilityChange(idx: number, value: string) {
+      setForm((prev: any) => {
+        const volatility = [...prev.portfolio.volatility];
+        volatility[idx] = Number(value);
+        return { ...prev, portfolio: { ...prev.portfolio, volatility } };
+      });
+    }
+    function handleCorrelationChange(i: number, j: number, value: string) {
+      setForm((prev: any) => {
+        const matrix = prev.portfolio.correlation_matrix.map((row: number[], idx: number) => [...row]);
+        matrix[i][j] = Number(value);
+        matrix[j][i] = Number(value);
+        return { ...prev, portfolio: { ...prev.portfolio, correlation_matrix: matrix } };
+      });
+    }
+    return open ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div className="bg-white rounded-lg shadow-lg p-8 min-w-[420px] min-h-[180px] relative">
+          <button
+            className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+            onClick={onClose}
+          >
+            ×
+          </button>
+          <div className="text-lg font-bold mb-4 text-zinc-800">Edit Block Parameters</div>
+          <form className="space-y-4" onSubmit={e => { e.preventDefault(); onSave(form); onClose(); }}>
+            <div>
+              <label className="block text-zinc-700 text-sm mb-1">Assets</label>
+              <div className="flex gap-2">
+                {form.portfolio.assets.map((asset: string, idx: number) => (
+                  <input
+                    key={idx}
+                    className="border border-zinc-300 rounded px-2 py-1 w-20"
+                    value={asset}
+                    onChange={e => handleAssetChange(idx, e.target.value)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-700 text-sm mb-1">Weights</label>
+              <div className="flex gap-2">
+                {form.portfolio.weights.map((w: number, idx: number) => (
+                  <input
+                    key={idx}
+                    type="number"
+                    step="any"
+                    className="border border-zinc-300 rounded px-2 py-1 w-20"
+                    value={w}
+                    onChange={e => handleWeightChange(idx, e.target.value)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-700 text-sm mb-1">Volatility</label>
+              <div className="flex gap-2">
+                {form.portfolio.volatility.map((v: number, idx: number) => (
+                  <input
+                    key={idx}
+                    type="number"
+                    step="any"
+                    className="border border-zinc-300 rounded px-2 py-1 w-20"
+                    value={v}
+                    onChange={e => handleVolatilityChange(idx, e.target.value)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-700 text-sm mb-1">Correlation Matrix</label>
+              <div className="flex flex-col gap-1">
+                {form.portfolio.correlation_matrix.map((row: number[], i: number) => (
+                  <div key={i} className="flex gap-2">
+                    {row.map((val: number, j: number) => (
+                      <input
+                        key={j}
+                        type="number"
+                        step="any"
+                        className="border border-zinc-300 rounded px-2 py-1 w-16"
+                        value={val}
+                        onChange={e => handleCorrelationChange(i, j, e.target.value)}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Perturbation Parameter</label>
+                <select name="param" className="border border-zinc-300 rounded px-2 py-1" value={form.param} onChange={handleChange}>
+                  <option value="volatility">Volatility</option>
+                  <option value="weight">Weight</option>
+                  <option value="correlation">Correlation</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Asset</label>
+                <select name="asset" className="border border-zinc-300 rounded px-2 py-1" value={form.asset} onChange={handleChange}>
+                  {form.portfolio.assets.map((asset: string, idx: number) => (
+                    <option key={idx} value={asset}>{asset}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Range</label>
+                <div className="flex gap-1">
+                  <input
+                    type="number"
+                    step="any"
+                    className="border border-zinc-300 rounded px-2 py-1 w-16"
+                    value={form.range[0]}
+                    onChange={e => handleRangeChange(0, e.target.value)}
+                  />
+                  <span className="mx-1">to</span>
+                  <input
+                    type="number"
+                    step="any"
+                    className="border border-zinc-300 rounded px-2 py-1 w-16"
+                    value={form.range[1]}
+                    onChange={e => handleRangeChange(1, e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Steps</label>
+                <input
+                  name="steps"
+                  type="number"
+                  min={2}
+                  className="border border-zinc-300 rounded px-2 py-1 w-16"
+                  value={form.steps}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                className="px-4 py-2 rounded bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded bg-green-600 text-white font-bold hover:bg-green-700"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    ) : null;
+  }
+
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-screen w-screen flex flex-col relative" onClick={handleCloseContextMenu}>
@@ -947,6 +1265,9 @@ function App() {
               setCurrentProjectId={setCurrentProjectId}
               closeProject={closeProject}
             />
+            {/* Results tabs bar and content */}
+            <ResultsTabsBar projectId={currentProjectId} />
+            <ResultsTabContent projectId={currentProjectId} />
             {openProjects.length > 0 ? (
               <MainPage
                 hasBlock={blockLocation === 'main'}
@@ -1076,6 +1397,17 @@ function App() {
               </div>
             </div>
           </div>
+        )}
+        {showBlockEditModal && (
+          <BlockEditModal
+            open={showBlockEditModal}
+            onClose={() => setShowBlockEditModal(false)}
+            params={projectBlockParams[currentProjectId]}
+            onSave={params => setProjectBlockParams(prev => ({ ...prev, [currentProjectId]: params }))}
+          />
+        )}
+        {isRunningModel && (
+          <div className="w-full h-1 bg-gradient-to-r from-blue-400 via-green-400 to-teal-400 animate-pulse absolute top-0 left-0 z-50" />
         )}
       </div>
     </DndContext>
