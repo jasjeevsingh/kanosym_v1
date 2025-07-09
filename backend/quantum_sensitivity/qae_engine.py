@@ -1,8 +1,9 @@
 # qae_engine.py
 import numpy as np
 from typing import Dict, Any
-from qiskit import QuantumCircuit, Aer
-from qiskit.primitives import Sampler
+from qiskit import QuantumCircuit
+from qiskit_aer import Aer
+from qiskit.primitives import StatevectorSampler
 from qiskit_algorithms import AmplitudeEstimation, EstimationProblem
 
 def run_qae(portfolio_state: Dict[str, Any]) -> float:
@@ -29,7 +30,7 @@ def run_qae(portfolio_state: Dict[str, Any]) -> float:
     qc.ry(theta, 0)
 
     # Set up QAE
-    sampler = Sampler()
+    sampler = StatevectorSampler()
     ae = AmplitudeEstimation(num_eval_qubits=3, sampler=sampler)  # 3 eval qubits
     problem = EstimationProblem(
         state_preparation=qc,
