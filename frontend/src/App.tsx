@@ -9,6 +9,7 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import PortfolioInput from './PortfolioInput';
 import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
+import NoiraPanel from './NoiraPanel';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -324,63 +325,6 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
       {showRunButton && onRunModel && (
         <RunModelButton onClick={onRunModel} />
       )}
-    </div>
-  );
-}
-
-function NoiraPanel() {
-  const [messages, setMessages] = useState([
-    { sender: 'noira', text: 'Hi! I am Noira, your modeling assistant. How can I help you today?' },
-    { sender: 'user', text: 'What is a sensitivity test?' },
-    { sender: 'noira', text: 'A sensitivity test lets you see how your model responds to changes in key parameters.' },
-  ]);
-  const [input, setInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  function sendMessage() {
-    if (input.trim()) {
-      setMessages(msgs => [...msgs, { sender: 'user', text: input }]);
-      setInput('');
-      // Simulate Noira response (mock)
-      setTimeout(() => {
-        setMessages(msgs => [...msgs, { sender: 'noira', text: 'Noira is thinking... (real AI coming soon!)' }]);
-      }, 800);
-    }
-  }
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  return (
-    <div className="h-full w-full bg-zinc-900 text-zinc-200 p-0 flex flex-col" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
-      <div className="font-bold px-4 pt-4 pb-2 text-base">Noira</div>
-      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`rounded-lg px-3 py-2 max-w-[80%] whitespace-pre-line ${msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-100 border border-zinc-700'}`}>{msg.text}</div>
-          </div>
-        ))}
-        <div ref={chatEndRef} />
-      </div>
-      <form
-        className="flex items-center gap-2 p-2 border-t border-zinc-800 bg-zinc-900"
-        onSubmit={e => { e.preventDefault(); sendMessage(); }}
-      >
-        <input
-          className="flex-1 bg-zinc-800 text-zinc-100 rounded px-3 py-2 outline-none border border-zinc-700 focus:border-blue-500"
-          placeholder="Ask Noira..."
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-        />
-        <button
-          type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition"
-        >
-          Send
-        </button>
-      </form>
     </div>
   );
 }
