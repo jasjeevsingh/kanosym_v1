@@ -82,7 +82,6 @@ def test_portfolio_validation(portfolio, test_name):
         if response.status_code == 200:
             result = response.json()
             print(f"✅ {test_name} - SUCCESS")
-            print(f"   Baseline Sharpe: {result.get('baseline_sharpe', 'N/A'):.4f}")
             print(f"   Results count: {len(result.get('results', []))}")
         else:
             error_data = response.json()

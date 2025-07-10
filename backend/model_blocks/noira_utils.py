@@ -65,7 +65,7 @@ def send_message_to_noira(
             "analysis_details": {
                 "parameter_range": range_vals,
                 "steps": steps,
-                "baseline_sharpe": results.get('baseline_sharpe'),
+                "baseline_volatility": results.get('baseline_volatility'),
                 "processing_mode": results.get('processing_mode')
             }
         }
@@ -106,14 +106,14 @@ def create_explanation_request(
     Returns:
         Message string for Noira
     """
-    baseline_sharpe = results.get('baseline_sharpe', 'unknown')
+    baseline_volatility = results.get('baseline_volatility', 'unknown')
     num_results = len(results.get('results', []))
     range_tested = results.get('range_tested', [])
     
     # Calculate detailed sensitivity metrics
     if results.get('results'):
         deltas = [r.get('delta_vs_baseline', 0) for r in results['results']]
-        sharpe_values = [r.get('sharpe', 0) for r in results['results']]
+        volatility_values = [r.get('volatility', 0) for r in results['results']]
         perturbed_values = [r.get('perturbed_value', 0) for r in results['results']]
         
         max_positive_change = max(deltas) if deltas else 0
@@ -133,7 +133,7 @@ def create_explanation_request(
             risk_level = "MINIMAL RISK"
         
         # Analyze graph characteristics
-        graph_analysis = analyze_sensitivity_curve(perturbed_values, sharpe_values, baseline_sharpe)
+        graph_analysis = analyze_sensitivity_curve(perturbed_values, volatility_values, baseline_volatility)
         
     else:
         max_positive_change = 0
@@ -152,14 +152,14 @@ def create_explanation_request(
     # Build detailed data table for the graph
     graph_data_table = ""
     if results.get('results'):
-        graph_data_table = "\n| Parameter Value | Sharpe Ratio | Change from Baseline | % Change |\n"
+        graph_data_table = "\n| Parameter Value | Volatility | Change from Baseline | % Change |\n"
         graph_data_table += "|----------------|--------------|---------------------|----------|\n"
         for r in results['results']:
             pval = r.get('perturbed_value', 0)
-            sharpe = r.get('sharpe', 0)
+            volatility = r.get('volatility', 0)
             delta = r.get('delta_vs_baseline', 0)
-            pct_change = (delta / baseline_sharpe * 100) if baseline_sharpe != 0 else 0
-            graph_data_table += f"| {pval:.4f} | {sharpe:.4f} | {delta:+.4f} | {pct_change:+.2f}% |\n"
+            pct_change = (delta / baseline_volatility * 100) if baseline_volatility != 0 else 0
+            graph_data_table += f"| {pval:.4f} | {volatility:.4f} | {delta:+.4f} | {pct_change:+.2f}% |\n"
 
     message = f"""I completed a {analysis_type} sensitivity analysis. Provide a QUANTITATIVE summary of the results and a recommended course of action for my portfolio.
 
@@ -177,7 +177,7 @@ def create_explanation_request(
 | **Method** | {analysis_type.title()} sensitivity testing |
 | **Parameter** | {param} for asset {asset} |
 | **Parameter Range** | {range_tested[0]:.4f} to {range_tested[-1]:.4f} |
-| **Baseline Sharpe** | {baseline_sharpe} |
+| **Baseline Volatility** | {baseline_volatility} |
 | **Test Points** | {num_results} |
 | **Risk Classification** | **{risk_level}** |
 
@@ -214,14 +214,14 @@ Focus on translating the **patterns in the sensitivity chart** into concrete inv
     return message
 
 
-def analyze_sensitivity_curve(param_values: list, sharpe_values: list, baseline_sharpe: float) -> Dict[str, str]:
+def analyze_sensitivity_curve(param_values: list, volatility_values: list, baseline_volatility: float) -> Dict[str, str]:
     """
     Analyze the characteristics of the sensitivity curve for graph interpretation.
     
     Args:
         param_values: List of parameter values (x-axis)
-        sharpe_values: List of Sharpe ratios (y-axis) 
-        baseline_sharpe: Baseline Sharpe ratio for reference
+        volatility_values: List of Volatility values (y-axis) 
+        baseline_volatility: Baseline Volatility for reference
         
     Returns:
         Dictionary with curve analysis characteristics
@@ -238,15 +238,15 @@ def analyze_sensitivity_curve(param_values: list, sharpe_values: list, baseline_
         }
     
     param_array = np.array(param_values)
-    sharpe_array = np.array(sharpe_values)
+    volatility_array = np.array(volatility_values)
     
     # Sort by parameter values to ensure proper order
     sorted_indices = np.argsort(param_array)
     param_sorted = param_array[sorted_indices]
-    sharpe_sorted = sharpe_array[sorted_indices]
+    volatility_sorted = volatility_array[sorted_indices]
     
     # Calculate first and second derivatives (approximate)
-    first_deriv = np.gradient(sharpe_sorted, param_sorted)
+    first_deriv = np.gradient(volatility_sorted, param_sorted)
     second_deriv = np.gradient(first_deriv, param_sorted)
     
     # Analyze curve shape
@@ -260,7 +260,7 @@ def analyze_sensitivity_curve(param_values: list, sharpe_values: list, baseline_
         curve_shape = "Mixed curvature with inflection points"
     
     # Analyze trend direction
-    overall_slope = (sharpe_sorted[-1] - sharpe_sorted[0]) / (param_sorted[-1] - param_sorted[0])
+    overall_slope = (volatility_sorted[-1] - volatility_sorted[0]) / (param_sorted[-1] - param_sorted[0])
     if overall_slope > 0.01:
         trend_direction = f"Positive (slope: {overall_slope:.4f})"
     elif overall_slope < -0.01:
@@ -276,22 +276,22 @@ def analyze_sensitivity_curve(param_values: list, sharpe_values: list, baseline_
     
     inflection_str = f"{len(inflection_points)} points at: {', '.join(inflection_points)}" if inflection_points else "None detected"
     
-    # Find optimal range (highest Sharpe ratios)
-    max_sharpe_idx = np.argmax(sharpe_sorted)
-    top_25_percent = np.percentile(sharpe_sorted, 75)
-    optimal_indices = np.where(sharpe_sorted >= top_25_percent)[0]
+    # Find optimal range (highest Volatility ratios)
+    max_volatility_idx = np.argmax(volatility_sorted)
+    top_25_percent = np.percentile(volatility_sorted, 75)
+    optimal_indices = np.where(volatility_sorted >= top_25_percent)[0]
     
     if len(optimal_indices) > 0:
         optimal_min = param_sorted[optimal_indices[0]]
         optimal_max = param_sorted[optimal_indices[-1]]
         optimal_range = f"{optimal_min:.4f} to {optimal_max:.4f} (top 25% performance)"
     else:
-        optimal_range = f"Around {param_sorted[max_sharpe_idx]:.4f} (peak performance)"
+        optimal_range = f"Around {param_sorted[max_volatility_idx]:.4f} (peak performance)"
     
     # Assess linearity
-    linear_fit = np.polyfit(param_sorted, sharpe_sorted, 1)
+    linear_fit = np.polyfit(param_sorted, volatility_sorted, 1)
     linear_pred = np.polyval(linear_fit, param_sorted)
-    r_squared = 1 - (np.sum((sharpe_sorted - linear_pred) ** 2) / np.sum((sharpe_sorted - np.mean(sharpe_sorted)) ** 2))
+    r_squared = 1 - (np.sum((volatility_sorted - linear_pred) ** 2) / np.sum((volatility_sorted - np.mean(volatility_sorted)) ** 2))
     
     if r_squared > 0.95:
         linearity = f"Highly linear (R² = {r_squared:.3f})"
@@ -320,9 +320,9 @@ def format_analysis_summary(results: Dict[str, Any]) -> str:
         Formatted summary string
     """
     processing_mode = results.get('processing_mode', 'unknown')
-    baseline_sharpe = results.get('baseline_sharpe', 'N/A')
+    baseline_volatility = results.get('baseline_volatility', 'N/A')
     num_points = len(results.get('results', []))
     perturbation = results.get('perturbation', 'unknown')
     asset = results.get('asset', 'unknown')
     
-    return f"{processing_mode.title()} analysis: {perturbation} sensitivity for {asset} (baseline Sharpe: {baseline_sharpe}, {num_points} points)"
+    return f"{processing_mode.title()} analysis: {perturbation} sensitivity for {asset} (baseline Volatility: {baseline_volatility}, {num_points} points)"

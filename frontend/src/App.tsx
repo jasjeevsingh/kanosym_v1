@@ -871,8 +871,8 @@ function App() {
         return;
       }
       
-      // Add results tab
-      addResultsTab(currentProjectId, data);
+      // Add results tab, include testType
+      addResultsTab(currentProjectId, { ...data, testType: blockMode });
       
       // Trigger Noira notification if sent
       if (data.noira_notification?.sent && data.noira_notification?.brief_message) {

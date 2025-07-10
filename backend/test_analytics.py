@@ -113,9 +113,9 @@ def test_analytics():
         collector.start_collection()
         
         # Simulate some results
-        collector.add_result({"perturbed_value": 0.15, "sharpe": 1.2})
-        collector.add_result({"perturbed_value": 0.18, "sharpe": 1.3})
-        collector.add_result({"perturbed_value": 0.20, "sharpe": 1.25})
+        collector.add_result({"perturbed_value": 0.15, "volatility": 0.15})
+        collector.add_result({"perturbed_value": 0.18, "volatility": 0.18})
+        collector.add_result({"perturbed_value": 0.20, "volatility": 0.20})
         
         collector.end_collection()
         

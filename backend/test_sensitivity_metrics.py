@@ -21,11 +21,11 @@ def test_sensitivity_metrics():
     
     # Add sample results that would simulate a sensitivity test
     sample_results = [
-        {"perturbed_value": 0.15, "sharpe": 1.20},
-        {"perturbed_value": 0.18, "sharpe": 1.35},
-        {"perturbed_value": 0.20, "sharpe": 1.25},
-        {"perturbed_value": 0.22, "sharpe": 1.10},
-        {"perturbed_value": 0.25, "sharpe": 0.95}
+        {"perturbed_value": 0.15, "portfolio_volatility_daily": 0.02, "portfolio_volatility_annualized": 0.05},
+        {"perturbed_value": 0.18, "portfolio_volatility_daily": 0.025, "portfolio_volatility_annualized": 0.06},
+        {"perturbed_value": 0.20, "portfolio_volatility_daily": 0.022, "portfolio_volatility_annualized": 0.055},
+        {"perturbed_value": 0.22, "portfolio_volatility_daily": 0.021, "portfolio_volatility_annualized": 0.05},
+        {"perturbed_value": 0.25, "portfolio_volatility_daily": 0.023, "portfolio_volatility_annualized": 0.06}
     ]
     
     for result in sample_results:
@@ -44,8 +44,10 @@ def test_sensitivity_metrics():
     
     if 'sensitivity_metrics' in analytics:
         sm = analytics['sensitivity_metrics']
-        print(f"✅ Sharpe Ratio Range: {sm['sharpe_range'][0]:.4f} - {sm['sharpe_range'][1]:.4f}")
-        print(f"✅ Sharpe Volatility: {sm['sharpe_volatility']:.4f}")
+        print(f"✅ Portfolio Volatility Daily Range: {sm['portfolio_volatility_daily_range'][0]:.4f} - {sm['portfolio_volatility_daily_range'][1]:.4f}")
+        print(f"✅ Portfolio Volatility Annualized Range: {sm['portfolio_volatility_annualized_range'][0]:.4f} - {sm['portfolio_volatility_annualized_range'][1]:.4f}")
+        print(f"✅ Portfolio Volatility Daily Volatility: {sm['portfolio_volatility_daily_volatility']:.4f}")
+        print(f"✅ Portfolio Volatility Annualized Volatility: {sm['portfolio_volatility_annualized_volatility']:.4f}")
         print(f"✅ Max Sensitivity Point: {sm['max_sensitivity_point']:.4f}")
         print(f"✅ Curve Steepness: {sm['curve_steepness']:.4f}")
         print(f"✅ Risk-Return Ratio: {sm['risk_return_ratio']:.4f}")
@@ -61,13 +63,17 @@ def test_sensitivity_metrics():
         print("-" * 20)
         
         # Interpret the results
-        sharpe_range = sm['sharpe_range']
-        sharpe_vol = sm['sharpe_volatility']
+        portfolio_volatility_daily_range = sm['portfolio_volatility_daily_range']
+        portfolio_volatility_daily_vol = sm['portfolio_volatility_daily_volatility']
+        portfolio_volatility_annualized_range = sm['portfolio_volatility_annualized_range']
+        portfolio_volatility_annualized_vol = sm['portfolio_volatility_annualized_volatility']
         max_sens = sm['max_sensitivity_point']
         curve_steep = sm['curve_steepness']
         
-        print(f"• Sharpe ratio varies from {sharpe_range[0]:.4f} to {sharpe_range[1]:.4f}")
-        print(f"• Portfolio shows {sharpe_vol:.4f} volatility in Sharpe ratios")
+        print(f"• Portfolio volatility daily varies from {portfolio_volatility_daily_range[0]:.4f} to {portfolio_volatility_daily_range[1]:.4f}")
+        print(f"• Portfolio shows {portfolio_volatility_daily_vol:.4f} volatility in daily portfolio volatility")
+        print(f"• Portfolio volatility annualized varies from {portfolio_volatility_annualized_range[0]:.4f} to {portfolio_volatility_annualized_range[1]:.4f}")
+        print(f"• Portfolio shows {portfolio_volatility_annualized_vol:.4f} volatility in annualized portfolio volatility")
         print(f"• Maximum sensitivity occurs at parameter value {max_sens:.4f}")
         print(f"• Sensitivity curve has steepness of {curve_steep:.4f}")
         
@@ -88,8 +94,10 @@ def test_sensitivity_metrics():
     print("-" * 30)
     if 'sensitivity' in formatted_analytics:
         fs = formatted_analytics['sensitivity']
-        print(f"Sharpe Range: {fs['sharpe_range']['min']} - {fs['sharpe_range']['max']}")
-        print(f"Sharpe Volatility: {fs['sharpe_volatility']}")
+        print(f"Portfolio Volatility Daily Range: {fs['portfolio_volatility_daily_range']['min']} - {fs['portfolio_volatility_daily_range']['max']}")
+        print(f"Portfolio Volatility Annualized Range: {fs['portfolio_volatility_annualized_range']['min']} - {fs['portfolio_volatility_annualized_range']['max']}")
+        print(f"Portfolio Volatility Daily Volatility: {fs['portfolio_volatility_daily_volatility']}")
+        print(f"Portfolio Volatility Annualized Volatility: {fs['portfolio_volatility_annualized_volatility']}")
         print(f"Max Sensitivity Point: {fs['max_sensitivity_point']}")
         print(f"Curve Steepness: {fs['curve_steepness']}")
         print(f"Risk-Return Ratio: {fs['risk_return_ratio']}")
