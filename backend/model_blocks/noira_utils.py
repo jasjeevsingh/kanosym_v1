@@ -111,14 +111,33 @@ def create_explanation_request(
     Returns:
         Message string for Noira
     """
-    baseline_volatility = results.get('baseline_volatility', 'unknown')
+    # Handle different baseline field names from different analysis types
+    baseline_volatility = None
+    if analysis_type == 'quantum':
+        baseline_volatility = results.get('baseline_portfolio_volatility_daily')
+        if baseline_volatility is None:
+            baseline_volatility = results.get('baseline_portfolio_volatility_annualized')
+    elif analysis_type in ['classical', 'hybrid']:
+        baseline_volatility = results.get('baseline_sharpe')
+    
+    # Fallback to generic baseline_volatility field if available
+    if baseline_volatility is None:
+        baseline_volatility = results.get('baseline_volatility')
+    
+    # If still None or not a number, set to a safe default
+    if baseline_volatility is None or not isinstance(baseline_volatility, (int, float)):
+        baseline_volatility = 0.0
+        baseline_volatility_display = 'N/A'
+    else:
+        baseline_volatility_display = f"{baseline_volatility:.4f}"
+    
     num_results = len(results.get('results', []))
     range_tested = results.get('range_tested', [])
     
     # Calculate detailed sensitivity metrics
     if results.get('results'):
         deltas = [r.get('delta_vs_baseline', 0) for r in results['results']]
-        volatility_values = [r.get('volatility', 0) for r in results['results']]
+        volatility_values = [r.get('volatility', r.get('sharpe', 0)) for r in results['results']]
         perturbed_values = [r.get('perturbed_value', 0) for r in results['results']]
         
         max_positive_change = max(deltas) if deltas else 0
@@ -137,7 +156,7 @@ def create_explanation_request(
         else:
             risk_level = "MINIMAL RISK"
         
-        # Analyze graph characteristics
+        # Analyze graph characteristics - pass the numeric baseline value
         graph_analysis = analyze_sensitivity_curve(perturbed_values, volatility_values, baseline_volatility)
         
     else:
@@ -161,10 +180,14 @@ def create_explanation_request(
         graph_data_table += "|----------------|--------------|---------------------|----------|\n"
         for r in results['results']:
             pval = r.get('perturbed_value', 0)
-            volatility = r.get('volatility', 0)
+            vol_val = r.get('volatility', r.get('sharpe', 0))
             delta = r.get('delta_vs_baseline', 0)
-            pct_change = (delta / baseline_volatility * 100) if baseline_volatility != 0 else 0
-            graph_data_table += f"| {pval:.4f} | {volatility:.4f} | {delta:+.4f} | {pct_change:+.2f}% |\n"
+            # Only calculate percentage if baseline_volatility is a valid number > 0
+            if isinstance(baseline_volatility, (int, float)) and baseline_volatility != 0:
+                pct_change = (delta / baseline_volatility * 100)
+            else:
+                pct_change = 0
+            graph_data_table += f"| {pval:.4f} | {vol_val:.4f} | {delta:+.4f} | {pct_change:+.2f}% |\n"
 
     message = f"""I completed a {analysis_type} sensitivity analysis. Provide a QUANTITATIVE summary of the results and a recommended course of action for my portfolio.
 
@@ -175,7 +198,7 @@ def create_explanation_request(
 | **Method** | {analysis_type.title()} sensitivity testing |
 | **Parameter** | {param} for asset {asset} |
 | **Parameter Range** | {range_tested[0]:.4f} to {range_tested[-1]:.4f} |
-| **Baseline Volatility** | {baseline_volatility} |
+| **Baseline {analysis_type.title()} Metric** | {baseline_volatility_display} |
 | **Test Points** | {num_results} |
 | **Risk Classification** | **{risk_level}** |
 
@@ -258,8 +281,32 @@ def analyze_sensitivity_curve(param_values: list, volatility_values: list, basel
             "linearity": "Unknown"
         }
     
-    param_array = np.array(param_values)
-    volatility_array = np.array(volatility_values)
+    # Ensure we have valid numeric data
+    try:
+        param_array = np.array(param_values, dtype=float)
+        volatility_array = np.array(volatility_values, dtype=float)
+        
+        # Remove any NaN or infinite values
+        valid_mask = np.isfinite(param_array) & np.isfinite(volatility_array)
+        param_array = param_array[valid_mask]
+        volatility_array = volatility_array[valid_mask]
+        
+        if len(param_array) < 3:
+            return {
+                "curve_shape": "Insufficient valid data for analysis",
+                "trend_direction": "Unknown",
+                "inflection_points": "Cannot determine",
+                "optimal_range": "Insufficient data",
+                "linearity": "Unknown"
+            }
+    except (ValueError, TypeError):
+        return {
+            "curve_shape": "Invalid data format",
+            "trend_direction": "Unknown",
+            "inflection_points": "Cannot determine",
+            "optimal_range": "Invalid data",
+            "linearity": "Unknown"
+        }
     
     # Sort by parameter values to ensure proper order
     sorted_indices = np.argsort(param_array)
@@ -281,13 +328,16 @@ def analyze_sensitivity_curve(param_values: list, volatility_values: list, basel
         curve_shape = "Mixed curvature with inflection points"
     
     # Analyze trend direction
-    overall_slope = (volatility_sorted[-1] - volatility_sorted[0]) / (param_sorted[-1] - param_sorted[0])
-    if overall_slope > 0.01:
-        trend_direction = f"Positive (slope: {overall_slope:.4f})"
-    elif overall_slope < -0.01:
-        trend_direction = f"Negative (slope: {overall_slope:.4f})"
+    if param_sorted[-1] == param_sorted[0]:  # Avoid division by zero
+        trend_direction = "Flat/Neutral (no parameter variation)"
     else:
-        trend_direction = f"Flat/Neutral (slope: {overall_slope:.4f})"
+        overall_slope = (volatility_sorted[-1] - volatility_sorted[0]) / (param_sorted[-1] - param_sorted[0])
+        if overall_slope > 0.01:
+            trend_direction = f"Positive (slope: {overall_slope:.4f})"
+        elif overall_slope < -0.01:
+            trend_direction = f"Negative (slope: {overall_slope:.4f})"
+        else:
+            trend_direction = f"Flat/Neutral (slope: {overall_slope:.4f})"
     
     # Find inflection points (where second derivative changes sign)
     inflection_points = []
@@ -309,17 +359,28 @@ def analyze_sensitivity_curve(param_values: list, volatility_values: list, basel
     else:
         optimal_range = f"Around {param_sorted[max_volatility_idx]:.4f} (peak performance)"
     
-    # Assess linearity
-    linear_fit = np.polyfit(param_sorted, volatility_sorted, 1)
-    linear_pred = np.polyval(linear_fit, param_sorted)
-    r_squared = 1 - (np.sum((volatility_sorted - linear_pred) ** 2) / np.sum((volatility_sorted - np.mean(volatility_sorted)) ** 2))
-    
-    if r_squared > 0.95:
-        linearity = f"Highly linear (R² = {r_squared:.3f})"
-    elif r_squared > 0.8:
-        linearity = f"Mostly linear (R² = {r_squared:.3f})"
-    else:
-        linearity = f"Non-linear (R² = {r_squared:.3f})"
+    # Assess linearity with improved error handling
+    try:
+        linear_fit = np.polyfit(param_sorted, volatility_sorted, 1)
+        linear_pred = np.polyval(linear_fit, param_sorted)
+        
+        # Calculate R-squared with safe division
+        ss_res = np.sum((volatility_sorted - linear_pred) ** 2)
+        ss_tot = np.sum((volatility_sorted - np.mean(volatility_sorted)) ** 2)
+        
+        if ss_tot == 0:  # All y values are the same
+            r_squared = 1.0 if ss_res == 0 else 0.0
+        else:
+            r_squared = 1 - (ss_res / ss_tot)
+        
+        if r_squared > 0.95:
+            linearity = f"Highly linear (R² = {r_squared:.3f})"
+        elif r_squared > 0.8:
+            linearity = f"Mostly linear (R² = {r_squared:.3f})"
+        else:
+            linearity = f"Non-linear (R² = {r_squared:.3f})"
+    except (np.linalg.LinAlgError, ValueError):
+        linearity = "Cannot determine linearity (insufficient variation)"
     
     return {
         "curve_shape": curve_shape,
@@ -341,9 +402,29 @@ def format_analysis_summary(results: Dict[str, Any]) -> str:
         Formatted summary string
     """
     processing_mode = results.get('processing_mode', 'unknown')
-    baseline_volatility = results.get('baseline_volatility', 'N/A')
+    
+    # Handle different baseline field names from different analysis types
+    baseline_value = None
+    if processing_mode == 'quantum':
+        baseline_value = results.get('baseline_portfolio_volatility_daily')
+        if baseline_value is None:
+            baseline_value = results.get('baseline_portfolio_volatility_annualized')
+        metric_name = "volatility"
+    elif processing_mode in ['classical', 'hybrid']:
+        baseline_value = results.get('baseline_sharpe')
+        metric_name = "Sharpe"
+    else:
+        baseline_value = results.get('baseline_volatility')
+        metric_name = "metric"
+    
+    # Format the baseline value
+    if baseline_value is not None and isinstance(baseline_value, (int, float)):
+        baseline_display = f"{baseline_value:.4f}"
+    else:
+        baseline_display = 'N/A'
+    
     num_points = len(results.get('results', []))
     perturbation = results.get('perturbation', 'unknown')
     asset = results.get('asset', 'unknown')
     
-    return f"{processing_mode.title()} analysis: {perturbation} sensitivity for {asset} (baseline Volatility: {baseline_volatility}, {num_points} points)"
+    return f"{processing_mode.title()} analysis: {perturbation} sensitivity for {asset} (baseline {metric_name}: {baseline_display}, {num_points} points)"

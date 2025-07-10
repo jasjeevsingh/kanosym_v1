@@ -147,10 +147,16 @@ def quantum_sensitivity_test(
     results = []
     for p in perturbed_portfolios:
         metrics = run_quantum_volatility(p)
+        # Calculate delta vs baseline
+        delta_daily = metrics["portfolio_volatility_daily"] - baseline_daily
+        delta_annualized = metrics["portfolio_volatility_annualized"] - baseline_annualized
+        
         result = {
             "perturbed_value": p["perturbed_value"],
             "portfolio_volatility_daily": metrics["portfolio_volatility_daily"],
-            "portfolio_volatility_annualized": metrics["portfolio_volatility_annualized"]
+            "portfolio_volatility_annualized": metrics["portfolio_volatility_annualized"],
+            "volatility": metrics["portfolio_volatility_daily"],  # Use daily volatility as the main metric
+            "delta_vs_baseline": delta_daily  # Use daily volatility delta
         }
         results.append(result)
         analytics.add_result(result)
