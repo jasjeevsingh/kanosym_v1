@@ -219,6 +219,7 @@ function ResizableSidebar({ children, min = 160, max = 400, initial = 224 }: { c
 function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical' }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
   return (
     <div
+      style={{ resize: 'none', width: 'fit-content', minWidth: '203px', maxWidth: '203px' }}
       className={`px-4 py-2 rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
     >
@@ -249,6 +250,25 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   onDeselect: () => void;
   blockMode: 'classical' | 'hybrid' | 'quantum';
 }) {
+  // Add CSS for hiding scrollbars
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, []);
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -259,18 +279,22 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   function handleMouseDown(e: React.MouseEvent) {
+    console.log('handleMouseDown called, isSelected:', isSelected);
     if (!isSelected) return;
+    console.log('Starting drag');
     setDragging(true);
     dragStart.current = { x: e.clientX, y: e.clientY };
     e.stopPropagation();
   }
+
+  // might not being used, commenting out for now
   function handleMouseMove(e: MouseEvent) {
-    if (dragging && dragStart.current && blockPosition) {
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-      onBlockDrag(dx, dy);
-      dragStart.current = { x: e.clientX, y: e.clientY };
-    }
+    // if (dragging && dragStart.current && blockPosition) {
+    //   const dx = e.clientX - dragStart.current.x;
+    //   const dy = e.clientY - dragStart.current.y;
+    //   onBlockDrag(dx, dy);
+    //   dragStart.current = { x: e.clientX, y: e.clientY };
+    // }
   }
   function handleMouseUp() {
     if (dragging) {
@@ -296,32 +320,48 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
     <div
       id="kanosym-mbe"
       ref={setNodeRef}
-      className={`h-full w-full text-zinc-100 p-8 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
+      className={`h-full w-full text-zinc-100 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
       style={{
         position: 'relative',
         backgroundColor: '#27272a',
-        backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
         backgroundSize: '20px 20px',
       }}
       onClick={onDeselect}
     >
-      <div id="kanosym-mbe-dropzone" className="flex-1 relative">
-        {hasBlock && blockPosition ? (
-          <div
-            style={{ position: 'absolute', left: blockPosition.x, top: blockPosition.y, cursor: isSelected ? 'grab' : 'pointer', zIndex: 10 }}
-            onClick={e => { e.stopPropagation(); onSelect(); }}
-            onMouseDown={isSelected ? handleMouseDown : undefined}
-          >
-            <div className={`transition border-2 rounded ${isSelected ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
-              <DraggableBlock id="main-block" onContextMenu={handleContextMenu} mode={blockMode} />
+      <div 
+        id="kanosym-mbe-dropzone" 
+        className={`flex-1 relative ${hasBlock ? 'overflow-auto' : 'overflow-hidden'} scrollbar-hide`} 
+        style={{ 
+          scrollbarWidth: 'none', 
+          msOverflowStyle: 'none'
+        }}
+      >
+        <div 
+          className="relative"
+          style={{
+            width: hasBlock ? '2000px' : '100%',
+            height: hasBlock ? '2000px' : '100%',
+            backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}
+        >
+          {hasBlock && blockPosition ? (
+            <div
+              style={{ position: 'absolute', left: blockPosition.x, top: blockPosition.y, cursor: isSelected ? 'grab' : 'pointer', zIndex: 10 }}
+              onClick={e => { e.stopPropagation(); onSelect(); }}
+              onMouseDown={isSelected ? handleMouseDown : undefined}
+            >
+              <div className={`transition border-2 rounded ${isSelected ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
+                <DraggableBlock id="main-block" onContextMenu={handleContextMenu} mode={blockMode} />
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-3xl font-bold mb-4">Model Building Environment</div>
-            <div className="text-zinc-400">(Drag the blocks here)</div>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full">
+              <div className="text-3xl font-bold mb-4">Model Building Environment</div>
+              <div className="text-zinc-400">(Drag the blocks here)</div>
+            </div>
+          )}
+        </div>
       </div>
       {showRunButton && onRunModel && (
         <RunModelButton onClick={onRunModel} />
@@ -656,6 +696,50 @@ function App() {
   const [showNoira, setShowNoira] = useState(true);
   const [showBlockBar, setShowBlockBar] = useState(true);
   const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null);
+  const [blockMoveCount, setBlockMoveCount] = useState<{ [projectId: string]: number }>({});
+
+  // Effect to recenter unmoved blocks when window resizes
+  useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout;
+    
+    function handleResize() {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
+        if (!dropzoneElem) return;
+        
+        const dropzoneRect = dropzoneElem.getBoundingClientRect();
+        const blockWidth = 203;
+        const blockHeight = 50;
+        
+        setProjectBlockPositions(prev => {
+          const newPositions = { ...prev };
+          Object.keys(newPositions).forEach(projectId => {
+            const position = newPositions[projectId];
+            const moveCount = blockMoveCount[projectId] || 0;
+            
+            // Only recenter blocks that haven't been moved by the user (moveCount === 0)
+            if (position && moveCount === 0) {
+              console.log('Recentering block for project:', projectId, 'moveCount:', moveCount);
+              newPositions[projectId] = {
+                x: dropzoneRect.width / 2 - blockWidth / 2,
+                y: dropzoneRect.height / 2 - blockHeight / 2
+              };
+            } else if (position) {
+              console.log('Not recentering block for project:', projectId, 'moveCount:', moveCount);
+            }
+          });
+          return newPositions;
+        });
+      }, 100); // Debounce resize events
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
+  }, [blockMoveCount]);
 
   // Add mode state to App
   const [mode, setMode] = useState<'classical' | 'hybrid' | 'quantum'>('classical');
@@ -756,44 +840,47 @@ function App() {
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
         let dropX = 200, dropY = 120; // fallback default
         if (activeId === 'blockbar-block' && dropzoneRect) {
-          let pointerX: number | null = null, pointerY: number | null = null;
-          if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
-            pointerX = Number(event.activatorEvent.clientX);
-            pointerY = Number(event.activatorEvent.clientY);
-          } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
-            pointerX = Number(window.event.clientX);
-            pointerY = Number(window.event.clientY);
-          }
-          if (
-            pointerX !== null && pointerY !== null &&
-            pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
-            pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
-          ) {
-            dropX = pointerX - dropzoneRect.left;
-            dropY = pointerY - dropzoneRect.top;
-          } else {
-            // Snap to center if pointer is not inside dropzone
-            dropX = dropzoneRect.width / 2;
-            dropY = dropzoneRect.height / 2;
-          }
+          // Always center the block when first dragged from blockbar, regardless of container size
+          const blockWidth = 203; // Width of the portfolio sensitivity test block
+          const blockHeight = 50;  // Approximate height of the block
+          dropX = dropzoneRect.width / 2 - blockWidth / 2;  // Center horizontally
+          dropY = dropzoneRect.height / 2 - blockHeight / 2; // Center vertically
         } else if (activeId === 'main-block' && dropzoneRect && projectBlockPositions[currentProjectId]) {
           // If dragging the block within the MBE, add delta to current position
           const prev = projectBlockPositions[currentProjectId];
           dropX = prev!.x + (event.delta?.x ?? 0);
           dropY = prev!.y + (event.delta?.y ?? 0);
         } else if (dropzoneRect) {
-          // Fallback: center of dropzone
-          dropX = dropzoneRect.width / 2;
-          dropY = dropzoneRect.height / 2;
+          // Fallback: center of dropzone (same as first-time drag)
+          const blockWidth = 203; // Width of the portfolio sensitivity test block
+          const blockHeight = 50;  // Approximate height of the block
+          dropX = dropzoneRect.width / 2 - blockWidth / 2;  // Center horizontally
+          dropY = dropzoneRect.height / 2 - blockHeight / 2; // Center vertically
         }
         // Clamp to dropzone bounds if rect is available
         if (dropzoneRect) {
-          dropX = Math.max(0, Math.min(dropX, dropzoneRect.width));
-          dropY = Math.max(0, Math.min(dropY, dropzoneRect.height));
+          const blockWidth = 203; // Width of the portfolio sensitivity test block
+          const blockHeight = 50;  // Approximate height of the block
+          dropX = Math.max(0, Math.min(dropX, dropzoneRect.width - blockWidth));
+          dropY = Math.max(0, Math.min(dropY, dropzoneRect.height - blockHeight));
         }
         setBlockLocationForCurrent('main');
         setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: { x: dropX, y: dropY } }));
         setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
+        
+        // Handle move count based on whether this is initial placement or a move
+        if (activeId === 'blockbar-block') {
+          // Reset move count when first placed (so it can be recentered on resize)
+          setBlockMoveCount(prev => ({ ...prev, [currentProjectId]: 0 }));
+        } else if (activeId === 'main-block') {
+          // Increment move count when the main block is moved
+          setBlockMoveCount(prev => {
+            const currentCount = prev[currentProjectId] || 0;
+            const newCount = currentCount + 1;
+            console.log('Incrementing move count for project:', currentProjectId, 'from', currentCount, 'to', newCount);
+            return { ...prev, [currentProjectId]: newCount };
+          });
+        }
       } else if (event.over.id === 'blockbar-dropzone') {
         setBlockLocationForCurrent('blockbar');
         setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
@@ -956,10 +1043,18 @@ function App() {
     setSelectedBlockProject(currentProjectId);
   }
   function handleBlockDrag(dx: number, dy: number) {
+    console.log('handleBlockDrag called with dx:', dx, 'dy:', dy, 'for project:', currentProjectId);
     setProjectBlockPositions(prev => {
       const pos = prev[currentProjectId];
       if (!pos) return prev;
       return { ...prev, [currentProjectId]: { x: pos.x + dx, y: pos.y + dy } };
+    });
+    // Increment move count when user drags it within the main area
+    setBlockMoveCount(prev => {
+      const currentCount = prev[currentProjectId] || 0;
+      const newCount = currentCount + 1;
+      console.log('Incrementing move count for project:', currentProjectId, 'from', currentCount, 'to', newCount);
+      return { ...prev, [currentProjectId]: newCount };
     });
   }
   function handleBlockDragEnd() {
