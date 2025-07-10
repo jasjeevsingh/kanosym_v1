@@ -974,6 +974,7 @@ function App() {
           }
         }
 
+        // beginning of current change
         // Clamp to dropzone bounds if rect is available
         if (dropzoneRect) {
           const blockWidth = 203; // Width of the portfolio sensitivity test block
@@ -1008,7 +1009,35 @@ function App() {
             }
           }));
           setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
+
+          // end of current change
+        
+        // beginning of incoming change
+          // Clamp to canvas bounds (2000px x 2000px virtual canvas)
+        const canvasWidth = 2000;
+        const canvasHeight = 2000;
+        const blockWidth = 203; // Width of the portfolio sensitivity test block
+        const blockHeight = 50;  // Approximate height of the block
+        dropX = Math.max(0, Math.min(dropX, canvasWidth - blockWidth));
+        dropY = Math.max(0, Math.min(dropY, canvasHeight - blockHeight));
+        setBlockLocationForCurrent('main');
+        setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: { x: dropX, y: dropY } }));
+        setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
+        
+        // Handle move count based on whether this is initial placement or a move
+        if (activeId === 'blockbar-block') {
+          // Reset move count when first placed (so it can be recentered on resize)
+          setBlockMoveCount(prev => ({ ...prev, [currentProjectId]: 0 }));
+        } else if (activeId === 'main-block') {
+          // Increment move count when the main block is moved
+          setBlockMoveCount(prev => {
+            const currentCount = prev[currentProjectId] || 0;
+            const newCount = currentCount + 1;
+            console.log('Incrementing move count for project:', currentProjectId, 'from', currentCount, 'to', newCount);
+            return { ...prev, [currentProjectId]: newCount };
+          });
         }
+        // end of incoming change
       } else if (event.over.id === 'blockbar-dropzone') {
         // Remove the current block type from the project
         const currentBlockMode = projectBlockModes[currentProjectId];
