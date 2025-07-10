@@ -15,6 +15,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics import AnalyticsCollector
+from ..noira_utils import send_message_to_noira, format_analysis_summary
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def classical_sensitivity_test(
@@ -40,6 +45,9 @@ def classical_sensitivity_test(
     # Initialize analytics collector
     analytics = AnalyticsCollector('classical')
     analytics.start_collection()
+        Dictionary with sensitivity analysis results and Noira notification info
+    """
+    logger.info(f"Starting classical sensitivity analysis: {param} for {asset}")
     
     # 1. Perturb the portfolio
     perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
@@ -70,6 +78,24 @@ def classical_sensitivity_test(
         results=metrics,
         analytics=analytics.get_analytics_summary()
     )
+    
+    # 6. Send explanation request to Noira and get notification info
+    logger.info(f"Classical analysis complete: {format_analysis_summary(output)}")
+    noira_sent, brief_message = send_message_to_noira(
+        analysis_type="classical",
+        portfolio=portfolio,
+        param=param,
+        asset=asset,
+        range_vals=range_vals,
+        steps=steps,
+        results=output
+    )
+    
+    # 7. Add Noira notification info to output
+    output["noira_notification"] = {
+        "sent": noira_sent,
+        "brief_message": brief_message
+    }
     
     return output
 
@@ -227,3 +253,4 @@ def format_output(perturbation: str, asset: str, range_tested: List[float], base
         output["analytics"] = analytics
         
     return output 
+    }

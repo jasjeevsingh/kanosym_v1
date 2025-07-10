@@ -24,7 +24,7 @@ class ChatController:
         self.api_key: Optional[str] = None
         self.chat_history: List[Dict[str, Any]] = []
         self.debug_mode: bool = False
-        self.model: str = "gpt-4"
+        self.model: str = "gpt-4o"
         self.max_tokens: int = 1000
         self.temperature: float = 0.7
         
@@ -44,7 +44,7 @@ class ChatController:
             
             # Test the API key with a simple request
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=10
             )

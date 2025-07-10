@@ -16,6 +16,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics import AnalyticsCollector
+from ..noira_utils import send_message_to_noira, format_analysis_summary
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def quantum_sensitivity_test(
@@ -36,11 +41,13 @@ def quantum_sensitivity_test(
         steps: Number of steps in the range
         
     Returns:
-        Dictionary with sensitivity analysis results and analytics
+        Dictionary with sensitivity analysis results and Noira notification info
     """
     # Initialize analytics collector
     analytics = AnalyticsCollector('quantum')
     analytics.start_collection()
+    
+    logger.info(f"Starting quantum sensitivity analysis: {param} for {asset}")
     
     # 1. Perturb the portfolio
     perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
@@ -71,6 +78,24 @@ def quantum_sensitivity_test(
         results=metrics,
         analytics=analytics.get_analytics_summary()
     )
+    
+    # 6. Send explanation request to Noira and get notification info
+    logger.info(f"Quantum analysis complete: {format_analysis_summary(output)}")
+    noira_sent, brief_message = send_message_to_noira(
+        analysis_type="quantum",
+        portfolio=portfolio,
+        param=param,
+        asset=asset,
+        range_vals=range_vals,
+        steps=steps,
+        results=output
+    )
+    
+    # 7. Add Noira notification info to output
+    output["noira_notification"] = {
+        "sent": noira_sent,
+        "brief_message": brief_message
+    }
     
     return output
 
