@@ -248,6 +248,7 @@ IMPORTANT FORMATTING GUIDELINES:
 - Include mathematical equations using $$ for display math and $ for inline variables. Do not use parentheses for inline variables.
 - Be quantitative and reference specific numerical results when available
 - Explain complex concepts clearly with both intuitive explanations and technical mathematical details
+- Prioritize clarity and conciseness in your responses
 
 When discussing financial metrics, always include relevant mathematical formulas using proper LaTeX notation."""
         

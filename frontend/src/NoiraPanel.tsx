@@ -647,31 +647,8 @@ export default function NoiraPanel() {
     return () => clearInterval(pollInterval);
   }, [status?.api_key_set]);
 
-  // Poll for thinking status separately
-  useEffect(() => {
-    if (!status?.api_key_set) return;
-    
-    const checkThinkingStatus = async () => {
-      try {
-        const response = await fetch(`${apiService.current.baseUrl}/thinking-status`);
-        if (response.ok) {
-          const result = await response.json();
-          setIsThinking(result.is_thinking || false);
-        }
-      } catch (error) {
-        console.error('Error checking thinking status:', error);
-        setIsThinking(false);
-      }
-    };
-    
-    // Check immediately
-    checkThinkingStatus();
-    
-    // Then poll every 2 seconds for thinking status (less frequent to reduce log noise)
-    const thinkingInterval = setInterval(checkThinkingStatus, 2000);
-    
-    return () => clearInterval(thinkingInterval);
-  }, [status?.api_key_set]);
+  // No longer polling for thinking status since endpoint was removed
+  // Analysis thinking indicator is handled by the backend via display-updates polling
 
   const refreshStatus = async () => {
     console.log('Refreshing status...');
