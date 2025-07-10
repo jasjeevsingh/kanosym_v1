@@ -859,12 +859,31 @@ function App() {
         body: JSON.stringify(blockParams),
       });
       const data = await res.json();
+      
+      // Add results tab
       addResultsTab(currentProjectId, data);
+      
+      // Check if Noira notification was sent and trigger frontend message
+      if (data.noira_notification?.sent && data.noira_notification?.brief_message) {
+        // Trigger Noira panel to show the brief message
+        triggerNoiraMessage(data.noira_notification.brief_message);
+      }
+      
       setIsRunningModel(false);
     } catch (err) {
       setIsRunningModel(false);
       alert('Error running model');
     }
+  }
+
+  // Add function to trigger Noira message
+  function triggerNoiraMessage(briefMessage: string) {
+    // We'll need to communicate with NoiraPanel component
+    // For now, we can dispatch a custom event that NoiraPanel can listen to
+    const event = new CustomEvent('noiraAutoMessage', { 
+      detail: { message: briefMessage } 
+    });
+    window.dispatchEvent(event);
   }
 
   // Helper to add a results tab

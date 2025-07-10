@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Types for API responses
 interface ChatMessage {
@@ -416,9 +418,9 @@ function DebugPanel({
                 className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
                 disabled={loading}
               >
-                <option value="gpt-4">GPT-4</option>
-                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-4.1">GPT-4.1</option>
+                <option value="o3-mini">o3-mini</option>
               </select>
             </div>
             <div>
@@ -489,6 +491,61 @@ function DebugPanel({
   );
 }
 
+// Add MessageContent component before the main component
+function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boolean }) {
+  if (isUser) {
+    // Plain text for user messages
+    return (
+      <div className="whitespace-pre-line">
+        {message.text}
+        {message.timestamp && (
+          <div className="text-xs opacity-50 mt-1">
+            {new Date(message.timestamp).toLocaleTimeString()}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Markdown rendering for Noira messages
+  return (
+    <div className="prose prose-invert prose-sm max-w-none">
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Customize styling for dark theme
+          h1: ({children}) => <h1 className="text-lg font-bold text-zinc-100 mb-2">{children}</h1>,
+          h2: ({children}) => <h2 className="text-base font-bold text-zinc-100 mb-2">{children}</h2>,
+          h3: ({children}) => <h3 className="text-sm font-bold text-zinc-100 mb-1">{children}</h3>,
+          p: ({children}) => <p className="text-zinc-100 mb-2 last:mb-0">{children}</p>,
+          strong: ({children}) => <strong className="font-bold text-zinc-50">{children}</strong>,
+          em: ({children}) => <em className="italic text-zinc-200">{children}</em>,
+          ul: ({children}) => <ul className="list-disc list-inside text-zinc-100 mb-2 space-y-1">{children}</ul>,
+          ol: ({children}) => <ol className="list-decimal list-inside text-zinc-100 mb-2 space-y-1">{children}</ol>,
+          li: ({children}) => <li className="text-zinc-100">{children}</li>,
+          code: ({children}) => <code className="bg-zinc-700 text-blue-300 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+          pre: ({children}) => <pre className="bg-zinc-700 text-zinc-100 p-2 rounded text-xs overflow-x-auto mb-2">{children}</pre>,
+          blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-3 text-zinc-200 italic mb-2">{children}</blockquote>,
+          table: ({children}) => <table className="w-full border-collapse border border-zinc-600 mb-2 text-xs">{children}</table>,
+          thead: ({children}) => <thead className="bg-zinc-700">{children}</thead>,
+          tbody: ({children}) => <tbody>{children}</tbody>,
+          tr: ({children}) => <tr className="border-b border-zinc-600">{children}</tr>,
+          th: ({children}) => <th className="border border-zinc-600 px-2 py-1 text-left font-bold text-zinc-100">{children}</th>,
+          td: ({children}) => <td className="border border-zinc-600 px-2 py-1 text-zinc-100">{children}</td>,
+          a: ({href, children}) => <a href={href} className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+        }}
+      >
+        {message.text}
+      </ReactMarkdown>
+      {message.timestamp && (
+        <div className="text-xs opacity-50 mt-1">
+          {new Date(message.timestamp).toLocaleTimeString()}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Main NoiraPanel Component
 export default function NoiraPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -512,6 +569,28 @@ export default function NoiraPanel() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Listen for automatic Noira messages from model runs
+  useEffect(() => {
+    const handleAutoMessage = (event: CustomEvent) => {
+      const briefMessage = event.detail?.message;
+      if (briefMessage && status?.api_key_set) {
+        // Add the brief message to chat and trigger sending to backend
+        setMessages(prev => [...prev, { sender: 'user', text: briefMessage }]);
+        
+        // Automatically send the brief message to get Noira's response
+        setTimeout(() => {
+          sendAutoMessage(briefMessage);
+        }, 100);
+      }
+    };
+
+    window.addEventListener('noiraAutoMessage', handleAutoMessage as EventListener);
+    
+    return () => {
+      window.removeEventListener('noiraAutoMessage', handleAutoMessage as EventListener);
+    };
+  }, [status?.api_key_set]);
+
   const refreshStatus = async () => {
     console.log('Refreshing status...');
     const [statusData, debugData] = await Promise.all([
@@ -521,6 +600,39 @@ export default function NoiraPanel() {
     setStatus(statusData);
     setDebugInfo(debugData);
     console.log('Status refreshed:', { statusData, debugData });
+  };
+
+  const sendAutoMessage = async (message: string) => {
+    if (!message.trim() || loading || !status?.api_key_set) return;
+
+    setLoading(true);
+
+    try {
+      const result = await apiService.current.sendMessage(message);
+      
+      if (result.success && result.response) {
+        setMessages(prev => [...prev, { 
+          sender: 'noira', 
+          text: result.response!,
+          timestamp: result.timestamp 
+        }]);
+      } else {
+        setMessages(prev => [...prev, { 
+          sender: 'noira', 
+          text: `Error: ${result.message || 'Unknown error occurred'}`,
+          timestamp: result.timestamp 
+        }]);
+      }
+    } catch (error) {
+      setMessages(prev => [...prev, { 
+        sender: 'noira', 
+        text: `Connection error: ${error}`,
+        timestamp: new Date().toISOString()
+      }]);
+    }
+
+    setLoading(false);
+    refreshStatus();
   };
 
   const sendMessage = async () => {
@@ -596,17 +708,12 @@ export default function NoiraPanel() {
       <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`rounded-lg px-3 py-2 max-w-[80%] whitespace-pre-line ${
+            <div className={`rounded-lg px-3 py-2 max-w-[80%] ${
               msg.sender === 'user' 
-                ? 'bg-blue-600 text-white' 
+                ? 'bg-blue-600 text-white whitespace-pre-line' 
                 : 'bg-zinc-800 text-zinc-100 border border-zinc-700'
             }`}>
-              {msg.text}
-              {msg.timestamp && (
-                <div className="text-xs opacity-50 mt-1">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </div>
-              )}
+              <MessageContent message={msg} isUser={msg.sender === 'user'} />
             </div>
           </div>
         ))}
