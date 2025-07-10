@@ -80,7 +80,7 @@ def classical_sensitivity_test(
     
     # 6. Send explanation request to Noira and get notification info
     logger.info(f"Classical analysis complete: {format_analysis_summary(output)}")
-    noira_sent, brief_message = send_message_to_noira(
+    noira_sent, brief_message, llm_response = send_message_to_noira(
         analysis_type="classical",
         portfolio=portfolio,
         param=param,
@@ -93,7 +93,8 @@ def classical_sensitivity_test(
     # 7. Add Noira notification info to output
     output["noira_notification"] = {
         "sent": noira_sent,
-        "brief_message": brief_message
+        "brief_message": brief_message,
+        "llm_response": llm_response
     }
     
     return output

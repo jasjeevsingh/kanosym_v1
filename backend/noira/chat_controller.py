@@ -7,10 +7,15 @@ and debugging features for the Noira AI assistant.
 
 import json
 import os
+import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import openai
 from openai import OpenAI
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ChatController:
@@ -98,8 +103,28 @@ class ChatController:
             }
         
         try:
+            # Log full context and message details being sent to Noira
+            logger.info("=" * 60)
+            logger.info("🤖 SENDING MESSAGE TO NOIRA")
+            logger.info("=" * 60)
+            logger.info(f"Model: {self.model}")
+            logger.info(f"Max Tokens: {self.max_tokens}")
+            logger.info(f"Temperature: {self.temperature}")
+            logger.info(f"Timestamp: {datetime.now().isoformat()}")
+            
+            if context:
+                logger.info("\n📊 CONTEXT PROVIDED:")
+                logger.info("-" * 40)
+                logger.info(json.dumps(context, indent=2))
+            else:
+                logger.info("\n📊 CONTEXT: None provided")
+            
             # Prepare system message with context
             system_message = self._build_system_message(context)
+            
+            logger.info("\n🔧 SYSTEM MESSAGE:")
+            logger.info("-" * 40)
+            logger.info(system_message)
             
             # Build messages array with history
             messages = [{"role": "system", "content": system_message}]
@@ -108,10 +133,27 @@ class ChatController:
             recent_history = self.chat_history[-10:] if len(self.chat_history) > 10 else self.chat_history
             messages.extend(recent_history)
             
+            logger.info(f"\n💬 CHAT HISTORY: {len(recent_history)} messages included")
+            if recent_history:
+                logger.info("-" * 40)
+                for i, hist_msg in enumerate(recent_history):
+                    role = hist_msg.get('role', 'unknown')
+                    content = hist_msg.get('content', '')
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    logger.info(f"  [{i+1}] {role}: {content_preview}")
+            
             # Add current user message
             messages.append({"role": "user", "content": message})
             
+            logger.info(f"\n📝 USER MESSAGE:")
+            logger.info("-" * 40)
+            logger.info(message)
+            logger.info(f"\nMessage Length: {len(message)} characters")
+            
+            logger.info(f"\n📤 TOTAL MESSAGES TO API: {len(messages)}")
+            
             # Send to OpenAI
+            logger.info("\n🚀 Sending to OpenAI API...")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -121,9 +163,25 @@ class ChatController:
             
             assistant_response = response.choices[0].message.content
             
+            logger.info("\n✅ RECEIVED RESPONSE:")
+            logger.info("-" * 40)
+            logger.info(assistant_response)
+            logger.info(f"\nResponse Length: {len(assistant_response) if assistant_response else 0} characters")
+            
+            # Log token usage
+            if hasattr(response, 'usage'):
+                logger.info(f"\n💰 TOKEN USAGE:")
+                logger.info("-" * 40)
+                logger.info(f"  Prompt Tokens: {response.usage.prompt_tokens}")
+                logger.info(f"  Completion Tokens: {response.usage.completion_tokens}")
+                logger.info(f"  Total Tokens: {response.usage.total_tokens}")
+            
             # Add to chat history
             self.chat_history.append({"role": "user", "content": message})
             self.chat_history.append({"role": "assistant", "content": assistant_response})
+            
+            logger.info(f"\n📚 Chat History Updated: {len(self.chat_history)} total messages")
+            logger.info("=" * 60)
             
             return {
                 "success": True,
@@ -137,6 +195,11 @@ class ChatController:
             }
             
         except Exception as e:
+            logger.error(f"\n❌ ERROR SENDING MESSAGE:")
+            logger.error("-" * 40)
+            logger.error(f"Error: {str(e)}")
+            logger.error("=" * 60)
+            
             return {
                 "success": False,
                 "message": f"Error sending message: {str(e)}",

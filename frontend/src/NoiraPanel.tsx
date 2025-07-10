@@ -573,14 +573,29 @@ export default function NoiraPanel() {
   useEffect(() => {
     const handleAutoMessage = (event: CustomEvent) => {
       const briefMessage = event.detail?.message;
+      const preGeneratedResponse = event.detail?.response;
+      
       if (briefMessage && status?.api_key_set) {
-        // Add the brief message to chat and trigger sending to backend
+        // Add the brief message to chat as if user typed it
         setMessages(prev => [...prev, { sender: 'user', text: briefMessage }]);
         
-        // Automatically send the brief message to get Noira's response
-        setTimeout(() => {
-          sendAutoMessage(briefMessage);
-        }, 100);
+        // If we have a pre-generated response from backend, use it directly
+        if (preGeneratedResponse) {
+          // Add Noira's response immediately without calling the API
+          setTimeout(() => {
+            setMessages(prev => [...prev, { 
+              sender: 'noira', 
+              text: preGeneratedResponse,
+              timestamp: new Date().toISOString()
+            }]);
+          }, 500); // Small delay to make it feel natural
+        } else {
+          // Fallback: if no pre-generated response, call the API with brief message
+          // This shouldn't happen in the new flow, but kept for safety
+          setTimeout(() => {
+            sendAutoMessage(briefMessage);
+          }, 100);
+        }
       }
     };
 

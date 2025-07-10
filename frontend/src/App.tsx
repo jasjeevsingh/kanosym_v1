@@ -874,10 +874,10 @@ function App() {
       // Add results tab
       addResultsTab(currentProjectId, data);
       
-      // Check if Noira notification was sent and trigger frontend message
+      // Trigger Noira notification if sent
       if (data.noira_notification?.sent && data.noira_notification?.brief_message) {
-        // Trigger Noira panel to show the brief message
-        triggerNoiraMessage(data.noira_notification.brief_message);
+        // Trigger a custom event to show message in NoiraPanel
+        triggerNoiraMessage(data.noira_notification.brief_message, data.noira_notification.llm_response);
       }
       
       setIsRunningModel(false);
@@ -888,11 +888,14 @@ function App() {
   }
 
   // Add function to trigger Noira message
-  function triggerNoiraMessage(briefMessage: string) {
+  function triggerNoiraMessage(briefMessage: string, llmResponse?: string) {
     // We'll need to communicate with NoiraPanel component
     // For now, we can dispatch a custom event that NoiraPanel can listen to
     const event = new CustomEvent('noiraAutoMessage', { 
-      detail: { message: briefMessage } 
+      detail: { 
+        message: briefMessage,
+        response: llmResponse 
+      } 
     });
     window.dispatchEvent(event);
   }
