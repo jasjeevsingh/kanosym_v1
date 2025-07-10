@@ -904,13 +904,13 @@ function App() {
           dropX = dropzoneRect.width / 2 - blockWidth / 2;  // Center horizontally
           dropY = dropzoneRect.height / 2 - blockHeight / 2; // Center vertically
         }
-        // Clamp to dropzone bounds if rect is available
-        if (dropzoneRect) {
-          const blockWidth = 203; // Width of the portfolio sensitivity test block
-          const blockHeight = 50;  // Approximate height of the block
-          dropX = Math.max(0, Math.min(dropX, dropzoneRect.width - blockWidth));
-          dropY = Math.max(0, Math.min(dropY, dropzoneRect.height - blockHeight));
-        }
+        // Clamp to canvas bounds (2000px x 2000px virtual canvas)
+        const canvasWidth = 2000;
+        const canvasHeight = 2000;
+        const blockWidth = 203; // Width of the portfolio sensitivity test block
+        const blockHeight = 50;  // Approximate height of the block
+        dropX = Math.max(0, Math.min(dropX, canvasWidth - blockWidth));
+        dropY = Math.max(0, Math.min(dropY, canvasHeight - blockHeight));
         setBlockLocationForCurrent('main');
         setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: { x: dropX, y: dropY } }));
         setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
