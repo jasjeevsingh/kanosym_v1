@@ -13,7 +13,7 @@
    cd backend
    python api.py
    ```
-   The backend will run on `http://localhost:5000`
+   The backend will run on `http://localhost:5001`
 
 ## Frontend Setup
 
@@ -62,11 +62,11 @@
 
 ### Backend Issues
 - Ensure Python dependencies are installed
-- Check if port 5000 is available
+- Check if port 5001 is available
 - Verify OpenAI API key is valid
 
 ### Frontend Issues
-- Check if backend is running on port 5000
+- Check if backend is running on port 5001
 - Verify CORS is enabled (handled by flask-cors)
 - Check browser console for network errors
 
