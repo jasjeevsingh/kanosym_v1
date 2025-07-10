@@ -163,13 +163,6 @@ def create_explanation_request(
 
     message = f"""I completed a {analysis_type} sensitivity analysis. Provide a QUANTITATIVE summary of the results and a recommended course of action for my portfolio.
 
-**FORMAT YOUR RESPONSE USING MARKDOWN** with proper formatting including:
-- **Bold text** for key metrics and headings
-- *Italic text* for emphasis
-- Tables for numerical comparisons
-- Bullet points for recommendations
-- Code blocks for formulas or technical details
-
 ## 📊 Analysis Data
 
 | Metric | Value |
@@ -181,6 +174,21 @@ def create_explanation_request(
 | **Test Points** | {num_results} |
 | **Risk Classification** | **{risk_level}** |
 
+## 📊 Mathematical Framework
+
+The Sharpe ratio being analyzed is defined as:
+
+$$\\text{{Sharpe Ratio}} = \\frac{{E[R_p] - R_f}}{{\\sigma_p}}$$
+
+Where:
+- $E[R_p]$ = Expected portfolio return
+- $R_f$ = Risk-free rate  
+- $\\sigma_p$ = Portfolio standard deviation
+
+For this sensitivity analysis, we perturbed the {param} parameter and measured:
+
+$$\\Delta S = S_{{\\text{{perturbed}}}} - S_{{\\text{{baseline}}}}$$
+
 ## 📈 Quantitative Results
 
 | Result Type | Value | Percentage |
@@ -189,6 +197,12 @@ def create_explanation_request(
 | **Maximum Downside** | {max_negative_change:.4f} | {max_negative_change*100:.2f}% |
 | **Average Change** | {avg_change:.4f} | {avg_change*100:.2f}% |
 | **Change Volatility** | {volatility:.4f} | - |
+
+The sensitivity coefficient can be expressed as:
+
+$$\\beta_{{\\text{{sensitivity}}}} = \\frac{{\\partial S}}{{\\partial \\theta}} \\approx \\frac{{\\Delta S}}{{\\Delta \\theta}}$$
+
+Where $\\theta$ represents the {param} parameter.
 
 ## 📊 Graph Analysis - Sensitivity Curve Characteristics
 
@@ -206,10 +220,12 @@ def create_explanation_request(
 Focus on translating the **patterns in the sensitivity chart** into concrete investment decisions. Reference specific data points from the table and curve characteristics in your analysis.
 
 **IMPORTANT:**
-- Be specific with numbers
-- Use markdown formatting
+- Be specific with numbers and use mathematical notation where appropriate
+- Include LaTeX formulas to explain key financial concepts
+- Use markdown formatting extensively  
 - Provide actionable insights
-- Reference specific data points from the table and curve characteristics in your analysis."""
+- Reference specific data points from the table and curve characteristics in your analysis
+- Express portfolio optimization insights using mathematical formulations"""
 
     return message
 

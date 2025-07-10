@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 // Types for API responses
 interface ChatMessage {
@@ -511,7 +514,8 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
   return (
     <div className="prose prose-invert prose-sm max-w-none">
       <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           // Customize styling for dark theme
           h1: ({children}) => <h1 className="text-lg font-bold text-zinc-100 mb-2">{children}</h1>,
@@ -549,7 +553,10 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
 // Main NoiraPanel Component
 export default function NoiraPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { sender: 'noira', text: 'Hi! I am Noira, your quantum portfolio modeling assistant. How can I help you today?' },
+    { 
+      sender: 'noira', 
+      text: `Hi! I am **Noira**, your quantum portfolio modeling assistant. How can I help you today?` 
+    },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -574,6 +581,7 @@ export default function NoiraPanel() {
     const handleAutoMessage = (event: CustomEvent) => {
       const briefMessage = event.detail?.message;
       const preGeneratedResponse = event.detail?.response;
+      const showThinkingState = event.detail?.showThinkingState;
       
       if (briefMessage && status?.api_key_set) {
         // Add the brief message to chat as if user typed it
@@ -581,14 +589,16 @@ export default function NoiraPanel() {
         
         // If we have a pre-generated response from backend, use it directly
         if (preGeneratedResponse) {
-          // Add Noira's response immediately without calling the API
-          setTimeout(() => {
-            setMessages(prev => [...prev, { 
-              sender: 'noira', 
-              text: preGeneratedResponse,
-              timestamp: new Date().toISOString()
-            }]);
-          }, 500); // Small delay to make it feel natural
+          // Clear loading state and add Noira's response
+          setLoading(false);
+          setMessages(prev => [...prev, { 
+            sender: 'noira', 
+            text: preGeneratedResponse,
+            timestamp: new Date().toISOString()
+          }]);
+        } else if (showThinkingState) {
+          // Show thinking state while waiting for async response
+          setLoading(true);
         } else {
           // Fallback: if no pre-generated response, call the API with brief message
           // This shouldn't happen in the new flow, but kept for safety
