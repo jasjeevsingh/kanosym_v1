@@ -217,6 +217,10 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
+                    <span className="text-zinc-400">Computation Time:</span>
+                    <span className="text-white font-mono">{analytics.performance_metrics?.total_execution_time ? `${analytics.performance_metrics.total_execution_time.toFixed(3)} s` : 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-zinc-400">Circuits/s:</span>
                     <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.circuits_per_second, 1)}</span>
                   </div>
