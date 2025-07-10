@@ -35,6 +35,18 @@ class ChatController:
         # Storage for async Noira responses
         self.pending_responses: Dict[str, Dict[str, Any]] = {}  # analysis_id -> response_data
         
+        # NEW: Separate display history for what users see
+        self.display_history: List[Dict[str, Any]] = []
+        # Track last poll position for efficient updates
+        self.display_history_positions: Dict[str, int] = {}  # client_id -> last_position
+        
+        # Add welcome message
+        self.display_history.append({
+            "role": "assistant",
+            "content": """Hi! I am **Noira**, your quantum portfolio modeling assistant. How can I help you today?""",
+            "timestamp": datetime.now().isoformat()
+        })
+    
     def set_api_key(self, api_key: str) -> Dict[str, Any]:
         """
         Set OpenAI API key and initialize client.
@@ -182,6 +194,11 @@ class ChatController:
             self.chat_history.append({"role": "user", "content": message})
             self.chat_history.append({"role": "assistant", "content": assistant_response})
             
+            # Also update display history if this isn't from an analysis
+            if not context or not context.get("analysis_id"):
+                self.add_user_message(message)
+                self.add_assistant_message(assistant_response)
+            
             logger.info(f"\n📚 Chat History Updated: {len(self.chat_history)} total messages")
             logger.info("=" * 60)
             
@@ -250,6 +267,8 @@ When discussing financial metrics, always include relevant mathematical formulas
             Dictionary with reset confirmation
         """
         self.chat_history.clear()
+        self.display_history.clear()
+        self.display_history_positions.clear()
         return {
             "success": True,
             "message": "Chat history reset successfully",
@@ -425,6 +444,137 @@ When discussing financial metrics, always include relevant mathematical formulas
                     **response_data
                 })
         return pending
+
+    def add_brief_message(self, analysis_type: str, param: str, asset: str, analysis_id: str) -> str:
+        """
+        Add a brief message to display history for an analysis.
+        
+        Args:
+            analysis_type: Type of analysis (quantum/classical/hybrid)
+            param: Parameter being tested
+            asset: Asset being tested
+            analysis_id: Unique analysis ID for tracking
+            
+        Returns:
+            The brief message that was added
+        """
+        brief_message = f"Tell me about this {analysis_type} sensitivity test for {asset} {param}."
+        
+        # Add to display history
+        self.display_history.append({
+            "role": "user",
+            "content": brief_message,
+            "timestamp": datetime.now().isoformat(),
+            "is_brief": True,
+            "analysis_id": analysis_id
+        })
+        
+        # Add thinking state
+        self.display_history.append({
+            "role": "assistant", 
+            "content": "Analyzing the sensitivity results...",
+            "timestamp": datetime.now().isoformat(),
+            "is_thinking": True,
+            "analysis_id": analysis_id
+        })
+        
+        logger.info(f"Added brief message to display history for {analysis_type} analysis {analysis_id}")
+        return brief_message
+    
+    def update_display_with_response(self, analysis_id: str, llm_response: str) -> None:
+        """
+        Update display history by replacing thinking state with actual LLM response.
+        
+        Args:
+            analysis_id: Analysis ID to update
+            llm_response: The actual LLM response
+        """
+        # Find and update the thinking message
+        for i, msg in enumerate(self.display_history):
+            if msg.get("analysis_id") == analysis_id and msg.get("is_thinking"):
+                self.display_history[i] = {
+                    "role": "assistant",
+                    "content": llm_response,
+                    "timestamp": datetime.now().isoformat(),
+                    "analysis_id": analysis_id
+                }
+                logger.info(f"Updated display history with LLM response for analysis {analysis_id}")
+                break
+    
+    def add_user_message(self, message: str) -> None:
+        """
+        Add a regular user message to both histories.
+        
+        Args:
+            message: User message
+        """
+        msg_obj = {
+            "role": "user",
+            "content": message,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.display_history.append(msg_obj)
+        # Regular messages also go to chat history for LLM context
+        self.chat_history.append({"role": "user", "content": message})
+    
+    def add_assistant_message(self, message: str) -> None:
+        """
+        Add assistant message to both histories.
+        
+        Args:
+            message: Assistant message
+        """
+        msg_obj = {
+            "role": "assistant",
+            "content": message,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.display_history.append(msg_obj)
+        # Assistant messages also go to chat history
+        self.chat_history.append({"role": "assistant", "content": message})
+    
+    def get_display_updates(self, client_id: str = "default", full_history: bool = False) -> Dict[str, Any]:
+        """
+        Get display history updates for a client.
+        
+        Args:
+            client_id: Client identifier for tracking position
+            full_history: If True, return full history regardless of position
+            
+        Returns:
+            Dictionary with messages and metadata
+        """
+        last_position = self.display_history_positions.get(client_id, 0) if not full_history else 0
+        current_position = len(self.display_history)
+        
+        # Get new messages since last position
+        new_messages = self.display_history[last_position:current_position]
+        
+        # Update position for this client
+        self.display_history_positions[client_id] = current_position
+        
+        return {
+            "messages": new_messages,
+            "last_position": last_position,
+            "current_position": current_position,
+            "has_updates": len(new_messages) > 0,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    def reset_display_history(self) -> Dict[str, Any]:
+        """
+        Reset display history and positions.
+        
+        Returns:
+            Confirmation dictionary
+        """
+        self.display_history.clear()
+        self.display_history_positions.clear()
+        return {
+            "success": True,
+            "message": "Display history reset successfully",
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 # Global chat controller instance
