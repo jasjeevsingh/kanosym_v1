@@ -219,8 +219,16 @@ function ResizableSidebar({ children, min = 160, max = 400, initial = 224 }: { c
 function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical' }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
   return (
     <div
-      style={{ resize: 'none', width: 'fit-content', minWidth: '203px', maxWidth: '203px' }}
-      className={`px-4 py-2 rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
+      style={{
+        resize: 'none',
+        width: 'fit-content',
+        minWidth: '190px',
+        maxWidth: '190px',
+        padding: '6px 12px',
+        fontSize: '14px',
+        whiteSpace: 'nowrap',
+      }}
+      className={`rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
     >
       Portfolio Sensitivity Test
@@ -393,7 +401,6 @@ style={{
 </div>
 </div>
 
-      </div>
       {showRunButton && onRunModel && (
         <RunModelButton onClick={onRunModel} />
       )}
@@ -716,7 +723,7 @@ function SubtleResizableBorder({ onResize, direction, children, show = true, min
   );
 }
 
-function RunModelButton({ onClick }: { onClick: () => void }) {
+function RunModelButton({ onClick }: { onClick?: () => void }) {
   return (
     <button
       className="absolute bottom-6 right-8 z-40 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded shadow-lg transition"
@@ -762,10 +769,18 @@ function App() {
             // Only recenter blocks that haven't been moved by the user (moveCount === 0)
             if (position && moveCount === 0) {
               console.log('Recentering block for project:', projectId, 'moveCount:', moveCount);
-              newPositions[projectId] = {
-                x: dropzoneRect.width / 2 - blockWidth / 2,
-                y: dropzoneRect.height / 2 - blockHeight / 2
-              };
+              // Fix: position should be an object with block types, not a single position
+              const blockTypes = Object.keys(position);
+              if (blockTypes.length > 0) {
+                const blockType = blockTypes[0];
+                newPositions[projectId] = {
+                  ...position,
+                  [blockType]: {
+                    x: dropzoneRect.width / 2 - blockWidth / 2,
+                    y: dropzoneRect.height / 2 - blockHeight / 2
+                  }
+                };
+              }
             } else if (position) {
               console.log('Not recentering block for project:', projectId, 'moveCount:', moveCount);
             }
@@ -823,6 +838,7 @@ function App() {
   // Per-project block state - change from single block to multiple block types
   const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> }>({ [mockProjects[0].id]: new Set() });
   const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>({});
+  
   // Legacy function for backward compatibility - check if any block is placed
   function hasAnyBlock(projectId: string): boolean {
     return (projectBlocks[projectId]?.size || 0) > 0;
@@ -852,6 +868,7 @@ function App() {
       };
     });
   }
+  
   // Replace openProject logic with onKsmDoubleClick
   function onKsmDoubleClick(projectId: string) {
     if (!openProjects.find(p => p.id === projectId)) {
@@ -860,6 +877,7 @@ function App() {
     setCurrentProjectId(projectId);
     setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
   }
+  
   function closeProject(id: string) {
     const idx = openProjects.findIndex(p => p.id === id);
     if (idx !== -1) {
@@ -906,77 +924,56 @@ function App() {
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
         let dropX = 200, dropY = 120; // fallback default
 
-if (
-  (activeId === 'blockbar-classical' ||
-   activeId === 'blockbar-hybrid' ||
-   activeId === 'blockbar-quantum') &&
-  dropzoneRect
-) {
-  let pointerX: number | null = null, pointerY: number | null = null;
+        if (
+          (activeId === 'blockbar-classical' ||
+           activeId === 'blockbar-hybrid' ||
+           activeId === 'blockbar-quantum') &&
+          dropzoneRect
+        ) {
+          let pointerX: number | null = null, pointerY: number | null = null;
 
-  if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
-    pointerX = Number(event.activatorEvent.clientX);
-    pointerY = Number(event.activatorEvent.clientY);
-  } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
-    pointerX = Number(window.event.clientX);
-    pointerY = Number(window.event.clientY);
-  }
+          if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
+            pointerX = Number(event.activatorEvent.clientX);
+            pointerY = Number(event.activatorEvent.clientY);
+          } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
+            pointerX = Number(window.event.clientX);
+            pointerY = Number(window.event.clientY);
+          }
 
-  if (
-    pointerX !== null && pointerY !== null &&
-    pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
-    pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
-  ) {
-    dropX = pointerX - dropzoneRect.left;
-    dropY = pointerY - dropzoneRect.top;
-  } else {
-    dropX = dropzoneRect.width / 2;
-    dropY = dropzoneRect.height / 2;
-  }
-} else if (activeId === 'blockbar-block' && dropzoneRect) {
-  // Center block with fixed dimensions
-  const blockWidth = 203;
-  const blockHeight = 50;
-  dropX = dropzoneRect.width / 2 - blockWidth / 2;
-  dropY = dropzoneRect.height / 2 - blockHeight / 2;
-} else if (
-  activeId?.startsWith('main-') &&
-  dropzoneRect &&
-  projectBlockPositions[currentProjectId]
-) {
-  const blockType = activeId.replace('main-', '') as 'classical' | 'hybrid' | 'quantum';
-  const prev = projectBlockPositions[currentProjectId][blockType];
+          if (
+            pointerX !== null && pointerY !== null &&
+            pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
+            pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
+          ) {
+            dropX = pointerX - dropzoneRect.left;
+            dropY = pointerY - dropzoneRect.top;
+          } else {
+            dropX = dropzoneRect.width / 2;
+            dropY = dropzoneRect.height / 2;
+          }
+        } else if (
+          activeId?.startsWith('main-') &&
+          dropzoneRect &&
+          projectBlockPositions[currentProjectId]
+        ) {
+          const blockType = activeId.replace('main-', '') as 'classical' | 'hybrid' | 'quantum';
+          const prev = projectBlockPositions[currentProjectId][blockType];
 
-  if (prev) {
-    dropX = prev.x + (event.delta?.x ?? 0);
-    dropY = prev.y + (event.delta?.y ?? 0);
+          if (prev) {
+            dropX = prev.x + (event.delta?.x ?? 0);
+            dropY = prev.y + (event.delta?.y ?? 0);
 
-    setProjectBlockPositions(prev => ({
-      ...prev,
-      [currentProjectId]: {
-        ...(prev[currentProjectId] || {}),
-        [blockType]: { x: dropX, y: dropY }
-      }
-    }));
-    return;
-  }
-} else if (
-  activeId === 'main-block' &&
-  dropzoneRect &&
-  projectBlockPositions[currentProjectId]
-) {
-  const prev = projectBlockPositions[currentProjectId];
-  dropX = prev!.x + (event.delta?.x ?? 0);
-  dropY = prev!.y + (event.delta?.y ?? 0);
-}
-
-        } else if (dropzoneRect) {
-          // Fallback: center of dropzone (same as first-time drag)
-          const blockWidth = 203; // Width of the portfolio sensitivity test block
-          const blockHeight = 50;  // Approximate height of the block
-          dropX = dropzoneRect.width / 2 - blockWidth / 2;  // Center horizontally
-          dropY = dropzoneRect.height / 2 - blockHeight / 2; // Center vertically
+            setProjectBlockPositions(prev => ({
+              ...prev,
+              [currentProjectId]: {
+                ...(prev[currentProjectId] || {}),
+                [blockType]: { x: dropX, y: dropY }
+              }
+            }));
+            return;
+          }
         }
+
         // Clamp to dropzone bounds if rect is available
         if (dropzoneRect) {
           const blockWidth = 203; // Width of the portfolio sensitivity test block
@@ -985,60 +982,33 @@ if (
           dropY = Math.max(0, Math.min(dropY, dropzoneRect.height - blockHeight));
         }
 
-if (
-  activeId === 'blockbar-classical' ||
-  activeId === 'blockbar-hybrid' ||
-  activeId === 'blockbar-quantum'
-) {
-  // Determine block mode
-  let blockMode: 'classical' | 'hybrid' | 'quantum';
-  if (activeId === 'blockbar-classical') blockMode = 'classical';
-  else if (activeId === 'blockbar-hybrid') blockMode = 'hybrid';
-  else blockMode = 'quantum';
+        if (
+          activeId === 'blockbar-classical' ||
+          activeId === 'blockbar-hybrid' ||
+          activeId === 'blockbar-quantum'
+        ) {
+          // Determine block mode
+          let blockMode: 'classical' | 'hybrid' | 'quantum';
+          if (activeId === 'blockbar-classical') blockMode = 'classical';
+          else if (activeId === 'blockbar-hybrid') blockMode = 'hybrid';
+          else blockMode = 'quantum';
 
-  // Offset to prevent stacking
-  const existingBlocks = projectBlockPositions[currentProjectId] || {};
-  const offset = Object.keys(existingBlocks).length * 20;
-  const finalDropX = dropX + offset;
-  const finalDropY = dropY + offset;
+          // Offset to prevent stacking
+          const existingBlocks = projectBlockPositions[currentProjectId] || {};
+          const offset = Object.keys(existingBlocks).length * 20;
+          const finalDropX = dropX + offset;
+          const finalDropY = dropY + offset;
 
-  addBlockTypeToProject(currentProjectId, blockMode);
-  setProjectBlockPositions(prev => ({
-    ...prev,
-    [currentProjectId]: {
-      ...(prev[currentProjectId] || {}),
-      [blockMode]: { x: finalDropX, y: finalDropY }
-    }
-  }));
-  setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
-}
-else if (activeId === 'blockbar-block') {
-  // Handle placement of the single "main" block
-  setBlockLocationForCurrent('main');
-  setProjectBlockPositions(prev => ({
-    ...prev,
-    [currentProjectId]: { x: dropX, y: dropY }
-  }));
-  setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
-  setBlockMoveCount(prev => ({ ...prev, [currentProjectId]: 0 }));
-}
-else if (activeId === 'main-block') {
-  // Moving the "main" block
-  setProjectBlockPositions(prev => ({
-    ...prev,
-    [currentProjectId]: { x: dropX, y: dropY }
-  }));
-  setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
-
-  setBlockMoveCount(prev => {
-    const currentCount = prev[currentProjectId] || 0;
-    const newCount = currentCount + 1;
-    console.log('Incrementing move count for project:', currentProjectId, 'from', currentCount, 'to', newCount);
-    return { ...prev, [currentProjectId]: newCount };
-  });
-}
-
-
+          addBlockTypeToProject(currentProjectId, blockMode);
+          setProjectBlockPositions(prev => ({
+            ...prev,
+            [currentProjectId]: {
+              ...(prev[currentProjectId] || {}),
+              [blockMode]: { x: finalDropX, y: finalDropY }
+            }
+          }));
+          setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
+        }
       } else if (event.over.id === 'blockbar-dropzone') {
         // Remove the current block type from the project
         const currentBlockMode = projectBlockModes[currentProjectId];
