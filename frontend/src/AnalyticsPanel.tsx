@@ -371,6 +371,10 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 </div>
               </div>
             </div>
+            {/* Add note about Sharpe ratio and risk-only simulation */}
+            <div className="text-xs text-zinc-400 mt-2">
+              Note: Sharpe ratios are near zero because this sensitivity test uses a risk-only (zero mean return) simulation, as is standard for risk analysis.
+            </div>
 
             {/* Summary Insights */}
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 lg:col-span-2 xl:col-span-3">

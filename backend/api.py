@@ -12,12 +12,133 @@ from dotenv import load_dotenv
 from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
 from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
+import numpy as np
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+def validate_portfolio(portfolio):
+    """
+    Validate portfolio data structure and constraints.
+    
+    Args:
+        portfolio: Portfolio configuration dictionary
+        
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not portfolio:
+        return False, "Portfolio data is required"
+    
+    # Check required fields
+    required_fields = ['assets', 'weights', 'volatility', 'correlation_matrix']
+    for field in required_fields:
+        if field not in portfolio:
+            return False, f"Missing required field: {field}"
+    
+    assets = portfolio['assets']
+    weights = portfolio['weights']
+    volatility = portfolio['volatility']
+    correlation_matrix = portfolio['correlation_matrix']
+    
+    # Check asset count constraints
+    if len(assets) < 1:
+        return False, "Portfolio must have at least 1 asset"
+    if len(assets) > 5:
+        return False, "Portfolio cannot have more than 5 assets"
+    
+    # Check array lengths match
+    if len(assets) != len(weights) or len(assets) != len(volatility):
+        return False, "Number of assets, weights, and volatility values must match"
+    
+    # Check correlation matrix dimensions
+    if len(correlation_matrix) != len(assets):
+        return False, "Correlation matrix dimensions must match number of assets"
+    
+    for row in correlation_matrix:
+        if len(row) != len(assets):
+            return False, "Correlation matrix must be square"
+    
+    # Validate weights (should sum to 1, all positive)
+    total_weight = sum(weights)
+    if abs(total_weight - 1.0) > 0.01:  # Allow small floating point errors
+        return False, f"Weights must sum to 1.0 (current sum: {total_weight:.3f})"
+    
+    for i, weight in enumerate(weights):
+        if weight < 0:
+            return False, f"Weight for asset {assets[i]} must be non-negative"
+    
+    # Validate volatility (all positive)
+    for i, vol in enumerate(volatility):
+        if vol <= 0:
+            return False, f"Volatility for asset {assets[i]} must be positive"
+    
+    # Validate correlation matrix (symmetric, diagonal = 1, values in [-1, 1])
+    for i in range(len(assets)):
+        for j in range(len(assets)):
+            if i == j:
+                if abs(correlation_matrix[i][j] - 1.0) > 0.01:
+                    return False, f"Correlation matrix diagonal must be 1.0 for asset {assets[i]}"
+            else:
+                if abs(correlation_matrix[i][j] - correlation_matrix[j][i]) > 0.01:
+                    return False, f"Correlation matrix must be symmetric"
+                if correlation_matrix[i][j] < -1 or correlation_matrix[i][j] > 1:
+                    return False, f"Correlation values must be between -1 and 1"
+    
+    return True, ""
+
+def validate_sensitivity_params(param, asset, range_vals, steps, portfolio):
+    """
+    Validate sensitivity analysis parameters.
+    
+    Args:
+        param: Parameter to perturb
+        asset: Asset to perturb
+        range_vals: Range [min, max] for perturbation
+        steps: Number of steps
+        portfolio: Portfolio configuration
+        
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    # Validate parameter type
+    valid_params = ['volatility', 'weight', 'correlation']
+    if param not in valid_params:
+        return False, f"Invalid parameter: {param}. Must be one of {valid_params}"
+    
+    # Validate asset exists in portfolio
+    if asset not in portfolio['assets']:
+        return False, f"Asset '{asset}' not found in portfolio"
+    
+    # Validate range
+    if len(range_vals) != 2:
+        return False, "Range must have exactly 2 values [min, max]"
+    
+    min_val, max_val = range_vals
+    if min_val >= max_val:
+        return False, "Range min must be less than range max"
+    
+    # Validate parameter-specific constraints
+    asset_idx = portfolio['assets'].index(asset)
+    
+    if param == 'weight':
+        if min_val < 0 or max_val > 1:
+            return False, "Weight values must be between 0 and 1"
+    elif param == 'volatility':
+        if min_val <= 0 or max_val <= 0:
+            return False, "Volatility values must be positive"
+    elif param == 'correlation':
+        if min_val < -1 or max_val > 1:
+            return False, "Correlation values must be between -1 and 1"
+    
+    # Validate steps
+    if steps < 2 or steps > 20:
+        return False, "Steps must be between 2 and 20"
+    
+    return True, ""
 
 # Chat endpoints
 @app.route('/api/chat/set-api-key', methods=['POST'])
@@ -109,14 +230,28 @@ def quantum_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
-    result = quantum_sensitivity_test(
-        portfolio=portfolio,
-        param=param,
-        asset=asset,
-        range_vals=range_vals,
-        steps=steps
-    )
-    return jsonify(result)
+    
+    # Validate portfolio
+    is_valid, error_msg = validate_portfolio(portfolio)
+    if not is_valid:
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    # Validate sensitivity parameters
+    is_valid, error_msg = validate_sensitivity_params(param, asset, range_vals, steps, portfolio)
+    if not is_valid:
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    try:
+        result = quantum_sensitivity_test(
+            portfolio=portfolio,
+            param=param,
+            asset=asset,
+            range_vals=range_vals,
+            steps=steps
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/classical_sensitivity_test', methods=['POST'])
 def classical_sensitivity_test_api():
@@ -126,14 +261,28 @@ def classical_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
-    result = classical_sensitivity_test(
-        portfolio=portfolio,
-        param=param,
-        asset=asset,
-        range_vals=range_vals,
-        steps=steps
-    )
-    return jsonify(result)
+    
+    # Validate portfolio
+    is_valid, error_msg = validate_portfolio(portfolio)
+    if not is_valid:
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    # Validate sensitivity parameters
+    is_valid, error_msg = validate_sensitivity_params(param, asset, range_vals, steps, portfolio)
+    if not is_valid:
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    try:
+        result = classical_sensitivity_test(
+            portfolio=portfolio,
+            param=param,
+            asset=asset,
+            range_vals=range_vals,
+            steps=steps
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/hybrid_sensitivity_test', methods=['POST'])
 def hybrid_sensitivity_test_api():
@@ -143,14 +292,28 @@ def hybrid_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
-    result = hybrid_sensitivity_test(
-        portfolio=portfolio,
-        param=param,
-        asset=asset,
-        range_vals=range_vals,
-        steps=steps
-    )
-    return jsonify(result)
+    
+    # Validate portfolio
+    is_valid, error_msg = validate_portfolio(portfolio)
+    if not is_valid:
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    # Validate sensitivity parameters
+    is_valid, error_msg = validate_sensitivity_params(param, asset, range_vals, steps, portfolio)
+    if not is_valid:
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    try:
+        result = hybrid_sensitivity_test(
+            portfolio=portfolio,
+            param=param,
+            asset=asset,
+            range_vals=range_vals,
+            steps=steps
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)  # Change to 5001

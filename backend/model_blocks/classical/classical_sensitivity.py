@@ -190,11 +190,14 @@ def run_monte_carlo(portfolio_state: Dict[str, Any]) -> float:
     # Calculate Sharpe ratio (assuming risk-free rate = 0)
     mean_return = np.mean(portfolio_returns)
     std_return = np.std(portfolio_returns)
+    print(f"[DEBUG] mean_return: {mean_return}, std_return: {std_return}")
     
     if std_return == 0:
+        print("[DEBUG] std_return is zero, returning Sharpe ratio 0.0")
         return 0.0
     
     sharpe_ratio = mean_return / std_return
+    print(f"[DEBUG] Sharpe ratio: {sharpe_ratio}")
     
     return float(np.round(sharpe_ratio, 4))
 

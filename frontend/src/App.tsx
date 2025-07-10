@@ -830,7 +830,10 @@ function App() {
   async function handleRunModel() {
     // Gather block params from state (replace with your actual state)
     const blockParams = projectBlockParams[currentProjectId]; // e.g. { portfolio, param, asset, range, steps }
-    if (!blockParams) return;
+    if (!blockParams) {
+      alert('Please configure the block parameters first');
+      return;
+    }
     
     // Get the current block mode for this project
     const blockMode = projectBlockModes[currentProjectId] || 'classical';
@@ -860,6 +863,14 @@ function App() {
       });
       const data = await res.json();
       
+      if (!res.ok) {
+        // Handle validation errors
+        const errorMessage = data.error || 'Unknown error occurred';
+        alert(`Validation Error: ${errorMessage}`);
+        setIsRunningModel(false);
+        return;
+      }
+      
       // Add results tab
       addResultsTab(currentProjectId, data);
       
@@ -872,7 +883,7 @@ function App() {
       setIsRunningModel(false);
     } catch (err) {
       setIsRunningModel(false);
-      alert('Error running model');
+      alert('Error running model: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   }
 
@@ -1063,13 +1074,103 @@ function App() {
       steps: 6,
     });
 
+    // Helper function to update correlation matrix when assets change
+    function updateCorrelationMatrix(newAssets: string[]) {
+      const currentMatrix = form.portfolio.correlation_matrix;
+      const newSize = newAssets.length;
+      
+      if (newSize > currentMatrix.length) {
+        // Add new rows/columns
+        const newMatrix = currentMatrix.map((row: number[]) => [...row, 0.1]);
+        for (let i = currentMatrix.length; i < newSize; i++) {
+          const newRow = new Array(newSize).fill(0.1);
+          newRow[i] = 1; // Diagonal should be 1
+          newMatrix.push(newRow);
+        }
+        return newMatrix;
+      } else if (newSize < currentMatrix.length) {
+        // Remove rows/columns
+        return currentMatrix.slice(0, newSize).map((row: number[]) => row.slice(0, newSize));
+      }
+      return currentMatrix;
+    }
+
+    // Helper function to update arrays when assets change
+    function updateArray<T>(array: T[], newSize: number, defaultValue: T): T[] {
+      if (newSize > array.length) {
+        return [...array, ...Array(newSize - array.length).fill(defaultValue)];
+      } else if (newSize < array.length) {
+        return array.slice(0, newSize);
+      }
+      return array;
+    }
+
+    function addAsset() {
+      if (form.portfolio.assets.length >= 5) return;
+      
+      const newAssetName = `ASSET${form.portfolio.assets.length + 1}`;
+      const newAssets = [...form.portfolio.assets, newAssetName];
+      const newWeights = updateArray(form.portfolio.weights, newAssets.length, 0.1);
+      const newVolatility = updateArray(form.portfolio.volatility, newAssets.length, 0.2);
+      const newCorrelationMatrix = updateCorrelationMatrix(newAssets);
+      
+      // Normalize weights
+      const totalWeight = newWeights.reduce((sum: number, w: number) => sum + w, 0);
+      const normalizedWeights = newWeights.map((w: number) => w / totalWeight);
+      
+      setForm((prev: any) => ({
+        ...prev,
+        portfolio: {
+          ...prev.portfolio,
+          assets: newAssets,
+          weights: normalizedWeights,
+          volatility: newVolatility,
+          correlation_matrix: newCorrelationMatrix,
+        },
+        asset: newAssetName, // Set to the new asset
+      }));
+    }
+
+    function removeAsset(index: number) {
+      if (form.portfolio.assets.length <= 1) return;
+      
+      const newAssets = form.portfolio.assets.filter((_: string, i: number) => i !== index);
+      const newWeights = form.portfolio.weights.filter((_: number, i: number) => i !== index);
+      const newVolatility = form.portfolio.volatility.filter((_: number, i: number) => i !== index);
+      const newCorrelationMatrix = updateCorrelationMatrix(newAssets);
+      
+      // Normalize weights
+      const totalWeight = newWeights.reduce((sum: number, w: number) => sum + w, 0);
+      const normalizedWeights = newWeights.map((w: number) => w / totalWeight);
+      
+      // Update selected asset if it was removed
+      let newSelectedAsset = form.asset;
+      if (form.asset === form.portfolio.assets[index]) {
+        newSelectedAsset = newAssets[0];
+      }
+      
+      setForm((prev: any) => ({
+        ...prev,
+        portfolio: {
+          ...prev.portfolio,
+          assets: newAssets,
+          weights: normalizedWeights,
+          volatility: newVolatility,
+          correlation_matrix: newCorrelationMatrix,
+        },
+        asset: newSelectedAsset,
+      }));
+    }
+
     function handleChangePortfolioField(field: string, value: any) {
       setForm((prev: any) => ({ ...prev, portfolio: { ...prev.portfolio, [field]: value } }));
     }
+    
     function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
       const { name, value } = e.target;
       setForm((prev: any) => ({ ...prev, [name]: name === 'steps' ? Number(value) : value }));
     }
+    
     function handleRangeChange(idx: number, value: string) {
       setForm((prev: any) => {
         const range = [...prev.range];
@@ -1077,6 +1178,7 @@ function App() {
         return { ...prev, range };
       });
     }
+    
     function handleAssetChange(idx: number, value: string) {
       setForm((prev: any) => {
         const assets = [...prev.portfolio.assets];
@@ -1084,6 +1186,7 @@ function App() {
         return { ...prev, portfolio: { ...prev.portfolio, assets } };
       });
     }
+    
     function handleWeightChange(idx: number, value: string) {
       setForm((prev: any) => {
         const weights = [...prev.portfolio.weights];
@@ -1091,6 +1194,7 @@ function App() {
         return { ...prev, portfolio: { ...prev.portfolio, weights } };
       });
     }
+    
     function handleVolatilityChange(idx: number, value: string) {
       setForm((prev: any) => {
         const volatility = [...prev.portfolio.volatility];
@@ -1098,6 +1202,7 @@ function App() {
         return { ...prev, portfolio: { ...prev.portfolio, volatility } };
       });
     }
+    
     function handleCorrelationChange(i: number, j: number, value: string) {
       setForm((prev: any) => {
         const matrix = prev.portfolio.correlation_matrix.map((row: number[], idx: number) => [...row]);
@@ -1106,141 +1211,250 @@ function App() {
         return { ...prev, portfolio: { ...prev.portfolio, correlation_matrix: matrix } };
       });
     }
+
+    const blockTypeLabel =
+      projectBlockModes[currentProjectId] === 'classical'
+        ? 'Classical Portfolio Sensitivity Test'
+        : projectBlockModes[currentProjectId] === 'hybrid'
+        ? 'Hybrid Portfolio Sensitivity Test'
+        : 'Quantum Portfolio Sensitivity Test';
+
     return open ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div className="bg-white rounded-lg shadow-lg p-8 min-w-[420px] min-h-[180px] relative">
-          <button
-            className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
-            onClick={onClose}
-          >
-            ×
-          </button>
-          <div className="text-lg font-bold mb-4 text-zinc-800">Edit Block Parameters</div>
-          <form className="space-y-4" onSubmit={e => { e.preventDefault(); onSave(form); onClose(); }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-6 min-w-[800px] max-w-[1000px] max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <label className="block text-zinc-700 text-sm mb-1">Assets</label>
-              <div className="flex gap-2">
-                {form.portfolio.assets.map((asset: string, idx: number) => (
-                  <input
-                    key={idx}
-                    className="border border-zinc-300 rounded px-2 py-1 w-20"
-                    value={asset}
-                    onChange={e => handleAssetChange(idx, e.target.value)}
-                  />
-                ))}
-              </div>
+              <h2 className="text-xl font-semibold text-zinc-100">{blockTypeLabel}</h2>
+              <p className="text-sm text-zinc-400 mt-1">Configure portfolio parameters and sensitivity analysis</p>
             </div>
-            <div>
-              <label className="block text-zinc-700 text-sm mb-1">Weights</label>
-              <div className="flex gap-2">
-                {form.portfolio.weights.map((w: number, idx: number) => (
-                  <input
-                    key={idx}
-                    type="number"
-                    step="any"
-                    className="border border-zinc-300 rounded px-2 py-1 w-20"
-                    value={w}
-                    onChange={e => handleWeightChange(idx, e.target.value)}
-                  />
-                ))}
+            <button
+              className="text-zinc-400 hover:text-zinc-200 transition-colors p-2 rounded-lg hover:bg-zinc-800"
+              onClick={onClose}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form className="space-y-6" onSubmit={e => { e.preventDefault(); onSave(form); onClose(); }}>
+            {/* Portfolio Configuration Section */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <h3 className="text-lg font-medium text-zinc-100 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Portfolio Configuration
+              </h3>
+              
+              {/* Assets Management */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-zinc-300 text-sm font-medium">Assets ({form.portfolio.assets.length}/5)</label>
+                  <button
+                    type="button"
+                    onClick={addAsset}
+                    disabled={form.portfolio.assets.length >= 5}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-zinc-600 disabled:cursor-not-allowed transition-colors flex items-center"
+                  >
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add Asset
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {form.portfolio.assets.map((asset: string, idx: number) => (
+                    <div key={idx} className="bg-zinc-700 rounded-lg p-3 border border-zinc-600">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-zinc-400 font-medium">Asset {idx + 1}</span>
+                        {form.portfolio.assets.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeAsset(idx)}
+                            className="text-red-400 hover:text-red-300 transition-colors p-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Symbol</label>
+                          <input
+                            className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={asset}
+                            onChange={e => handleAssetChange(idx, e.target.value)}
+                            placeholder="AAPL"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Weight</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={form.portfolio.weights[idx]}
+                            onChange={e => handleWeightChange(idx, e.target.value)}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Volatility</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={form.portfolio.volatility[idx]}
+                            onChange={e => handleVolatilityChange(idx, e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="block text-zinc-700 text-sm mb-1">Volatility</label>
-              <div className="flex gap-2">
-                {form.portfolio.volatility.map((v: number, idx: number) => (
-                  <input
-                    key={idx}
-                    type="number"
-                    step="any"
-                    className="border border-zinc-300 rounded px-2 py-1 w-20"
-                    value={v}
-                    onChange={e => handleVolatilityChange(idx, e.target.value)}
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-zinc-700 text-sm mb-1">Correlation Matrix</label>
-              <div className="flex flex-col gap-1">
-                {form.portfolio.correlation_matrix.map((row: number[], i: number) => (
-                  <div key={i} className="flex gap-2">
-                    {row.map((val: number, j: number) => (
-                      <input
-                        key={j}
-                        type="number"
-                        step="any"
-                        className="border border-zinc-300 rounded px-2 py-1 w-16"
-                        value={val}
-                        onChange={e => handleCorrelationChange(i, j, e.target.value)}
-                      />
+
+              {/* Correlation Matrix */}
+              <div>
+                <label className="block text-zinc-300 text-sm font-medium mb-3">Correlation Matrix</label>
+                <div className="bg-zinc-700 rounded-lg p-3 border border-zinc-600 overflow-x-auto">
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${form.portfolio.assets.length + 1}, minmax(60px, 1fr))` }}>
+                    {/* Header row */}
+                    <div className="text-xs text-zinc-400 font-medium p-1"></div>
+                    {form.portfolio.assets.map((asset: string, idx: number) => (
+                      <div key={idx} className="text-xs text-zinc-400 font-medium p-1 text-center">{asset}</div>
+                    ))}
+                    
+                    {/* Data rows */}
+                    {form.portfolio.correlation_matrix.map((row: number[], i: number) => (
+                      <React.Fragment key={i}>
+                        <div className="text-xs text-zinc-400 font-medium p-1">{form.portfolio.assets[i]}</div>
+                        {row.map((val: number, j: number) => (
+                          <input
+                            key={j}
+                            type="number"
+                            step="0.01"
+                            min="-1"
+                            max="1"
+                            className="w-full bg-zinc-600 border border-zinc-500 rounded px-1 py-1 text-zinc-100 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            value={val}
+                            onChange={e => handleCorrelationChange(i, j, e.target.value)}
+                            disabled={i === j}
+                          />
+                        ))}
+                      </React.Fragment>
                     ))}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
-            <div className="flex gap-4">
-              <div>
-                <label className="block text-zinc-700 text-sm mb-1">Perturbation Parameter</label>
-                <select name="param" className="border border-zinc-300 rounded px-2 py-1" value={form.param} onChange={handleChange}>
-                  <option value="volatility">Volatility</option>
-                  <option value="weight">Weight</option>
-                  <option value="correlation">Correlation</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-zinc-700 text-sm mb-1">Asset</label>
-                <select name="asset" className="border border-zinc-300 rounded px-2 py-1" value={form.asset} onChange={handleChange}>
-                  {form.portfolio.assets.map((asset: string, idx: number) => (
-                    <option key={idx} value={asset}>{asset}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-zinc-700 text-sm mb-1">Range</label>
-                <div className="flex gap-1">
+
+            {/* Sensitivity Analysis Section */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <h3 className="text-lg font-medium text-zinc-100 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Sensitivity Analysis Parameters
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-zinc-300 text-sm font-medium mb-2">Parameter to Perturb</label>
+                  <select 
+                    name="param" 
+                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    value={form.param} 
+                    onChange={handleChange}
+                  >
+                    <option value="volatility">Volatility</option>
+                    <option value="weight">Weight</option>
+                    <option value="correlation">Correlation</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-zinc-300 text-sm font-medium mb-2">Target Asset</label>
+                  <select 
+                    name="asset" 
+                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    value={form.asset} 
+                    onChange={handleChange}
+                  >
+                    {form.portfolio.assets.map((asset: string, idx: number) => (
+                      <option key={idx} value={asset}>{asset}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-zinc-300 text-sm font-medium mb-2">Range Min</label>
                   <input
                     type="number"
                     step="any"
-                    className="border border-zinc-300 rounded px-2 py-1 w-16"
+                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={form.range[0]}
                     onChange={e => handleRangeChange(0, e.target.value)}
+                    required
                   />
-                  <span className="mx-1">to</span>
+                </div>
+                
+                <div>
+                  <label className="block text-zinc-300 text-sm font-medium mb-2">Range Max</label>
                   <input
                     type="number"
                     step="any"
-                    className="border border-zinc-300 rounded px-2 py-1 w-16"
+                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={form.range[1]}
                     onChange={e => handleRangeChange(1, e.target.value)}
+                    required
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-zinc-700 text-sm mb-1">Steps</label>
+              
+              <div className="mt-4">
+                <label className="block text-zinc-300 text-sm font-medium mb-2">Number of Steps</label>
                 <input
                   name="steps"
                   type="number"
-                  min={2}
-                  className="border border-zinc-300 rounded px-2 py-1 w-16"
+                  min="2"
+                  max="20"
+                  className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.steps}
                   onChange={handleChange}
+                  required
                 />
+                <p className="text-xs text-zinc-400 mt-1">Number of points to test in the range (2-20)</p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4">
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
               <button
                 type="button"
-                className="px-4 py-2 rounded bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                className="px-6 py-2 bg-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-600 transition-colors font-medium"
                 onClick={onClose}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded bg-green-600 text-white font-bold hover:bg-green-700"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
               >
-                Save
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Save Configuration
               </button>
             </div>
           </form>
