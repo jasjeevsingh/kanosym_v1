@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 // Types for API responses
 interface ChatMessage {
@@ -511,7 +514,8 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
   return (
     <div className="prose prose-invert prose-sm max-w-none">
       <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           // Customize styling for dark theme
           h1: ({children}) => <h1 className="text-lg font-bold text-zinc-100 mb-2">{children}</h1>,
@@ -549,7 +553,10 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
 // Main NoiraPanel Component
 export default function NoiraPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { sender: 'noira', text: 'Hi! I am Noira, your quantum portfolio modeling assistant. How can I help you today?' },
+    { 
+      sender: 'noira', 
+      text: `Hi! I am **Noira**, your quantum portfolio modeling assistant. How can I help you today?` 
+    },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

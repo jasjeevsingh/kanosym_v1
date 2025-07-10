@@ -227,7 +227,14 @@ You help users understand:
 - Classical vs. hybrid vs. quantum approaches
 - Interpreting analysis results and charts
 
-Be concise, helpful, and explain complex concepts clearly. When discussing quantum concepts, provide intuitive explanations alongside technical details."""
+IMPORTANT FORMATTING GUIDELINES:
+- Use **LaTeX mathematical notation** extensively for formulas (e.g., $$\\text{Sharpe Ratio} = \\frac{E[R_p] - R_f}{\\sigma_p}$$)
+- Use **markdown formatting** with headers, tables, bullet points, and emphasis
+- Include mathematical equations using $$ for display math and $ for inline variables. Do not use parentheses for inline variables.
+- Be quantitative and reference specific numerical results when available
+- Explain complex concepts clearly with both intuitive explanations and technical mathematical details
+
+When discussing financial metrics, always include relevant mathematical formulas using proper LaTeX notation."""
         
         if context:
             context_info = f"\n\nCurrent Context:\n{json.dumps(context, indent=2)}"
