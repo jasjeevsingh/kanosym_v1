@@ -194,10 +194,8 @@ class ChatController:
             self.chat_history.append({"role": "user", "content": message})
             self.chat_history.append({"role": "assistant", "content": assistant_response})
             
-            # Also update display history if this isn't from an analysis
-            if not context or not context.get("analysis_id"):
-                self.add_user_message(message)
-                self.add_assistant_message(assistant_response)
+            # Note: Regular chat messages are handled directly by the frontend
+            # Display history is only used for analysis operations with async responses
             
             logger.info(f"\n📚 Chat History Updated: {len(self.chat_history)} total messages")
             logger.info("=" * 60)
@@ -460,7 +458,7 @@ When discussing financial metrics, always include relevant mathematical formulas
         """
         brief_message = f"Tell me about this {analysis_type} sensitivity test for {asset} {param}."
         
-        # Add to display history
+        # Add to display history - just the user message, no thinking state
         self.display_history.append({
             "role": "user",
             "content": brief_message,
@@ -469,37 +467,68 @@ When discussing financial metrics, always include relevant mathematical formulas
             "analysis_id": analysis_id
         })
         
-        # Add thinking state
-        self.display_history.append({
-            "role": "assistant", 
-            "content": "Analyzing the sensitivity results...",
+        # Mark as pending for thinking indicator
+        self.pending_responses[analysis_id] = {
+            "brief_message": brief_message,
+            "llm_response": None,  # Will be filled when response arrives
             "timestamp": datetime.now().isoformat(),
-            "is_thinking": True,
-            "analysis_id": analysis_id
-        })
+            "retrieved": False,
+            "is_pending": True  # Flag to indicate this is still processing
+        }
         
         logger.info(f"Added brief message to display history for {analysis_type} analysis {analysis_id}")
         return brief_message
     
     def update_display_with_response(self, analysis_id: str, llm_response: str) -> None:
         """
-        Update display history by replacing thinking state with actual LLM response.
+        Update display history by adding the actual LLM response and marking as complete.
         
         Args:
             analysis_id: Analysis ID to update
             llm_response: The actual LLM response
         """
-        # Find and update the thinking message
-        for i, msg in enumerate(self.display_history):
-            if msg.get("analysis_id") == analysis_id and msg.get("is_thinking"):
-                self.display_history[i] = {
-                    "role": "assistant",
-                    "content": llm_response,
-                    "timestamp": datetime.now().isoformat(),
-                    "analysis_id": analysis_id
-                }
-                logger.info(f"Updated display history with LLM response for analysis {analysis_id}")
-                break
+        # Add the assistant response to display history
+        self.display_history.append({
+            "role": "assistant",
+            "content": llm_response,
+            "timestamp": datetime.now().isoformat(),
+            "analysis_id": analysis_id
+        })
+        
+        # Update pending response and mark as complete
+        if analysis_id in self.pending_responses:
+            self.pending_responses[analysis_id].update({
+                "llm_response": llm_response,
+                "is_pending": False,
+                "completed_timestamp": datetime.now().isoformat()
+            })
+        
+        logger.info(f"Added LLM response to display history for analysis {analysis_id}")
+    
+    def has_pending_responses(self) -> bool:
+        """
+        Check if there are any responses currently being processed.
+        
+        Returns:
+            True if there are pending responses, False otherwise
+        """
+        return any(
+            response_data.get("is_pending", False) 
+            for response_data in self.pending_responses.values()
+        )
+    
+    def get_pending_analysis_ids(self) -> List[str]:
+        """
+        Get list of analysis IDs that are currently pending.
+        
+        Returns:
+            List of analysis IDs that are still processing
+        """
+        return [
+            analysis_id 
+            for analysis_id, response_data in self.pending_responses.items()
+            if response_data.get("is_pending", False)
+        ]
     
     def add_user_message(self, message: str) -> None:
         """
