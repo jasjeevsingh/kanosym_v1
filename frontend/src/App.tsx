@@ -881,7 +881,7 @@ function App() {
       }
       
       // Add results tab IMMEDIATELY (graph displays right away)
-      addResultsTab(currentProjectId, data);
+      addResultsTab(currentProjectId, { ...data, testType: blockMode });
       
       // Handle async Noira processing
       if (data.noira_notification?.processing && data.noira_notification?.analysis_id) {

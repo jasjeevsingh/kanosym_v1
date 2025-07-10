@@ -36,6 +36,8 @@ class QuantumMetrics:
     enhancement_factor: float
     measurement_probabilities: Dict[str, float]
     quantum_advantage_ratio: float
+    risk_reduction_ratio: Optional[float] = None
+    computation_time_comparison: Optional[float] = None
 
 
 @dataclass
@@ -203,7 +205,7 @@ class AnalyticsCollector:
         """Compute quantum-specific metrics"""
         if not self.performance_metrics:
             return
-            
+        
         # Simulate quantum metrics (in real implementation, these would come from actual quantum execution)
         execution_time = self.performance_metrics.total_execution_time
         steps = self.performance_metrics.steps_processed
@@ -217,25 +219,27 @@ class AnalyticsCollector:
         
         # Enhancement factor (simulated quantum advantage)
         if self.results:
-            classical_baseline = self.results[0]['portfolio_volatility_daily']
+            classical_baseline = self.results[0].get('classical_baseline_volatility')
             quantum_results = [r['portfolio_volatility_daily'] for r in self.results]
-            enhancement_factor = np.mean(quantum_results) / classical_baseline if classical_baseline != 0 else 1
-            
-            # Measurement probabilities (simulated)
-            measurement_probabilities = {
-                '00': 0.25,
-                '01': 0.25,
-                '10': 0.25,
-                '11': 0.25
-            }
-            
-            # Quantum advantage ratio
+            quantum_baseline = quantum_results[0] if quantum_results else 0
+            enhancement_factor = np.mean(quantum_results) / classical_baseline if classical_baseline and classical_baseline != 0 else 1
+            # Risk reduction ratio (classical/quantum)
+            risk_reduction_ratio = classical_baseline / quantum_baseline if classical_baseline and quantum_baseline and quantum_baseline != 0 else None
+            # Quantum advantage ratio (legacy, not recommended):
             quantum_advantage_ratio = enhancement_factor - 1 if enhancement_factor > 1 else 0
         else:
             enhancement_factor = 1.0
-            measurement_probabilities = {}
+            risk_reduction_ratio = None
             quantum_advantage_ratio = 0.0
-            
+        
+        # Computation time comparison (if available)
+        computation_time_comparison = None
+        if hasattr(self, 'classical_performance_metrics') and self.classical_performance_metrics:
+            classical_time = self.classical_performance_metrics.total_execution_time
+            quantum_time = execution_time
+            if classical_time and quantum_time:
+                computation_time_comparison = classical_time / quantum_time if quantum_time != 0 else None
+        
         self.quantum_metrics = QuantumMetrics(
             circuits_per_second=circuits_per_second,
             shots_per_second=shots_per_second,
@@ -244,7 +248,9 @@ class AnalyticsCollector:
             quantum_operations=quantum_operations,
             enhancement_factor=enhancement_factor,
             measurement_probabilities=measurement_probabilities,
-            quantum_advantage_ratio=quantum_advantage_ratio
+            quantum_advantage_ratio=quantum_advantage_ratio,
+            risk_reduction_ratio=risk_reduction_ratio,
+            computation_time_comparison=computation_time_comparison
         )
         
     def _compute_classical_metrics(self):

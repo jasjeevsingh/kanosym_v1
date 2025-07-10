@@ -43,8 +43,6 @@ interface AnalyticsData {
     optimal_hybrid_ratio: number;
   };
   sensitivity_metrics?: {
-    sharpe_range: { min: number; max: number };
-    sharpe_volatility: number;
     max_sensitivity_point: number;
     curve_steepness: number;
     risk_return_ratio: number;
@@ -320,16 +318,6 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Sharpe Ratio Range:</span>
-                  <span className="text-white font-mono">
-                    {analytics.sensitivity_metrics?.sharpe_range?.min || '0.0000'} - {analytics.sensitivity_metrics?.sharpe_range?.max || '0.0000'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Sharpe Volatility:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.sharpe_volatility || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-zinc-400">Max Sensitivity Point:</span>
                   <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_sensitivity_point || '0.0000'}</span>
                 </div>
@@ -371,10 +359,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 </div>
               </div>
             </div>
-            {/* Add note about Sharpe ratio and risk-only simulation */}
-            <div className="text-xs text-zinc-400 mt-2">
-              Note: Sharpe ratios are near zero because this sensitivity test uses a risk-only (zero mean return) simulation, as is standard for risk analysis.
-            </div>
+            {/* Removed note about Sharpe ratios being near zero */}
 
             {/* Summary Insights */}
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 lg:col-span-2 xl:col-span-3">
