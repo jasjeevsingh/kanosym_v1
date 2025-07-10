@@ -15,7 +15,7 @@ Before running KANOSYM, ensure you have the following installed:
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd kanosym_test1
+cd kanosym_v1
 ```
 
 ### 2. Backend Setup
@@ -45,11 +45,13 @@ cd frontend
 npm install
 ```
 
+**Important:** Make sure `npm install` completes successfully. This installs critical dependencies like `recharts` for data visualization.
+
 ## Running the Application
 
-KANOSYM requires **three components** to be running simultaneously. You'll need **three separate terminal windows**.
+KANOSYM requires **multiple components** to be running simultaneously. Follow this **exact startup order**:
 
-### Terminal 1: Flask Backend Server
+### Step 1: Start Backend Server (Terminal 1)
 ```bash
 # Navigate to backend directory
 cd backend
@@ -63,7 +65,7 @@ python api.py
 ```
 **Expected output:** Flask server running on `http://localhost:5001`
 
-### Terminal 2: Frontend Development Server
+### Step 2: Start Frontend Dev Server (Terminal 2)
 ```bash
 # Navigate to frontend directory
 cd frontend
@@ -73,9 +75,11 @@ npm run dev
 ```
 **Expected output:** Vite server running on `http://localhost:5173`
 
-### Terminal 3: Electron Desktop Application
+**⚠️ Wait for this to complete before starting Electron!**
+
+### Step 3: Start Electron App (Terminal 3) - OPTIONAL
 ```bash
-# Navigate to frontend directory
+# Navigate to frontend directory (same as Terminal 2)
 cd frontend
 
 # Start the Electron application
@@ -85,20 +89,22 @@ npm run electron
 
 ## Access Options
 
-### Option 1: Web Browser
+### Option 1: Web Browser (Recommended)
 - Open your browser and navigate to `http://localhost:5173`
-- Requires Terminals 1 and 2 to be running
+- Requires only Terminals 1 and 2 to be running
+- **This is the easiest way to use KANOSYM**
 
 ### Option 2: Electron Desktop App
 - The Electron app will automatically open when you run `npm run electron`
-- Requires all three terminals to be running
+- Requires **all three terminals** to be running
+- **Must start Vite dev server BEFORE starting Electron**
 
 ## Development Commands
 
 ### Backend (from `backend/` directory)
 - `python api.py` - Start the Flask API server
 - `pip install -r requirements.txt` - Install Python dependencies
-- `python -m pytest` - Run backend tests (if available)
+- `python test_server.py` - Run basic backend test
 
 ### Frontend (from `frontend/` directory)
 - `npm run dev` - Start Vite development server
@@ -117,38 +123,87 @@ npm run electron
 
 ### Common Issues
 
-1. **Port Conflicts:** 
+1. **Electron "could not load localhost:5173" Error:**
+   ```bash
+   # SOLUTION: Start Vite dev server FIRST, then Electron
+   cd frontend
+   npm run dev          # Wait for "Local: http://localhost:5173/"
+   npm run electron     # In a separate terminal
+   ```
+
+2. **"Failed to resolve import 'recharts'" Error:**
+   ```bash
+   # SOLUTION: Reinstall dependencies
+   cd frontend
+   npm install
+   ```
+
+3. **Port Conflicts:** 
    - If port 5001 is in use, Flask will show an error
    - If port 5173 is in use, Vite will automatically try the next available port
 
-2. **Python Dependencies:** 
-   - If you encounter issues with Qiskit installation:
+4. **Python Dependencies Issues:** 
    ```bash
+   # If you encounter Qiskit installation issues:
+   cd backend
    pip install --upgrade pip
+   pip uninstall qiskit qiskit-aer  # Remove problematic versions
    pip install -r requirements.txt
    ```
 
-3. **Node.js Issues:** 
-   - If npm install fails:
+5. **Node.js Issues:** 
    ```bash
+   # If npm install fails:
+   cd frontend
    npm cache clean --force
    npm install
    ```
 
-4. **Virtual Environment:** 
+6. **Virtual Environment:** 
    - Always ensure your Python virtual environment is activated when running backend commands
    - You should see `(venv)` in your terminal prompt
 
-5. **Connection Issues:**
-   - Ensure all three terminals are running
-   - Check that Flask is on port 5001 and Vite is on port 5173
+7. **Connection Issues:**
+   - Ensure backend is running on port 5001 and frontend on port 5173
    - The frontend will show connection errors if the backend isn't running
+   - Check browser console (F12) for detailed error messages
+
+8. **ImportError: cannot import name 'BaseSampler':**
+   ```bash
+   # This indicates version compatibility issues - backend should work with current requirements.txt
+   cd backend
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+## Quick Test
+
+To verify everything is working:
+
+1. **Test Backend:**
+   ```bash
+   cd backend
+   source venv/bin/activate
+   python -c "from quantum_sensitivity.engine import quantum_sensitivity_test; print('Backend OK')"
+   ```
+
+2. **Test Frontend:**
+   ```bash
+   cd frontend
+   npm run dev
+   # Should see: "Local: http://localhost:5173/"
+   ```
+
+3. **Test Full System:**
+   - Open browser to `http://localhost:5173`
+   - You should see the KANOSYM interface
+   - Try creating a simple portfolio and running sensitivity analysis
 
 ## Architecture Overview
 
 ### Folder Structure
 ```
-kanosym_test1/
+kanosym_v1/
 ├── backend/
 │   ├── quantum_sensitivity/
 │   │   ├── engine.py
@@ -158,6 +213,7 @@ kanosym_test1/
 │   │   └── format_output.py
 │   ├── api.py
 │   ├── chat_controller.py
+│   ├── test_server.py
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -168,17 +224,33 @@ kanosym_test1/
 │   ├── electron-main.cjs
 │   ├── package.json
 │   └── vite.config.ts
-└── README.md
+├── README.md
+└── README_CHAT_SETUP.md
 ```
 
 ### Backend
 - **Flask API** with endpoints for classical, hybrid, and quantum sensitivity tests
 - **Qiskit integration** for quantum computing simulations
 - **Modular design** for portfolio parsing, perturbation, QAE, and metrics
+- **Chat integration** with OpenAI API for AI assistance
 
 ### Frontend
 - **React + TypeScript** with Vite for fast development
 - **Tailwind CSS** for styling
 - **Drag-and-drop interface** for block-based modeling
 - **Electron** for desktop application packaging
-- **Real-time results visualization** and AI chat integration
+- **Real-time results visualization** with Recharts
+- **AI chat integration** with Noira assistant
+
+## API Endpoints
+
+### Quantum Sensitivity Analysis
+- `POST /api/quantum_sensitivity_test` - Run quantum-enhanced analysis
+- `POST /api/classical_sensitivity_test` - Run classical Monte Carlo analysis  
+- `POST /api/hybrid_sensitivity_test` - Run hybrid classical-quantum analysis
+
+### Chat System
+- `POST /api/chat/set-api-key` - Set OpenAI API key
+- `GET /api/chat/status` - Get connection status
+- `POST /api/chat/send` - Send message to AI assistant
+- `POST /api/chat/reset` - Reset chat history
