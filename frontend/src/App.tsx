@@ -236,10 +236,10 @@ function DraggableBlock({ id, onContextMenu, mode = 'classical' }: { id: string;
   );
 }
 
-function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onBlockDrag, onBlockDragEnd, onDeselect, blockMode }: {
+function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onBlockDrag, onBlockDragEnd, onDeselect, blockMode, currentProjectId, isBlockTypePlaced, projectBlockPositions, projectBlockModes }: {
   hasBlock: boolean;
   blockPosition: { x: number; y: number } | null;
-  onEditRequest: (e: React.MouseEvent) => void;
+  onEditRequest: (e: React.MouseEvent, blockType?: 'classical' | 'hybrid' | 'quantum') => void;
   showRunButton?: boolean;
   onRunModel?: () => void;
   isSelected: boolean;
@@ -248,49 +248,24 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   onBlockDragEnd: () => void;
   onDeselect: () => void;
   blockMode: 'classical' | 'hybrid' | 'quantum';
+  currentProjectId: string;
+  isBlockTypePlaced: (projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') => boolean;
+  projectBlockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } };
+  projectBlockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' };
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
-  const handleContextMenu = (e: React.MouseEvent) => {
+  const handleContextMenu = (e: React.MouseEvent, blockType: 'classical' | 'hybrid' | 'quantum') => {
     e.preventDefault();
     e.stopPropagation();
-    onEditRequest(e);
+    onEditRequest(e, blockType);
   };
-  // Drag logic for block
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
-  function handleMouseDown(e: React.MouseEvent) {
-    if (!isSelected) return;
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    e.stopPropagation();
-  }
-  function handleMouseMove(e: MouseEvent) {
-    if (dragging && dragStart.current && blockPosition) {
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-      onBlockDrag(dx, dy);
-      dragStart.current = { x: e.clientX, y: e.clientY };
-    }
-  }
-  function handleMouseUp() {
-    if (dragging) {
-      setDragging(false);
-      onBlockDragEnd();
-    }
-  }
-  useEffect(() => {
-    if (dragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    } else {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragging]);
+  
+  // Track which block is selected
+  const [selectedBlockType, setSelectedBlockType] = useState<'classical' | 'hybrid' | 'quantum' | null>(null);
+
+  // Get all placed blocks for this project
+  const placedBlocks = projectBlockPositions[currentProjectId] || {};
+  const hasAnyBlocks = Object.keys(placedBlocks).length > 0;
 
   return (
     <div
@@ -306,16 +281,33 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
       onClick={onDeselect}
     >
       <div id="kanosym-mbe-dropzone" className="flex-1 relative">
-        {hasBlock && blockPosition ? (
-          <div
-            style={{ position: 'absolute', left: blockPosition.x, top: blockPosition.y, cursor: isSelected ? 'grab' : 'pointer', zIndex: 10 }}
-            onClick={e => { e.stopPropagation(); onSelect(); }}
-            onMouseDown={isSelected ? handleMouseDown : undefined}
-          >
-            <div className={`transition border-2 rounded ${isSelected ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
-              <DraggableBlock id="main-block" onContextMenu={handleContextMenu} mode={blockMode} />
+        {hasAnyBlocks ? (
+          // Render all placed blocks
+          Object.entries(placedBlocks).map(([blockType, position]) => (
+            <div
+              key={blockType}
+              style={{ 
+                position: 'absolute', 
+                left: position.x, 
+                top: position.y, 
+                cursor: isSelected && selectedBlockType === blockType ? 'grab' : 'pointer', 
+                zIndex: 10 
+              }}
+              onClick={e => { 
+                e.stopPropagation(); 
+                setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+                onSelect(); 
+              }}
+            >
+              <div className={`transition border-2 rounded ${isSelected && selectedBlockType === blockType ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
+                <DraggableBlock 
+                  id={`main-${blockType}`} 
+                  onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
+                  mode={blockType as 'classical' | 'hybrid' | 'quantum'} 
+                />
+              </div>
             </div>
-          </div>
+          ))
         ) : (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="text-3xl font-bold mb-4">Model Building Environment</div>
@@ -330,11 +322,21 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   );
 }
 
-function BlockBar({ hasBlock, mode, setMode }: { hasBlock: boolean; mode: 'classical' | 'hybrid' | 'quantum'; setMode: (m: 'classical' | 'hybrid' | 'quantum') => void }) {
+function BlockBar({ hasBlock, mode, setMode, currentProjectId, isBlockTypePlaced }: { 
+  hasBlock: boolean; 
+  mode: 'classical' | 'hybrid' | 'quantum'; 
+  setMode: (m: 'classical' | 'hybrid' | 'quantum') => void;
+  currentProjectId: string;
+  isBlockTypePlaced: (projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') => boolean;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: 'blockbar-dropzone' });
   return (
     <div ref={setNodeRef} className={`w-full h-full bg-zinc-950 border-t border-zinc-800 flex items-center px-4 ${isOver ? 'bg-zinc-900' : ''}`}>      
-      {!hasBlock && <DraggableBlock id="blockbar-block" mode={mode} />}
+      <div className="flex gap-2">
+        {!isBlockTypePlaced(currentProjectId, mode) && (
+          <DraggableBlock id={`blockbar-${mode}`} mode={mode} />
+        )}
+      </div>
       <div className="flex-1" />
       <div className="flex gap-2 items-center">
         <ModeToggle mode={mode} setMode={setMode} />
@@ -651,7 +653,7 @@ function App() {
   // blockLocation: 'blockbar' | 'main' | 'dragging'
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; blockType?: 'classical' | 'hybrid' | 'quantum' } | null>(null);
   const [showExplorer, setShowExplorer] = useState(true);
   const [showNoira, setShowNoira] = useState(true);
   const [showBlockBar, setShowBlockBar] = useState(true);
@@ -695,12 +697,37 @@ function App() {
   // Project tab state
   const [openProjects, setOpenProjects] = useState([mockProjects[0]]);
   const [currentProjectId, setCurrentProjectId] = useState(mockProjects[0].id);
-  // Per-project block state
-  const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: 'blockbar' | 'main' }>({ [mockProjects[0].id]: 'blockbar' });
-  const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { x: number; y: number } | null }>({});
-  const blockLocation = projectBlocks[currentProjectId] || 'blockbar';
-  function setBlockLocationForCurrent(loc: 'blockbar' | 'main') {
-    setProjectBlocks(prev => ({ ...prev, [currentProjectId]: loc }));
+  // Per-project block state - change from single block to multiple block types
+  const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> }>({ [mockProjects[0].id]: new Set() });
+  const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>({});
+  // Legacy function for backward compatibility - check if any block is placed
+  function hasAnyBlock(projectId: string): boolean {
+    return (projectBlocks[projectId]?.size || 0) > 0;
+  }
+  
+  // Helper function to check if a specific block type is placed
+  function isBlockTypePlaced(projectId: string, blockType: 'classical' | 'hybrid' | 'quantum'): boolean {
+    return projectBlocks[projectId]?.has(blockType) || false;
+  }
+  
+  // Helper function to add a block type to a project
+  function addBlockTypeToProject(projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') {
+    setProjectBlocks(prev => ({
+      ...prev,
+      [projectId]: new Set([...(prev[projectId] || []), blockType])
+    }));
+  }
+  
+  // Helper function to remove a block type from a project
+  function removeBlockTypeFromProject(projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') {
+    setProjectBlocks(prev => {
+      const currentBlocks = new Set(prev[projectId] || []);
+      currentBlocks.delete(blockType);
+      return {
+        ...prev,
+        [projectId]: currentBlocks
+      };
+    });
   }
   // Replace openProject logic with onKsmDoubleClick
   function onKsmDoubleClick(projectId: string) {
@@ -708,7 +735,7 @@ function App() {
       setOpenProjects([...openProjects, mockProjects.find(p => p.id === projectId)!]);
     }
     setCurrentProjectId(projectId);
-    setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || 'blockbar' }));
+    setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
   }
   function closeProject(id: string) {
     const idx = openProjects.findIndex(p => p.id === id);
@@ -755,7 +782,7 @@ function App() {
         const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
         let dropX = 200, dropY = 120; // fallback default
-        if (activeId === 'blockbar-block' && dropzoneRect) {
+        if ((activeId === 'blockbar-classical' || activeId === 'blockbar-hybrid' || activeId === 'blockbar-quantum') && dropzoneRect) {
           let pointerX: number | null = null, pointerY: number | null = null;
           if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
             pointerX = Number(event.activatorEvent.clientX);
@@ -776,11 +803,24 @@ function App() {
             dropX = dropzoneRect.width / 2;
             dropY = dropzoneRect.height / 2;
           }
-        } else if (activeId === 'main-block' && dropzoneRect && projectBlockPositions[currentProjectId]) {
-          // If dragging the block within the MBE, add delta to current position
-          const prev = projectBlockPositions[currentProjectId];
-          dropX = prev!.x + (event.delta?.x ?? 0);
-          dropY = prev!.y + (event.delta?.y ?? 0);
+        } else if (activeId && activeId.startsWith('main-') && dropzoneRect && projectBlockPositions[currentProjectId]) {
+          // If dragging a block within the MBE, update its position
+          const blockType = activeId.replace('main-', '') as 'classical' | 'hybrid' | 'quantum';
+          const prev = projectBlockPositions[currentProjectId][blockType];
+          if (prev) {
+            dropX = prev.x + (event.delta?.x ?? 0);
+            dropY = prev.y + (event.delta?.y ?? 0);
+            
+            // Update the position of this specific block
+            setProjectBlockPositions(prev => ({ 
+              ...prev, 
+              [currentProjectId]: { 
+                ...(prev[currentProjectId] || {}), 
+                [blockType]: { x: dropX, y: dropY } 
+              } 
+            }));
+            return; // Don't continue with the rest of the logic
+          }
         } else if (dropzoneRect) {
           // Fallback: center of dropzone
           dropX = dropzoneRect.width / 2;
@@ -791,12 +831,46 @@ function App() {
           dropX = Math.max(0, Math.min(dropX, dropzoneRect.width));
           dropY = Math.max(0, Math.min(dropY, dropzoneRect.height));
         }
-        setBlockLocationForCurrent('main');
-        setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: { x: dropX, y: dropY } }));
-        setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: mode }));
+        // Determine the block mode based on the activeId
+        let blockMode: 'classical' | 'hybrid' | 'quantum';
+        if (activeId === 'blockbar-classical') blockMode = 'classical';
+        else if (activeId === 'blockbar-hybrid') blockMode = 'hybrid';
+        else if (activeId === 'blockbar-quantum') blockMode = 'quantum';
+        else blockMode = mode; // fallback
+        
+        // Add some offset to prevent blocks from stacking exactly on top of each other
+        const existingBlocks = projectBlockPositions[currentProjectId] || {};
+        const offset = Object.keys(existingBlocks).length * 20; // 20px offset per existing block
+        const finalDropX = dropX + offset;
+        const finalDropY = dropY + offset;
+        
+        // Add the block type to the project and set its position
+        addBlockTypeToProject(currentProjectId, blockMode);
+        setProjectBlockPositions(prev => ({ 
+          ...prev, 
+          [currentProjectId]: { 
+            ...(prev[currentProjectId] || {}), 
+            [blockMode]: { x: finalDropX, y: finalDropY } 
+          } 
+        }));
+        setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
       } else if (event.over.id === 'blockbar-dropzone') {
-        setBlockLocationForCurrent('blockbar');
-        setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+        // Remove the current block type from the project
+        const currentBlockMode = projectBlockModes[currentProjectId];
+        if (currentBlockMode) {
+          removeBlockTypeFromProject(currentProjectId, currentBlockMode);
+          setProjectBlockPositions(prev => {
+            const newPositions = { ...prev };
+            if (newPositions[currentProjectId]) {
+              delete newPositions[currentProjectId][currentBlockMode];
+              // Remove the project entry if no blocks remain
+              if (Object.keys(newPositions[currentProjectId]).length === 0) {
+                delete newPositions[currentProjectId];
+              }
+            }
+            return newPositions;
+          });
+        }
         setProjectBlockModes(prev => {
           const copy = { ...prev };
           delete copy[currentProjectId];
@@ -808,9 +882,9 @@ function App() {
     setActiveId(null);
   }
 
-  function handleEditRequest(e: React.MouseEvent) {
+  function handleEditRequest(e: React.MouseEvent, blockType?: 'classical' | 'hybrid' | 'quantum') {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
+    setContextMenu({ x: e.clientX, y: e.clientY, blockType });
   }
 
   function handleEdit() {
@@ -957,9 +1031,21 @@ function App() {
   }
   function handleBlockDrag(dx: number, dy: number) {
     setProjectBlockPositions(prev => {
-      const pos = prev[currentProjectId];
-      if (!pos) return prev;
-      return { ...prev, [currentProjectId]: { x: pos.x + dx, y: pos.y + dy } };
+      const projectPositions = prev[currentProjectId];
+      if (!projectPositions) return prev;
+      
+      // Update the position of the currently selected block type
+      const selectedBlockType = selectedBlockProject === currentProjectId ? projectBlockModes[currentProjectId] : null;
+      if (!selectedBlockType || !projectPositions[selectedBlockType]) return prev;
+      
+      const pos = projectPositions[selectedBlockType];
+      return { 
+        ...prev, 
+        [currentProjectId]: { 
+          ...projectPositions, 
+          [selectedBlockType]: { x: pos.x + dx, y: pos.y + dy } 
+        } 
+      };
     });
   }
   function handleBlockDragEnd() {
@@ -980,13 +1066,31 @@ function App() {
 
   // In App, add a handler for block delete
   function handleBlockDelete() {
-    setBlockLocationForCurrent('blockbar');
-    setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
-    setProjectBlockModes(prev => {
-      const copy = { ...prev };
-      delete copy[currentProjectId];
-      return copy;
-    });
+    // Remove the specific block type that was right-clicked
+    const blockTypeToDelete = contextMenu?.blockType;
+    if (blockTypeToDelete) {
+      removeBlockTypeFromProject(currentProjectId, blockTypeToDelete);
+      setProjectBlockPositions(prev => {
+        const newPositions = { ...prev };
+        if (newPositions[currentProjectId]) {
+          delete newPositions[currentProjectId][blockTypeToDelete];
+          // Remove the project entry if no blocks remain
+          if (Object.keys(newPositions[currentProjectId]).length === 0) {
+            delete newPositions[currentProjectId];
+          }
+        }
+        return newPositions;
+      });
+      
+      // Also remove from projectBlockModes if it was the current mode
+      if (projectBlockModes[currentProjectId] === blockTypeToDelete) {
+        setProjectBlockModes(prev => {
+          const copy = { ...prev };
+          delete copy[currentProjectId];
+          return copy;
+        });
+      }
+    }
     setSelectedBlockProject(null);
     setContextMenu(null);
   }
@@ -1492,19 +1596,23 @@ function App() {
             <ResultsTabsBar projectId={currentProjectId} />
             <ResultsTabContent projectId={currentProjectId} />
             {openProjects.length > 0 ? (
-              <MainPage
-                hasBlock={blockLocation === 'main'}
-                blockPosition={projectBlockPositions[currentProjectId] || null}
-                onEditRequest={handleEditRequest}
-                showRunButton={blockLocation === 'main'}
-                onRunModel={handleRunModel}
-                isSelected={isBlockSelected}
-                onSelect={handleBlockSelect}
-                onBlockDrag={handleBlockDrag}
-                onBlockDragEnd={handleBlockDragEnd}
-                onDeselect={handleBlockDeselect}
-                blockMode={projectBlockModes[currentProjectId] || mode}
-              />
+                          <MainPage
+              hasBlock={hasAnyBlock(currentProjectId)}
+              blockPosition={projectBlockPositions[currentProjectId]?.[projectBlockModes[currentProjectId] || mode] || null}
+              onEditRequest={handleEditRequest}
+              showRunButton={hasAnyBlock(currentProjectId)}
+              onRunModel={handleRunModel}
+              isSelected={isBlockSelected}
+              onSelect={handleBlockSelect}
+              onBlockDrag={handleBlockDrag}
+              onBlockDragEnd={handleBlockDragEnd}
+              onDeselect={handleBlockDeselect}
+              blockMode={projectBlockModes[currentProjectId] || mode}
+              currentProjectId={currentProjectId}
+              isBlockTypePlaced={isBlockTypePlaced}
+              projectBlockPositions={projectBlockPositions}
+              projectBlockModes={projectBlockModes}
+            />
             ) : (
               <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
                 <div className="text-2xl font-bold mb-2">Select a project to open</div>
@@ -1529,7 +1637,13 @@ function App() {
         {/* Block Bar at the bottom */}
         <SubtleResizableBorder direction="bottom" show={showBlockBar} min={48} max={160} initial={64}>
           <div className="h-full border-t border-zinc-800">
-            <BlockBar hasBlock={blockLocation === 'main'} mode={mode} setMode={setMode} />
+            <BlockBar 
+              hasBlock={hasAnyBlock(currentProjectId)} 
+              mode={mode} 
+              setMode={setMode} 
+              currentProjectId={currentProjectId}
+              isBlockTypePlaced={isBlockTypePlaced}
+            />
           </div>
         </SubtleResizableBorder>
         <DragOverlay>
