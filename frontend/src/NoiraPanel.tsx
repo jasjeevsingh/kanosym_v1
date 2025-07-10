@@ -574,6 +574,7 @@ export default function NoiraPanel() {
     const handleAutoMessage = (event: CustomEvent) => {
       const briefMessage = event.detail?.message;
       const preGeneratedResponse = event.detail?.response;
+      const showThinkingState = event.detail?.showThinkingState;
       
       if (briefMessage && status?.api_key_set) {
         // Add the brief message to chat as if user typed it
@@ -581,14 +582,16 @@ export default function NoiraPanel() {
         
         // If we have a pre-generated response from backend, use it directly
         if (preGeneratedResponse) {
-          // Add Noira's response immediately without calling the API
-          setTimeout(() => {
-            setMessages(prev => [...prev, { 
-              sender: 'noira', 
-              text: preGeneratedResponse,
-              timestamp: new Date().toISOString()
-            }]);
-          }, 500); // Small delay to make it feel natural
+          // Clear loading state and add Noira's response
+          setLoading(false);
+          setMessages(prev => [...prev, { 
+            sender: 'noira', 
+            text: preGeneratedResponse,
+            timestamp: new Date().toISOString()
+          }]);
+        } else if (showThinkingState) {
+          // Show thinking state while waiting for async response
+          setLoading(true);
         } else {
           // Fallback: if no pre-generated response, call the API with brief message
           // This shouldn't happen in the new flow, but kept for safety

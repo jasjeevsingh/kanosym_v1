@@ -13,6 +13,7 @@ from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
 from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
 import numpy as np
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -205,6 +206,47 @@ def update_chat_settings():
         temperature=data.get('temperature')
     )
     return jsonify(result)
+
+@app.route('/api/chat/pending-responses', methods=['GET'])
+def get_pending_responses():
+    """Get all pending Noira responses"""
+    try:
+        pending = chat_controller.get_pending_responses()
+        return jsonify({
+            "success": True,
+            "pending_responses": pending,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error getting pending responses: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/chat/async-response/<analysis_id>', methods=['GET'])
+def get_async_response(analysis_id):
+    """Get a specific async Noira response by analysis ID"""
+    try:
+        response_data = chat_controller.get_async_response(analysis_id)
+        if response_data:
+            return jsonify({
+                "success": True,
+                "response_data": response_data,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "No response found for this analysis ID",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error getting async response: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 # Placeholder endpoints for other functionality
 @app.route('/api/portfolio', methods=['POST'])

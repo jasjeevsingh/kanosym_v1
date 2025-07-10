@@ -32,6 +32,8 @@ class ChatController:
         self.model: str = "gpt-4o"
         self.max_tokens: int = 1000
         self.temperature: float = 0.7
+        # Storage for async Noira responses
+        self.pending_responses: Dict[str, Dict[str, Any]] = {}  # analysis_id -> response_data
         
     def set_api_key(self, api_key: str) -> Dict[str, Any]:
         """
@@ -365,6 +367,57 @@ Be concise, helpful, and explain complex concepts clearly. When discussing quant
             },
             "timestamp": datetime.now().isoformat()
         }
+
+    def store_async_response(self, analysis_id: str, brief_message: str, llm_response: str) -> None:
+        """
+        Store an async Noira response for later retrieval.
+        
+        Args:
+            analysis_id: Unique ID for the analysis
+            brief_message: Brief message for frontend display
+            llm_response: Full LLM response
+        """
+        self.pending_responses[analysis_id] = {
+            "brief_message": brief_message,
+            "llm_response": llm_response,
+            "timestamp": datetime.now().isoformat(),
+            "retrieved": False
+        }
+        logger.info(f"Stored async response for analysis {analysis_id}")
+    
+    def get_async_response(self, analysis_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve and mark as retrieved an async Noira response.
+        
+        Args:
+            analysis_id: Unique ID for the analysis
+            
+        Returns:
+            Response data if available, None otherwise
+        """
+        if analysis_id in self.pending_responses:
+            response_data = self.pending_responses[analysis_id]
+            if not response_data["retrieved"]:
+                response_data["retrieved"] = True
+                logger.info(f"Retrieved async response for analysis {analysis_id}")
+                return response_data
+        return None
+    
+    def get_pending_responses(self) -> List[Dict[str, Any]]:
+        """
+        Get all unretrieved pending responses.
+        
+        Returns:
+            List of pending response data with analysis IDs
+        """
+        pending = []
+        for analysis_id, response_data in self.pending_responses.items():
+            if not response_data["retrieved"]:
+                pending.append({
+                    "analysis_id": analysis_id,
+                    **response_data
+                })
+        return pending
 
 
 # Global chat controller instance

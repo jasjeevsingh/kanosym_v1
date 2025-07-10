@@ -13,6 +13,8 @@ from typing import Dict, Any, List
 import random
 import sys
 import os
+import threading
+import uuid
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics import AnalyticsCollector
 from ..noira_utils import send_message_to_noira, format_analysis_summary
@@ -78,23 +80,40 @@ def classical_sensitivity_test(
         analytics=analytics.get_analytics_summary()
     )
     
-    # 6. Send explanation request to Noira and get notification info
+    # 7. Start Noira processing in background (non-blocking)
     logger.info(f"Classical analysis complete: {format_analysis_summary(output)}")
-    noira_sent, brief_message, llm_response = send_message_to_noira(
-        analysis_type="classical",
-        portfolio=portfolio,
-        param=param,
-        asset=asset,
-        range_vals=range_vals,
-        steps=steps,
-        results=output
-    )
     
-    # 7. Add Noira notification info to output
+    # Generate unique analysis ID
+    analysis_id = str(uuid.uuid4())
+    
+    def process_noira_async():
+        """Process Noira explanation in background thread"""
+        try:
+            noira_sent, brief_message, llm_response = send_message_to_noira(
+                analysis_type="classical",
+                portfolio=portfolio,
+                param=param,
+                asset=asset,
+                range_vals=range_vals,
+                steps=steps,
+                results=output
+            )
+            if noira_sent and llm_response:
+                # Store the response for frontend polling
+                from noira.chat_controller import chat_controller
+                chat_controller.store_async_response(analysis_id, brief_message, llm_response)
+                logger.info(f"Noira response stored for classical analysis: {analysis_id}")
+        except Exception as e:
+            logger.error(f"Error processing Noira response: {e}")
+    
+    # Start background thread for Noira processing
+    threading.Thread(target=process_noira_async, daemon=True).start()
+    
+    # 8. Return results immediately (without waiting for Noira)
     output["noira_notification"] = {
-        "sent": noira_sent,
-        "brief_message": brief_message,
-        "llm_response": llm_response
+        "processing": True,
+        "analysis_id": analysis_id,
+        "brief_message": f"Tell me about this classical sensitivity test for {asset} {param}."
     }
     
     return output
