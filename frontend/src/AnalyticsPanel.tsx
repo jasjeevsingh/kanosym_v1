@@ -1,0 +1,433 @@
+import React from 'react';
+
+interface AnalyticsData {
+  mode: string;
+  performance_metrics: {
+    total_execution_time: number;
+    throughput: number;
+    steps_processed: number;
+    memory_usage_mb: number;
+    cpu_usage_percent: number;
+  };
+  statistical_metrics: {
+    confidence_interval_95: [number, number];
+    coefficient_of_variation: number;
+    skewness: number;
+    kurtosis: number;
+    standard_error: number;
+    statistical_significance: number;
+  };
+  quantum_metrics?: {
+    circuits_per_second: number;
+    shots_per_second: number;
+    circuit_depth: number;
+    total_qubits: number;
+    quantum_operations: number;
+    enhancement_factor: number;
+    quantum_advantage_ratio: number;
+  };
+  classical_metrics?: {
+    simulations_per_second: number;
+    iterations_per_second: number;
+    convergence_rate: number;
+    monte_carlo_efficiency: number;
+    standard_error: number;
+    statistical_significance: number;
+  };
+  hybrid_metrics?: {
+    quantum_classical_ratio: number;
+    hybrid_overhead: number;
+    synergy_factor: number;
+    efficiency_gain_vs_classical: number;
+    efficiency_gain_vs_quantum: number;
+    optimal_hybrid_ratio: number;
+  };
+  sensitivity_metrics?: {
+    sharpe_range: { min: number; max: number };
+    sharpe_volatility: number;
+    max_sensitivity_point: number;
+    curve_steepness: number;
+    risk_return_ratio: number;
+    portfolio_beta: number;
+    var_95: number;
+    expected_shortfall: number;
+    information_ratio: number;
+    sortino_ratio: number;
+    calmar_ratio: number;
+    max_drawdown: number;
+  };
+}
+
+interface AnalyticsPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  analytics: AnalyticsData | null;
+}
+
+const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analytics }) => {
+  if (!isOpen || !analytics) return null;
+
+  const formatNumber = (value: number, decimals: number = 2) => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(value);
+  };
+
+  const formatTime = (seconds: number) => {
+    if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
+    return `${seconds.toFixed(3)}s`;
+  };
+
+
+
+  const getModeColor = (mode: string) => {
+    switch (mode) {
+      case 'quantum': return 'text-blue-400';
+      case 'classical': return 'text-zinc-400';
+      case 'hybrid': return 'text-purple-400';
+      default: return 'text-gray-400';
+    }
+  };
+
+  const getModeBgColor = (mode: string) => {
+    switch (mode) {
+      case 'quantum': return 'bg-blue-900/20 border-blue-700/30';
+      case 'classical': return 'bg-zinc-900/20 border-zinc-700/30';
+      case 'hybrid': return 'bg-purple-900/20 border-purple-700/30';
+      default: return 'bg-gray-900/20 border-gray-700/30';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-11/12 max-w-6xl h-5/6 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-zinc-700">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-xl font-semibold text-white">Analytics Dashboard</h2>
+            <span className={`px-2 py-1 rounded text-xs font-medium uppercase ${getModeBgColor(analytics.mode)} ${getModeColor(analytics.mode)}`}>
+              {analytics.mode}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-white transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto max-h-[70vh] p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            
+            {/* Performance Metrics */}
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Performance Metrics
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Execution Time:</span>
+                  <span className="text-white font-mono">{formatTime(analytics.performance_metrics.total_execution_time)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Throughput:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.performance_metrics.throughput, 1)} steps/s</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Steps Processed:</span>
+                  <span className="text-white font-mono">{analytics.performance_metrics.steps_processed}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Memory Usage:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.performance_metrics.memory_usage_mb, 1)} MB</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">CPU Usage:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.performance_metrics.cpu_usage_percent, 1)}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Statistical Analysis */}
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Statistical Analysis
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">95% CI:</span>
+                  <span className="text-white font-mono">
+                    ({formatNumber(analytics.statistical_metrics.confidence_interval_95[0], 4)}, {formatNumber(analytics.statistical_metrics.confidence_interval_95[1], 4)})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Coeff. of Variation:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.coefficient_of_variation, 4)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Skewness:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.skewness, 4)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Kurtosis:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.kurtosis, 4)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Standard Error:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.standard_error, 4)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Statistical Significance:</span>
+                  <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.statistical_significance, 4)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode-Specific Metrics */}
+            {analytics.quantum_metrics && (
+              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Quantum Metrics
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Circuits/s:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.circuits_per_second, 1)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Shots/s:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.shots_per_second, 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Circuit Depth:</span>
+                    <span className="text-white font-mono">{analytics.quantum_metrics.circuit_depth}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Total Qubits:</span>
+                    <span className="text-white font-mono">{analytics.quantum_metrics.total_qubits}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Quantum Operations:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.quantum_operations, 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Enhancement Factor:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.enhancement_factor, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Quantum Advantage:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.quantum_advantage_ratio, 4)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {analytics.classical_metrics && (
+              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                  </svg>
+                  Classical Metrics
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Simulations/s:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.simulations_per_second, 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Iterations/s:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.iterations_per_second, 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Convergence Rate:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.convergence_rate, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">MC Efficiency:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.monte_carlo_efficiency, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Standard Error:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.standard_error, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Statistical Significance:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.statistical_significance, 4)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {analytics.hybrid_metrics && (
+              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Hybrid Metrics
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Q/C Ratio:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.quantum_classical_ratio, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Hybrid Overhead:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.hybrid_overhead, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Synergy Factor:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.synergy_factor, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Efficiency vs Classical:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.efficiency_gain_vs_classical, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Efficiency vs Quantum:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.efficiency_gain_vs_quantum, 4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Optimal Hybrid Ratio:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.optimal_hybrid_ratio, 4)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sensitivity Metrics - Finance Focused */}
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Sensitivity Metrics
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Sharpe Ratio Range:</span>
+                  <span className="text-white font-mono">
+                    {analytics.sensitivity_metrics?.sharpe_range?.min || '0.0000'} - {analytics.sensitivity_metrics?.sharpe_range?.max || '0.0000'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Sharpe Volatility:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.sharpe_volatility || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Max Sensitivity Point:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_sensitivity_point || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Curve Steepness:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.curve_steepness || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Risk-Return Ratio:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.risk_return_ratio || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Portfolio Beta:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.portfolio_beta || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Value at Risk (95%):</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.var_95 || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Expected Shortfall:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.expected_shortfall || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Information Ratio:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.information_ratio || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Sortino Ratio:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.sortino_ratio || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Calmar Ratio:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.calmar_ratio || '0.0000'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Maximum Drawdown:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_drawdown || '0.0000'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Insights */}
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 lg:col-span-2 xl:col-span-3">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                Key Insights
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-zinc-700/50 rounded p-3">
+                  <div className="text-sm text-zinc-400 mb-1">Performance</div>
+                  <div className="text-white font-medium">
+                    {analytics.performance_metrics.throughput > 10 ? 'High' : analytics.performance_metrics.throughput > 5 ? 'Medium' : 'Low'} throughput
+                  </div>
+                </div>
+                <div className="bg-zinc-700/50 rounded p-3">
+                  <div className="text-sm text-zinc-400 mb-1">Reliability</div>
+                  <div className="text-white font-medium">
+                    {analytics.statistical_metrics.statistical_significance > 0.95 ? 'Very High' : analytics.statistical_metrics.statistical_significance > 0.8 ? 'High' : 'Moderate'} confidence
+                  </div>
+                </div>
+                <div className="bg-zinc-700/50 rounded p-3">
+                  <div className="text-sm text-zinc-400 mb-1">Efficiency</div>
+                  <div className="text-white font-medium">
+                    {analytics.performance_metrics.memory_usage_mb < 100 ? 'Low' : analytics.performance_metrics.memory_usage_mb < 500 ? 'Medium' : 'High'} memory usage
+                  </div>
+                </div>
+                {analytics.quantum_metrics && (
+                  <div className="bg-zinc-700/50 rounded p-3">
+                    <div className="text-sm text-zinc-400 mb-1">Quantum Advantage</div>
+                    <div className="text-white font-medium">
+                      {analytics.quantum_metrics.enhancement_factor > 1.1 ? 'Significant' : analytics.quantum_metrics.enhancement_factor > 1.05 ? 'Moderate' : 'Minimal'} enhancement
+                    </div>
+                  </div>
+                )}
+                {analytics.hybrid_metrics && (
+                  <div className="bg-zinc-700/50 rounded p-3">
+                    <div className="text-sm text-zinc-400 mb-1">Synergy</div>
+                    <div className="text-white font-medium">
+                      {analytics.hybrid_metrics.synergy_factor > 1.1 ? 'Strong' : analytics.hybrid_metrics.synergy_factor > 1.05 ? 'Moderate' : 'Weak'} quantum-classical synergy
+                    </div>
+                  </div>
+                )}
+                <div className="bg-zinc-700/50 rounded p-3">
+                  <div className="text-sm text-zinc-400 mb-1">Statistical Quality</div>
+                  <div className="text-white font-medium">
+                    {analytics.statistical_metrics.coefficient_of_variation < 0.1 ? 'Excellent' : analytics.statistical_metrics.coefficient_of_variation < 0.2 ? 'Good' : 'Fair'} precision
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AnalyticsPanel; 

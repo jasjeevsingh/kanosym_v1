@@ -11,6 +11,10 @@ to analyze how portfolio performance changes when parameters are perturbed.
 import numpy as np
 from typing import Dict, Any, List
 import random
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from analytics import AnalyticsCollector
 
 
 def classical_sensitivity_test(
@@ -31,8 +35,12 @@ def classical_sensitivity_test(
         steps: Number of steps in the range
         
     Returns:
-        Dictionary with sensitivity analysis results
+        Dictionary with sensitivity analysis results and analytics
     """
+    # Initialize analytics collector
+    analytics = AnalyticsCollector('classical')
+    analytics.start_collection()
+    
     # 1. Perturb the portfolio
     perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
     
@@ -43,18 +51,24 @@ def classical_sensitivity_test(
     results = []
     for p in perturbed_portfolios:
         sharpe = run_monte_carlo(p)
-        results.append({"perturbed_value": p["perturbed_value"], "sharpe": sharpe})
+        result = {"perturbed_value": p["perturbed_value"], "sharpe": sharpe}
+        results.append(result)
+        analytics.add_result(result)
     
     # 4. Compute deltas
     metrics = compute_metrics(baseline_sharpe, results)
     
-    # 5. Format output
+    # 5. End analytics collection
+    analytics.end_collection()
+    
+    # 6. Format output with analytics
     output = format_output(
         perturbation=param,
         asset=asset,
         range_tested=list(np.linspace(range_vals[0], range_vals[1], steps)),
         baseline_sharpe=baseline_sharpe,
-        results=metrics
+        results=metrics,
+        analytics=analytics.get_analytics_summary()
     )
     
     return output
@@ -184,7 +198,7 @@ def compute_metrics(base_result: float, results_list: List[Dict]) -> List[Dict]:
     return output
 
 
-def format_output(perturbation: str, asset: str, range_tested: List[float], baseline_sharpe: float, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+def format_output(perturbation: str, asset: str, range_tested: List[float], baseline_sharpe: float, results: List[Dict[str, Any]], analytics: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Format the final output for the frontend.
     
@@ -194,11 +208,12 @@ def format_output(perturbation: str, asset: str, range_tested: List[float], base
         range_tested: List of values tested
         baseline_sharpe: Baseline Sharpe ratio
         results: List of results from perturbation analysis
+        analytics: Analytics data from the test
         
     Returns:
         Formatted output dictionary
     """
-    return {
+    output = {
         "perturbation": perturbation,
         "asset": asset,
         "range_tested": range_tested,
@@ -206,4 +221,9 @@ def format_output(perturbation: str, asset: str, range_tested: List[float], base
         "results": results,
         "processing_mode": "classical",
         "description": "Classical Monte Carlo simulation for portfolio sensitivity analysis"
-    } 
+    }
+    
+    if analytics:
+        output["analytics"] = analytics
+        
+    return output 

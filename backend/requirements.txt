@@ -7,6 +7,8 @@ python-dotenv>=1.0.0
 
 # Scientific Computing
 numpy>=1.24.0
+scipy>=1.10.0
+psutil>=5.9.0
 
 # Quantum Computing - Using working stable versions
 qiskit==0.44.3
