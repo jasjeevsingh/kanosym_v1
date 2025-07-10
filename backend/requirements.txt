@@ -1,9 +1,21 @@
-flask-cors 
-dotenv
-numpy
-qiskit>=2.1.0
-qiskit-aer
-openai>=1.0.0
+# Web Framework
 flask>=2.3.0
 flask-cors>=4.0.0
-python-dotenv>=1.0.0 
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+
+# Scientific Computing
+numpy>=1.24.0
+
+# Quantum Computing
+qiskit>=1.0.0
+qiskit-aer>=0.14.0
+qiskit-algorithms>=0.3.0
+
+# AI/ML
+openai>=1.0.0
+
+# Optional: Development & Testing (uncomment if needed)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0 
