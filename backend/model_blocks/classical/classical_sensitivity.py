@@ -40,13 +40,12 @@ def classical_sensitivity_test(
         steps: Number of steps in the range
         
     Returns:
-        Dictionary with sensitivity analysis results and analytics
+        Dictionary with sensitivity analysis results and Noira notification info
     """
     # Initialize analytics collector
     analytics = AnalyticsCollector('classical')
     analytics.start_collection()
-        Dictionary with sensitivity analysis results and Noira notification info
-    """
+        
     logger.info(f"Starting classical sensitivity analysis: {param} for {asset}")
     
     # 1. Perturb the portfolio
@@ -253,4 +252,4 @@ def format_output(perturbation: str, asset: str, range_tested: List[float], base
         output["analytics"] = analytics
         
     return output 
-    }
+    
