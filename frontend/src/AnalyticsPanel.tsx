@@ -16,6 +16,9 @@ interface AnalyticsData {
     kurtosis: number;
     standard_error: number;
     statistical_significance: number;
+    median_volatility?: number;
+    iqr_volatility?: number;
+    sample_size?: number;
   };
   quantum_metrics?: {
     circuits_per_second: number;
@@ -53,6 +56,9 @@ interface AnalyticsData {
     sortino_ratio: number;
     calmar_ratio: number;
     max_drawdown: number;
+    baseline_portfolio_volatility_daily?: number;
+    portfolio_volatility_range?: [number, number];
+    percentile_95_volatility?: number;
   };
 }
 
@@ -186,8 +192,16 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                   <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.standard_error, 4)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Statistical Significance:</span>
-                  <span className="text-white font-mono">{formatNumber(analytics.statistical_metrics.statistical_significance, 4)}</span>
+                  <span className="text-zinc-400">Median Volatility:</span>
+                  <span className="text-white font-mono">{analytics.statistical_metrics?.median_volatility ?? 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Interquartile Range (IQR):</span>
+                  <span className="text-white font-mono">{analytics.statistical_metrics?.iqr_volatility ?? 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Sample Size:</span>
+                  <span className="text-white font-mono">{analytics.statistical_metrics?.sample_size ?? 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -221,14 +235,6 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Quantum Operations:</span>
                     <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.quantum_operations, 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Enhancement Factor:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.enhancement_factor, 4)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Quantum Advantage:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.quantum_metrics.quantum_advantage_ratio, 4)}</span>
                   </div>
                 </div>
               </div>
@@ -308,7 +314,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
               </div>
             )}
 
-            {/* Sensitivity Metrics - Finance Focused */}
+            {/* Sensitivity Metrics - Risk Only */}
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -318,44 +324,26 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
+                  <span className="text-zinc-400">Baseline Portfolio Volatility:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.baseline_portfolio_volatility_daily?.toFixed(4) ?? 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Volatility Range:</span>
+                  <span className="text-white font-mono">
+                    {analytics.sensitivity_metrics?.portfolio_volatility_range ? `${analytics.sensitivity_metrics.portfolio_volatility_range[0].toFixed(4)} - ${analytics.sensitivity_metrics.portfolio_volatility_range[1].toFixed(4)}` : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-zinc-400">Max Sensitivity Point:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_sensitivity_point || '0.0000'}</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_sensitivity_point?.toFixed(4) ?? 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Curve Steepness:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.curve_steepness || '0.0000'}</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.curve_steepness?.toFixed(4) ?? 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Risk-Return Ratio:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.risk_return_ratio || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Portfolio Beta:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.portfolio_beta || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Value at Risk (95%):</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.var_95 || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Expected Shortfall:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.expected_shortfall || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Information Ratio:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.information_ratio || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Sortino Ratio:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.sortino_ratio || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Calmar Ratio:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.calmar_ratio || '0.0000'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Maximum Drawdown:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_drawdown || '0.0000'}</span>
+                  <span className="text-zinc-400">95th Percentile Volatility:</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.percentile_95_volatility !== undefined ? analytics.sensitivity_metrics.percentile_95_volatility.toFixed(4) : 'N/A'}</span>
                 </div>
               </div>
             </div>

@@ -70,7 +70,9 @@ class StatisticalMetrics:
     skewness: float
     kurtosis: float
     standard_error: float
-    statistical_significance: float
+    median_volatility: float
+    iqr_volatility: float
+    sample_size: int
 
 
 @dataclass
@@ -82,6 +84,7 @@ class SensitivityMetrics:
     curve_steepness: float
     baseline_portfolio_volatility_daily: float
     baseline_portfolio_volatility_annualized: float
+    percentile_95_volatility: Optional[float] = None
 
 
 class AnalyticsCollector:
@@ -161,14 +164,18 @@ class AnalyticsCollector:
         skewness = stats.skew(vol_values) if len(vol_values) > 2 else 0
         kurtosis = stats.kurtosis(vol_values) if len(vol_values) > 2 else 0
         standard_error = stats.sem(vol_values) if len(vol_values) > 1 else 0
-        statistical_significance = 0  # Not meaningful for risk-only
+        median_volatility = float(np.median(vol_values)) if vol_values else 0
+        iqr_volatility = float(np.percentile(vol_values, 75) - np.percentile(vol_values, 25)) if vol_values else 0
+        sample_size = len(vol_values)
         self.statistical_metrics = StatisticalMetrics(
             confidence_interval_95=confidence_interval,
             coefficient_of_variation=cv,
             skewness=skewness,
             kurtosis=kurtosis,
             standard_error=standard_error,
-            statistical_significance=statistical_significance
+            median_volatility=median_volatility,
+            iqr_volatility=iqr_volatility,
+            sample_size=sample_size
         )
 
     def _compute_sensitivity_metrics(self):
@@ -181,6 +188,8 @@ class AnalyticsCollector:
         # Range
         portfolio_volatility_range = (min(vol_values), max(vol_values))
         portfolio_volatility_annualized_range = (min(vol_ann_values), max(vol_ann_values))
+        # 95th percentile of simulated volatility
+        percentile_95_volatility = float(np.percentile(vol_values, 95)) if vol_values else None
         # Max sensitivity point (where volatility changes most)
         if len(vol_values) > 1:
             vol_diffs = np.abs(np.diff(vol_values))
@@ -198,7 +207,8 @@ class AnalyticsCollector:
             max_sensitivity_point=max_sensitivity_point,
             curve_steepness=curve_steepness,
             baseline_portfolio_volatility_daily=baseline_portfolio_volatility_daily,
-            baseline_portfolio_volatility_annualized=baseline_portfolio_volatility_annualized
+            baseline_portfolio_volatility_annualized=baseline_portfolio_volatility_annualized,
+            percentile_95_volatility=percentile_95_volatility
         )
         
     def _compute_quantum_metrics(self):
@@ -227,10 +237,12 @@ class AnalyticsCollector:
             risk_reduction_ratio = classical_baseline / quantum_baseline if classical_baseline and quantum_baseline and quantum_baseline != 0 else None
             # Quantum advantage ratio (legacy, not recommended):
             quantum_advantage_ratio = enhancement_factor - 1 if enhancement_factor > 1 else 0
+            measurement_probabilities = {}
         else:
             enhancement_factor = 1.0
             risk_reduction_ratio = None
             quantum_advantage_ratio = 0.0
+            measurement_probabilities = {}
         
         # Computation time comparison (if available)
         computation_time_comparison = None
@@ -274,18 +286,15 @@ class AnalyticsCollector:
         # Standard error and statistical significance
         if self.statistical_metrics:
             standard_error = self.statistical_metrics.standard_error
-            statistical_significance = self.statistical_metrics.statistical_significance
         else:
             standard_error = 0.0
-            statistical_significance = 0.0
             
         self.classical_metrics = ClassicalMetrics(
             simulations_per_second=simulations_per_second,
             iterations_per_second=iterations_per_second,
             convergence_rate=convergence_rate,
             monte_carlo_efficiency=monte_carlo_efficiency,
-            standard_error=standard_error,
-            statistical_significance=statistical_significance
+            standard_error=standard_error
         )
         
     def _compute_hybrid_metrics(self):
@@ -358,7 +367,9 @@ def format_analytics_for_frontend(analytics: Dict[str, Any]) -> Dict[str, Any]:
             'skewness': f"{analytics['statistical_metrics']['skewness']:.4f}",
             'kurtosis': f"{analytics['statistical_metrics']['kurtosis']:.4f}",
             'standard_error': f"{analytics['statistical_metrics']['standard_error']:.4f}",
-            'statistical_significance': f"{analytics['statistical_metrics']['statistical_significance']:.4f}"
+            'median_volatility': analytics['statistical_metrics']['median_volatility'],
+            'iqr_volatility': analytics['statistical_metrics']['iqr_volatility'],
+            'sample_size': analytics['statistical_metrics']['sample_size']
         }
     }
     if 'sensitivity_metrics' in analytics:
@@ -374,6 +385,7 @@ def format_analytics_for_frontend(analytics: Dict[str, Any]) -> Dict[str, Any]:
             'max_sensitivity_point': f"{analytics['sensitivity_metrics']['max_sensitivity_point']:.4f}",
             'curve_steepness': f"{analytics['sensitivity_metrics']['curve_steepness']:.4f}",
             'baseline_portfolio_volatility_daily': f"{analytics['sensitivity_metrics']['baseline_portfolio_volatility_daily']:.4f}",
-            'baseline_portfolio_volatility_annualized': f"{analytics['sensitivity_metrics']['baseline_portfolio_volatility_annualized']:.4f}"
+            'baseline_portfolio_volatility_annualized': f"{analytics['sensitivity_metrics']['baseline_portfolio_volatility_annualized']:.4f}",
+            'percentile_95_volatility': f"{analytics['sensitivity_metrics']['percentile_95_volatility']:.4f}" if analytics['sensitivity_metrics'].get('percentile_95_volatility') is not None else None
         }
     return formatted 

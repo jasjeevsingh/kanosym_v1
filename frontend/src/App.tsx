@@ -642,7 +642,7 @@ function RunModelButton({ onClick }: { onClick: () => void }) {
       style={{ position: 'absolute', bottom: 75, right: 10 }}
       onClick={onClick}
     >
-      Run Model
+      Run
     </button>
   );
 }

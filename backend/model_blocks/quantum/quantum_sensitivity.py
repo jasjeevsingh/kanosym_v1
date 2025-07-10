@@ -20,104 +20,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics import AnalyticsCollector
 from ..noira_utils import send_message_to_noira, format_analysis_summary
 import logging
+from qiskit.circuit.library import WeightedAdder
+from qiskit.algorithms import EstimationProblem
+from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
+from qiskit.utils import QuantumInstance
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-
-def quantum_sensitivity_test(
-    portfolio: Dict[str, Any],
-    param: str,
-    asset: str,
-    range_vals: list,
-    steps: int
-) -> Dict[str, Any]:
-    """
-    Main function for quantum sensitivity testing.
-    
-    Args:
-        portfolio: Portfolio configuration with assets, weights, volatility, correlation_matrix
-        param: Parameter to perturb ('volatility', 'weight', 'correlation')
-        asset: Asset to perturb
-        range_vals: [min_value, max_value] for perturbation range
-        steps: Number of steps in the range
-        
-    Returns:
-        Dictionary with sensitivity analysis results and Noira notification info
-    """
-    # Initialize analytics collector
-    analytics = AnalyticsCollector('quantum')
-    analytics.start_collection()
-    
-    logger.info(f"Starting quantum sensitivity analysis: {param} for {asset}")
-    
-    # 1. Perturb the portfolio
-    perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
-    
-    # 2. Run QAE for baseline (unperturbed)
-    baseline_sharpe = run_qae(portfolio)
-    
-    # 3. Run QAE for each perturbed portfolio
-    results = []
-    for p in perturbed_portfolios:
-        sharpe = run_qae(p)
-        result = {"perturbed_value": p["perturbed_value"], "sharpe": sharpe}
-        results.append(result)
-        analytics.add_result(result)
-    
-    # 4. Compute deltas
-    metrics = compute_metrics(baseline_sharpe, results)
-    
-    # 5. End analytics collection
-    analytics.end_collection()
-    
-    # 6. Format output with analytics
-    output = format_output(
-        perturbation=param,
-        asset=asset,
-        range_tested=list(np.linspace(range_vals[0], range_vals[1], steps)),
-        baseline_sharpe=baseline_sharpe,
-        results=metrics,
-        analytics=analytics.get_analytics_summary()
-    )
-    
-    # 7. Start Noira processing in background (non-blocking)
-    logger.info(f"Quantum analysis complete: {format_analysis_summary(output)}")
-    
-    # Generate unique analysis ID
-    analysis_id = str(uuid.uuid4())
-    
-    def process_noira_async():
-        """Process Noira explanation in background thread"""
-        try:
-            noira_sent, brief_message, llm_response = send_message_to_noira(
-                analysis_type="quantum",
-                portfolio=portfolio,
-                param=param,
-                asset=asset,
-                range_vals=range_vals,
-                steps=steps,
-                results=output
-            )
-            if noira_sent and llm_response:
-                # Store the response for frontend polling
-                from noira.chat_controller import chat_controller
-                chat_controller.store_async_response(analysis_id, brief_message, llm_response)
-                logger.info(f"Noira response stored for quantum analysis: {analysis_id}")
-        except Exception as e:
-            logger.error(f"Error processing Noira response: {e}")
-    
-    # Start background thread for Noira processing
-    threading.Thread(target=process_noira_async, daemon=True).start()
-    
-    # 8. Return results immediately (without waiting for Noira)
-    output["noira_notification"] = {
-        "processing": True,
-        "analysis_id": analysis_id,
-        "brief_message": f"Tell me about this quantum sensitivity test for {asset} {param}."
-    }
-    
-    return output
 
 
 def perturb_portfolio(param: str, asset: str, range_vals: List[float], steps: int, portfolio: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -166,29 +75,49 @@ def perturb_portfolio(param: str, asset: str, range_vals: List[float], steps: in
 
 def run_quantum_volatility(portfolio_state: Dict[str, Any]) -> dict:
     """
-    Quantum-inspired volatility estimator (mocked for now).
-    Returns both daily and annualized portfolio volatility.
+    Quantum volatility estimator using Qiskit's Iterative Amplitude Estimation (QAE).
+    Supports up to 3 assets. If more than 3 assets, raises a ValueError with a warning.
     """
     weights = np.array(portfolio_state['weights'])
     volatility = np.array(portfolio_state['volatility'])
     correlation_matrix = np.array(portfolio_state['correlation_matrix'])
-    assert weights.shape == volatility.shape, "Weights and volatility must align"
-    assert correlation_matrix.shape == (len(weights), len(weights)), "Correlation matrix must be square"
-    num_simulations = 10000
-    time_periods = 252
-    np.random.seed(42)
-    covariance_matrix = np.outer(volatility, volatility) * correlation_matrix
-    returns = np.random.multivariate_normal(
-        mean=np.zeros(len(weights)),
-        cov=covariance_matrix,
-        size=(num_simulations, time_periods)
+    n_assets = len(weights)
+    if n_assets > 3:
+        raise ValueError("Quantum volatility estimator currently only supports up to 3 assets due to quantum resource constraints. Please use 3 or fewer assets for quantum analysis.")
+    if n_assets < 2:
+        raise ValueError("At least 2 assets are required for quantum volatility estimation.")
+
+    # For 2 or 3 assets, compute portfolio variance
+    # Variance = w^T * Cov * w
+    cov_matrix = np.outer(volatility, volatility) * correlation_matrix
+    portfolio_variance = float(weights @ cov_matrix @ weights)
+
+    # Map variance to probability amplitude in [0, 1]
+    max_variance = 1.0
+    scaled_variance = min(portfolio_variance / max_variance, 1.0)
+
+    from qiskit import QuantumCircuit
+    qc = QuantumCircuit(1)
+    qc.ry(2 * np.arcsin(np.sqrt(scaled_variance)), 0)
+
+    from qiskit.algorithms import EstimationProblem
+    from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
+    from qiskit.utils import QuantumInstance
+    backend = Aer.get_backend('aer_simulator')
+    qi = QuantumInstance(backend, shots=1000)
+    qae = IterativeAmplitudeEstimation(epsilon_target=0.01, alpha=0.05, quantum_instance=qi)
+    problem = EstimationProblem(
+        state_preparation=qc,
+        objective_qubits=[0],
+        grover_operator=None
     )
-    portfolio_returns = np.sum(returns * weights, axis=1)
-    daily_vol = float(np.std(portfolio_returns))
-    annualized_vol = daily_vol * np.sqrt(252)
+    result = qae.estimate(problem)
+    est_variance = result.estimation
+    est_volatility = np.sqrt(est_variance * max_variance)
+    annualized_vol = est_volatility * np.sqrt(252)
     return {
-        'portfolio_volatility_daily': daily_vol,
-        'portfolio_volatility_annualized': annualized_vol
+        'portfolio_volatility_daily': float(est_volatility),
+        'portfolio_volatility_annualized': float(annualized_vol)
     }
 
 
@@ -200,14 +129,21 @@ def quantum_sensitivity_test(
     steps: int
 ) -> Dict[str, Any]:
     """
-    Main function for quantum sensitivity testing (portfolio volatility only).
+    Main function for quantum sensitivity testing (volatility only, with Noira async and analytics).
     """
     analytics = AnalyticsCollector('quantum')
     analytics.start_collection()
+    logger.info(f"Starting quantum sensitivity analysis: {param} for {asset}")
+
+    # 1. Perturb the portfolio
     perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
+
+    # 2. Run quantum volatility for baseline (unperturbed)
     baseline_metrics = run_quantum_volatility(portfolio)
     baseline_daily = baseline_metrics['portfolio_volatility_daily']
     baseline_annualized = baseline_metrics['portfolio_volatility_annualized']
+
+    # 3. Run quantum volatility for each perturbed portfolio
     results = []
     for p in perturbed_portfolios:
         metrics = run_quantum_volatility(p)
@@ -218,7 +154,11 @@ def quantum_sensitivity_test(
         }
         results.append(result)
         analytics.add_result(result)
+
+    # 4. End analytics collection
     analytics.end_collection()
+
+    # 5. Format output with analytics
     output = format_output(
         perturbation=param,
         asset=asset,
@@ -228,6 +168,35 @@ def quantum_sensitivity_test(
         results=results,
         analytics=analytics.get_analytics_summary()
     )
+
+    # 6. Start Noira processing in background (non-blocking)
+    logger.info(f"Quantum analysis complete: {format_analysis_summary(output)}")
+    analysis_id = str(uuid.uuid4())
+    def process_noira_async():
+        try:
+            noira_sent, brief_message, llm_response = send_message_to_noira(
+                analysis_type="quantum",
+                portfolio=portfolio,
+                param=param,
+                asset=asset,
+                range_vals=range_vals,
+                steps=steps,
+                results=output
+            )
+            if noira_sent and llm_response:
+                from noira.chat_controller import chat_controller
+                chat_controller.store_async_response(analysis_id, brief_message, llm_response)
+                logger.info(f"Noira response stored for quantum analysis: {analysis_id}")
+        except Exception as e:
+            logger.error(f"Error processing Noira response: {e}")
+    threading.Thread(target=process_noira_async, daemon=True).start()
+
+    # 7. Return results immediately (without waiting for Noira)
+    output["noira_notification"] = {
+        "processing": True,
+        "analysis_id": analysis_id,
+        "brief_message": f"Tell me about this quantum sensitivity test for {asset} {param}."
+    }
     return output
 
 
