@@ -22,7 +22,7 @@ def send_message_to_noira(
     range_vals: list,
     steps: int,
     results: Dict[str, Any]
-) -> Tuple[bool, str]:
+) -> Tuple[bool, str, Optional[str]]:
     """
     Send an explanatory message to Noira about the analysis that was just run.
     
@@ -36,9 +36,10 @@ def send_message_to_noira(
         results: Analysis results
         
     Returns:
-        Tuple of (success: bool, brief_message: str)
+        Tuple of (success: bool, brief_message: str, llm_response: Optional[str])
         - success: Whether the message was successfully sent to Noira
         - brief_message: Short message for frontend display
+        - llm_response: The actual response from Noira
     """
     # Create brief message for frontend
     brief_message = f"Tell me about this {analysis_type} sensitivity test for {asset} {param}."
@@ -50,7 +51,7 @@ def send_message_to_noira(
         # Only proceed if API key is set
         if not chat_controller.api_key:
             logger.info(f"Noira API key not set, skipping explanation for {analysis_type} analysis")
-            return False, brief_message
+            return False, brief_message, None
         
         # Create context about the analysis
         context = {
@@ -76,14 +77,15 @@ def send_message_to_noira(
         result = chat_controller.send_message(full_message, context)
         if result.get('success'):
             logger.info(f"Successfully sent {analysis_type} analysis explanation to Noira")
-            return True, brief_message
+            llm_response = result.get('response', '')
+            return True, brief_message, llm_response
         else:
             logger.warning(f"Failed to send message to Noira: {result.get('message')}")
-            return False, brief_message
+            return False, brief_message, None
             
     except Exception as e:
         logger.error(f"Error sending message to Noira: {str(e)}")
-        return False, brief_message
+        return False, brief_message, None
 
 
 def create_explanation_request(
