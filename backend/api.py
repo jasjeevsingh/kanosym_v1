@@ -10,6 +10,7 @@ from noira.chat_controller import chat_controller
 import os
 import logging
 from dotenv import load_dotenv
+import werkzeug.serving
 from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
 from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
@@ -21,6 +22,14 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+# Custom logger to filter out thinking-status polling noise
+class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
+    def log_request(self, code='-', size='-'):
+        # Filter out thinking-status endpoint logs since they're just polling
+        if self.path and '/thinking-status' in self.path:
+            return
+        super().log_request(code, size)
 
 def validate_portfolio(portfolio):
     """
@@ -258,6 +267,28 @@ def get_display_updates():
     result = chat_controller.get_display_updates(client_id, full_history)
     return jsonify(result)
 
+@app.route('/api/chat/thinking-status', methods=['GET'])
+def get_thinking_status():
+    """Check if there are any pending responses (thinking state)"""
+    try:
+        has_pending = chat_controller.has_pending_responses()
+        pending_ids = chat_controller.get_pending_analysis_ids()
+        
+        return jsonify({
+            "success": True,
+            "is_thinking": has_pending,
+            "pending_analysis_ids": pending_ids,
+            "pending_count": len(pending_ids),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error checking thinking status: {str(e)}",
+            "is_thinking": False,
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
 @app.route('/api/chat/reset-display', methods=['POST'])
 def reset_display_history():
     """Reset display history"""
@@ -377,10 +408,11 @@ class NoPollingRequestFilter(logging.Filter):
     """Filter out frequent polling requests from Flask logs"""
     
     def filter(self, record):
-        # Filter out GET requests to display-updates endpoint
+        # Filter out GET requests to polling endpoints
         if hasattr(record, 'getMessage'):
             message = record.getMessage()
-            if 'GET /api/chat/display-updates' in message:
+            if ('GET /api/chat/display-updates' in message or 
+                'GET /api/chat/thinking-status' in message):
                 return False
         return True
 
@@ -389,4 +421,4 @@ if __name__ == '__main__':
     werkzeug_logger = logging.getLogger('werkzeug')
     werkzeug_logger.addFilter(NoPollingRequestFilter())
     
-    app.run(debug=True, port=5001)  # Change to 5001
+    app.run(debug=True, port=5001, request_handler=FilteredRequestHandler)

@@ -11,6 +11,7 @@ interface ChatMessage {
   text: string;
   timestamp?: string;
   isThinking?: boolean;
+  messageId?: string;
 }
 
 interface ApiResponse {
@@ -50,7 +51,7 @@ interface DebugInfo {
 
 // API service class - UPDATED TO PORT 5001
 class ChatApiService {
-  private baseUrl = 'http://localhost:5001/api/chat';  // Changed from 5000 to 5001
+  public baseUrl = 'http://localhost:5001/api/chat';  // Changed from 5000 to 5001
 
   async setApiKey(apiKey: string): Promise<ApiResponse> {
     try {
@@ -518,6 +519,20 @@ function DebugPanel({
 
 // Add MessageContent component before the main component
 function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boolean }) {
+  // Format timestamp consistently
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return '';
+    try {
+      return new Date(timestamp).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return '';
+    }
+  };
+
   if (isUser) {
     // Plain text for user messages
     return (
@@ -525,7 +540,7 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
         {message.text}
         {message.timestamp && (
           <div className="text-xs opacity-50 mt-1">
-            {new Date(message.timestamp).toLocaleTimeString()}
+            {formatTimestamp(message.timestamp)}
           </div>
         )}
       </div>
@@ -565,7 +580,7 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
       </ReactMarkdown>
       {message.timestamp && (
         <div className="text-xs opacity-50 mt-1">
-          {new Date(message.timestamp).toLocaleTimeString()}
+          {formatTimestamp(message.timestamp)}
         </div>
       )}
     </div>
@@ -580,6 +595,7 @@ export default function NoiraPanel() {
   const [showDebug, setShowDebug] = useState(false);
   const [status, setStatus] = useState<ChatStatus | null>(null);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const apiService = useRef(new ChatApiService());
 
@@ -604,8 +620,7 @@ export default function NoiraPanel() {
         const formattedMessages = updates.messages.map((msg: any) => ({
           sender: msg.role === 'user' ? 'user' : 'noira',
           text: msg.content,
-          timestamp: msg.timestamp,
-          isThinking: msg.is_thinking
+          timestamp: msg.timestamp
         }));
         setMessages(formattedMessages);
       }
@@ -613,7 +628,7 @@ export default function NoiraPanel() {
     
     loadInitialHistory();
     
-    // Then poll for updates every second
+    // Poll for updates every second
     const pollInterval = setInterval(async () => {
       const updates = await apiService.current.getDisplayUpdates('default', false);
       if (updates.has_updates && updates.messages) {
@@ -621,37 +636,41 @@ export default function NoiraPanel() {
           const newMessages = updates.messages.map((msg: any) => ({
             sender: msg.role === 'user' ? 'user' : 'noira',
             text: msg.content,
-            timestamp: msg.timestamp,
-            isThinking: msg.is_thinking
+            timestamp: msg.timestamp
           }));
           
-          // Replace thinking messages with actual responses
-          const updatedMessages = [...prev];
-          newMessages.forEach((newMsg: any) => {
-            if (newMsg.isThinking) {
-              // Add thinking message
-              updatedMessages.push(newMsg);
-              setLoading(true);
-            } else {
-              // Look for thinking message to replace
-              const thinkingIndex = updatedMessages.findIndex(
-                (m, idx) => m.isThinking && idx === updatedMessages.length - 1
-              );
-              if (thinkingIndex !== -1) {
-                updatedMessages[thinkingIndex] = newMsg;
-                setLoading(false);
-              } else {
-                updatedMessages.push(newMsg);
-              }
-            }
-          });
-          
-          return updatedMessages;
+          return [...prev, ...newMessages];
         });
       }
     }, 1000);
     
     return () => clearInterval(pollInterval);
+  }, [status?.api_key_set]);
+
+  // Poll for thinking status separately
+  useEffect(() => {
+    if (!status?.api_key_set) return;
+    
+    const checkThinkingStatus = async () => {
+      try {
+        const response = await fetch(`${apiService.current.baseUrl}/thinking-status`);
+        if (response.ok) {
+          const result = await response.json();
+          setIsThinking(result.is_thinking || false);
+        }
+      } catch (error) {
+        console.error('Error checking thinking status:', error);
+        setIsThinking(false);
+      }
+    };
+    
+    // Check immediately
+    checkThinkingStatus();
+    
+    // Then poll every 2 seconds for thinking status (less frequent to reduce log noise)
+    const thinkingInterval = setInterval(checkThinkingStatus, 2000);
+    
+    return () => clearInterval(thinkingInterval);
   }, [status?.api_key_set]);
 
   const refreshStatus = async () => {
@@ -665,38 +684,71 @@ export default function NoiraPanel() {
     console.log('Status refreshed:', { statusData, debugData });
   };
 
-
-
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { sender: 'user', text: userMessage }]);
+    
+    // Immediately add user message for instant feedback
+    const userTimestamp = new Date().toISOString();
+    const thinkingMessageId = `thinking-${Date.now()}`;
+    
+    setMessages(prev => [
+      ...prev, 
+      { 
+        sender: 'user', 
+        text: userMessage,
+        timestamp: userTimestamp
+      },
+      {
+        sender: 'noira',
+        text: 'Thinking...',
+        isThinking: true,
+        messageId: thinkingMessageId,
+        timestamp: new Date().toISOString()
+      }
+    ]);
+    
     setLoading(true);
 
     try {
       const result = await apiService.current.sendMessage(userMessage);
       
       if (result.success && result.response) {
-        setMessages(prev => [...prev, { 
-          sender: 'noira', 
-          text: result.response!,
-          timestamp: result.timestamp 
-        }]);
+        // Replace thinking message with actual response
+        setMessages(prev => prev.map(msg => 
+          msg.messageId === thinkingMessageId 
+            ? { 
+                sender: 'noira', 
+                text: result.response!,
+                timestamp: result.timestamp 
+              }
+            : msg
+        ));
       } else {
-        setMessages(prev => [...prev, { 
-          sender: 'noira', 
-          text: `Error: ${result.message || 'Unknown error occurred'}`,
-          timestamp: result.timestamp 
-        }]);
+        // Replace thinking message with error
+        setMessages(prev => prev.map(msg => 
+          msg.messageId === thinkingMessageId 
+            ? { 
+                sender: 'noira', 
+                text: `Error: ${result.message || 'Unknown error occurred'}`,
+                timestamp: result.timestamp 
+              }
+            : msg
+        ));
       }
     } catch (error) {
-      setMessages(prev => [...prev, { 
-        sender: 'noira', 
-        text: `Connection error: ${error}`,
-        timestamp: new Date().toISOString()
-      }]);
+      // Replace thinking message with connection error
+      setMessages(prev => prev.map(msg => 
+        msg.messageId === thinkingMessageId 
+          ? { 
+              sender: 'noira', 
+              text: `Connection error: ${error}`,
+              timestamp: new Date().toISOString()
+            }
+          : msg
+      ));
     }
 
     setLoading(false);
@@ -733,13 +785,19 @@ export default function NoiraPanel() {
           <div className={`text-xs ${getStatusColor()}`}>
             ● {getStatusText()}
           </div>
+          {isThinking && (
+            <div className="flex items-center gap-1 text-xs text-blue-400">
+              <div className="animate-spin w-3 h-3 border border-blue-400 border-t-transparent rounded-full"></div>
+              Analyzing...
+            </div>
+          )}
         </div>
       </div>
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={msg.messageId || i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`rounded-lg px-3 py-2 max-w-[80%] ${
               msg.sender === 'user' 
                 ? 'bg-blue-600 text-white whitespace-pre-line' 
@@ -748,7 +806,7 @@ export default function NoiraPanel() {
               {msg.isThinking ? (
                 <div className="flex items-center gap-2">
                   <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                  {msg.text}
+                  <span className="text-zinc-300 italic">{msg.text}</span>
                 </div>
               ) : (
                 <MessageContent message={msg} isUser={msg.sender === 'user'} />
@@ -756,8 +814,6 @@ export default function NoiraPanel() {
             </div>
           </div>
         ))}
-        
-
         
         <div ref={chatEndRef} />
       </div>
