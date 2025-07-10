@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from noira.chat_controller import chat_controller
 import os
+import logging
 from dotenv import load_dotenv
 from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
@@ -372,5 +373,20 @@ def hybrid_sensitivity_test_api():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+class NoPollingRequestFilter(logging.Filter):
+    """Filter out frequent polling requests from Flask logs"""
+    
+    def filter(self, record):
+        # Filter out GET requests to display-updates endpoint
+        if hasattr(record, 'getMessage'):
+            message = record.getMessage()
+            if 'GET /api/chat/display-updates' in message:
+                return False
+        return True
+
 if __name__ == '__main__':
+    # Configure logging to filter out polling requests
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.addFilter(NoPollingRequestFilter())
+    
     app.run(debug=True, port=5001)  # Change to 5001

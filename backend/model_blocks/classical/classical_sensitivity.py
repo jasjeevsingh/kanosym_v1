@@ -86,25 +86,32 @@ def classical_sensitivity_test(
     # Generate unique analysis ID
     analysis_id = str(uuid.uuid4())
     
+    # Add brief message to display history immediately
+    from noira.chat_controller import chat_controller
+    brief_message = chat_controller.add_brief_message("classical", param, asset, analysis_id)
+    
     def process_noira_async():
         """Process Noira explanation in background thread"""
         try:
-            noira_sent, brief_message, llm_response = send_message_to_noira(
+            noira_sent, _, llm_response = send_message_to_noira(
                 analysis_type="classical",
                 portfolio=portfolio,
                 param=param,
                 asset=asset,
                 range_vals=range_vals,
                 steps=steps,
-                results=output
+                results=output,
+                analysis_id=analysis_id  # Pass analysis_id for context
             )
             if noira_sent and llm_response:
-                # Store the response for frontend polling
-                from noira.chat_controller import chat_controller
-                chat_controller.store_async_response(analysis_id, brief_message, llm_response)
-                logger.info(f"Noira response stored for classical analysis: {analysis_id}")
+                # Update display history with actual response
+                chat_controller.update_display_with_response(analysis_id, llm_response)
+                logger.info(f"Updated display history with LLM response for classical analysis: {analysis_id}")
         except Exception as e:
             logger.error(f"Error processing Noira response: {e}")
+            # Update with error message
+            chat_controller.update_display_with_response(analysis_id, 
+                f"Sorry, there was an error analyzing the results: {str(e)}")
     
     # Start background thread for Noira processing
     threading.Thread(target=process_noira_async, daemon=True).start()
@@ -113,7 +120,7 @@ def classical_sensitivity_test(
     output["noira_notification"] = {
         "processing": True,
         "analysis_id": analysis_id,
-        "brief_message": f"Tell me about this classical sensitivity test for {asset} {param}."
+        "brief_message": brief_message
     }
     
     return output
@@ -191,55 +198,56 @@ def run_monte_carlo_volatility(portfolio_state: Dict[str, Any]) -> dict:
     }
 
 
-def classical_sensitivity_test(
-    portfolio: Dict[str, Any],
-    param: str,
-    asset: str,
-    range_vals: list,
-    steps: int
-) -> Dict[str, Any]:
+def run_monte_carlo(portfolio_state: Dict[str, Any]) -> float:
     """
-    Main function for classical sensitivity testing (portfolio volatility only).
+    Run Monte Carlo simulation (mocked for now).
+    Returns estimated Sharpe ratio using Monte Carlo.
     """
-    analytics = AnalyticsCollector('classical')
-    analytics.start_collection()
-    perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
-    baseline_metrics = run_monte_carlo_volatility(portfolio)
-    baseline_daily = baseline_metrics['portfolio_volatility_daily']
-    baseline_annualized = baseline_metrics['portfolio_volatility_annualized']
-    results = []
-    for p in perturbed_portfolios:
-        metrics = run_monte_carlo_volatility(p)
-        result = {
-            "perturbed_value": p["perturbed_value"],
-            "portfolio_volatility_daily": metrics["portfolio_volatility_daily"],
-            "portfolio_volatility_annualized": metrics["portfolio_volatility_annualized"]
-        }
-        results.append(result)
-        analytics.add_result(result)
-    analytics.end_collection()
-    output = format_output(
-        perturbation=param,
-        asset=asset,
-        range_tested=list(np.linspace(range_vals[0], range_vals[1], steps)),
-        baseline_portfolio_volatility_daily=baseline_daily,
-        baseline_portfolio_volatility_annualized=baseline_annualized,
-        results=results,
-        analytics=analytics.get_analytics_summary()
-    )
-    return output
+    # Placeholder for Monte Carlo implementation
+    weights = np.array(portfolio_state['weights'])
+    volatility = np.array(portfolio_state['volatility'])
+    correlation_matrix = np.array(portfolio_state['correlation_matrix'])
+    
+    # Mock Monte Carlo result (simplified)
+    portfolio_vol = np.sqrt(weights @ (correlation_matrix * np.outer(volatility, volatility)) @ weights)
+    portfolio_return = np.sum(weights * 0.1)  # Assuming 10% expected return
+    sharpe = portfolio_return / portfolio_vol
+    
+    return float(sharpe)
 
 
-def format_output(perturbation: str, asset: str, range_tested: List[float], baseline_portfolio_volatility_daily: float, baseline_portfolio_volatility_annualized: float, results: List[Dict[str, Any]], analytics: Dict[str, Any] = None) -> Dict[str, Any]:
+def compute_metrics(baseline: float, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Compute sensitivity metrics from results.
+    """
+    metrics = []
+    for result in results:
+        delta = result['sharpe'] - baseline
+        sensitivity = delta / baseline if baseline != 0 else 0
+        metrics.append({
+            'perturbed_value': result['perturbed_value'],
+            'sharpe': result['sharpe'],
+            'volatility': result['sharpe'],  # Use sharpe as the main metric for classical
+            'delta_vs_baseline': delta,
+            'sensitivity': sensitivity
+        })
+    return metrics
+
+
+def format_output(perturbation: str, asset: str, range_tested: List[float], 
+                  baseline_sharpe: float, results: List[Dict[str, Any]], 
+                  analytics: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Format output for API response.
+    """
     output = {
         "perturbation": perturbation,
         "asset": asset,
         "range_tested": range_tested,
-        "baseline_portfolio_volatility_daily": baseline_portfolio_volatility_daily,
-        "baseline_portfolio_volatility_annualized": baseline_portfolio_volatility_annualized,
+        "baseline_sharpe": baseline_sharpe,
         "results": results,
         "processing_mode": "classical",
-        "description": "Classical Monte Carlo simulation for portfolio sensitivity analysis (portfolio volatility only)"
+        "description": "Classical Monte Carlo simulation for portfolio sensitivity analysis"
     }
     if analytics:
         output["analytics"] = analytics
