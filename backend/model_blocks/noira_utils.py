@@ -21,7 +21,8 @@ def send_message_to_noira(
     asset: str,
     range_vals: list,
     steps: int,
-    results: Dict[str, Any]
+    results: Dict[str, Any],
+    analysis_id: Optional[str] = None
 ) -> Tuple[bool, str, Optional[str]]:
     """
     Send an explanatory message to Noira about the analysis that was just run.
@@ -69,6 +70,10 @@ def send_message_to_noira(
                 "processing_mode": results.get('processing_mode')
             }
         }
+        
+        # Add analysis_id if provided
+        if analysis_id:
+            context["analysis_id"] = analysis_id
         
         # Create a message asking Noira to explain the results
         full_message = create_explanation_request(analysis_type, param, asset, results)

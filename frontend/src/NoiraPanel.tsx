@@ -10,6 +10,7 @@ interface ChatMessage {
   sender: 'user' | 'noira';
   text: string;
   timestamp?: string;
+  isThinking?: boolean;
 }
 
 interface ApiResponse {
@@ -164,6 +165,27 @@ class ChatApiService {
           temperature: 0,
         },
         timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async getDisplayUpdates(clientId: string = 'default', fullHistory: boolean = false): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        client_id: clientId,
+        full_history: fullHistory.toString()
+      });
+      const response = await fetch(`${this.baseUrl}/display-updates?${params}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Display updates error:', error);
+      return {
+        messages: [],
+        has_updates: false,
+        timestamp: new Date().toISOString()
       };
     }
   }
@@ -552,12 +574,7 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
 
 // Main NoiraPanel Component
 export default function NoiraPanel() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { 
-      sender: 'noira', 
-      text: `Hi! I am **Noira**, your quantum portfolio modeling assistant. How can I help you today?` 
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
@@ -576,44 +593,65 @@ export default function NoiraPanel() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Listen for automatic Noira messages from model runs
+  // Poll for display updates from backend
   useEffect(() => {
-    const handleAutoMessage = (event: CustomEvent) => {
-      const briefMessage = event.detail?.message;
-      const preGeneratedResponse = event.detail?.response;
-      const showThinkingState = event.detail?.showThinkingState;
-      
-      if (briefMessage && status?.api_key_set) {
-        // Add the brief message to chat as if user typed it
-        setMessages(prev => [...prev, { sender: 'user', text: briefMessage }]);
-        
-        // If we have a pre-generated response from backend, use it directly
-        if (preGeneratedResponse) {
-          // Clear loading state and add Noira's response
-          setLoading(false);
-          setMessages(prev => [...prev, { 
-            sender: 'noira', 
-            text: preGeneratedResponse,
-            timestamp: new Date().toISOString()
-          }]);
-        } else if (showThinkingState) {
-          // Show thinking state while waiting for async response
-          setLoading(true);
-        } else {
-          // Fallback: if no pre-generated response, call the API with brief message
-          // This shouldn't happen in the new flow, but kept for safety
-          setTimeout(() => {
-            sendAutoMessage(briefMessage);
-          }, 100);
-        }
+    if (!status?.api_key_set) return;
+    
+    // Get full history on mount
+    const loadInitialHistory = async () => {
+      const updates = await apiService.current.getDisplayUpdates('default', true);
+      if (updates.messages) {
+        const formattedMessages = updates.messages.map((msg: any) => ({
+          sender: msg.role === 'user' ? 'user' : 'noira',
+          text: msg.content,
+          timestamp: msg.timestamp,
+          isThinking: msg.is_thinking
+        }));
+        setMessages(formattedMessages);
       }
     };
-
-    window.addEventListener('noiraAutoMessage', handleAutoMessage as EventListener);
     
-    return () => {
-      window.removeEventListener('noiraAutoMessage', handleAutoMessage as EventListener);
-    };
+    loadInitialHistory();
+    
+    // Then poll for updates every second
+    const pollInterval = setInterval(async () => {
+      const updates = await apiService.current.getDisplayUpdates('default', false);
+      if (updates.has_updates && updates.messages) {
+        setMessages(prev => {
+          const newMessages = updates.messages.map((msg: any) => ({
+            sender: msg.role === 'user' ? 'user' : 'noira',
+            text: msg.content,
+            timestamp: msg.timestamp,
+            isThinking: msg.is_thinking
+          }));
+          
+          // Replace thinking messages with actual responses
+          const updatedMessages = [...prev];
+          newMessages.forEach((newMsg: any) => {
+            if (newMsg.isThinking) {
+              // Add thinking message
+              updatedMessages.push(newMsg);
+              setLoading(true);
+            } else {
+              // Look for thinking message to replace
+              const thinkingIndex = updatedMessages.findIndex(
+                (m, idx) => m.isThinking && idx === updatedMessages.length - 1
+              );
+              if (thinkingIndex !== -1) {
+                updatedMessages[thinkingIndex] = newMsg;
+                setLoading(false);
+              } else {
+                updatedMessages.push(newMsg);
+              }
+            }
+          });
+          
+          return updatedMessages;
+        });
+      }
+    }, 1000);
+    
+    return () => clearInterval(pollInterval);
   }, [status?.api_key_set]);
 
   const refreshStatus = async () => {
@@ -627,38 +665,7 @@ export default function NoiraPanel() {
     console.log('Status refreshed:', { statusData, debugData });
   };
 
-  const sendAutoMessage = async (message: string) => {
-    if (!message.trim() || loading || !status?.api_key_set) return;
 
-    setLoading(true);
-
-    try {
-      const result = await apiService.current.sendMessage(message);
-      
-      if (result.success && result.response) {
-        setMessages(prev => [...prev, { 
-          sender: 'noira', 
-          text: result.response!,
-          timestamp: result.timestamp 
-        }]);
-      } else {
-        setMessages(prev => [...prev, { 
-          sender: 'noira', 
-          text: `Error: ${result.message || 'Unknown error occurred'}`,
-          timestamp: result.timestamp 
-        }]);
-      }
-    } catch (error) {
-      setMessages(prev => [...prev, { 
-        sender: 'noira', 
-        text: `Connection error: ${error}`,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-
-    setLoading(false);
-    refreshStatus();
-  };
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -738,21 +745,19 @@ export default function NoiraPanel() {
                 ? 'bg-blue-600 text-white whitespace-pre-line' 
                 : 'bg-zinc-800 text-zinc-100 border border-zinc-700'
             }`}>
-              <MessageContent message={msg} isUser={msg.sender === 'user'} />
+              {msg.isThinking ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                  {msg.text}
+                </div>
+              ) : (
+                <MessageContent message={msg} isUser={msg.sender === 'user'} />
+              )}
             </div>
           </div>
         ))}
         
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-zinc-800 text-zinc-100 border border-zinc-700 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2">
-                <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                Noira is thinking...
-              </div>
-            </div>
-          </div>
-        )}
+
         
         <div ref={chatEndRef} />
       </div>

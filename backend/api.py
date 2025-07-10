@@ -248,6 +248,21 @@ def get_async_response(analysis_id):
             "timestamp": datetime.now().isoformat()
         }), 500
 
+@app.route('/api/chat/display-updates', methods=['GET'])
+def get_display_updates():
+    """Poll for display history updates"""
+    client_id = request.args.get('client_id', 'default')
+    full_history = request.args.get('full_history', 'false').lower() == 'true'
+    
+    result = chat_controller.get_display_updates(client_id, full_history)
+    return jsonify(result)
+
+@app.route('/api/chat/reset-display', methods=['POST'])
+def reset_display_history():
+    """Reset display history"""
+    result = chat_controller.reset_display_history()
+    return jsonify(result)
+
 # Placeholder endpoints for other functionality
 @app.route('/api/portfolio', methods=['POST'])
 def portfolio_input():

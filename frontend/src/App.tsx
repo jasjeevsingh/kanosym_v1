@@ -856,11 +856,7 @@ function App() {
     
     setIsRunningModel(true);
     
-    // Generate user message based on analysis parameters
-    const userMessage = `Tell me about this ${blockMode} sensitivity test for ${blockParams.asset} ${blockParams.param}.`;
-    
-    // IMMEDIATELY show user message and thinking state in Noira
-    triggerNoiraMessage(userMessage, null, true); // true = show thinking state
+    // Backend will handle all message generation and display // true = show thinking state
     
     try {
       const res = await fetch(endpoint, {
@@ -875,87 +871,20 @@ function App() {
         const errorMessage = data.error || 'Unknown error occurred';
         alert(`Validation Error: ${errorMessage}`);
         setIsRunningModel(false);
-        // Clear thinking state on error
-        triggerNoiraMessage(userMessage, "Sorry, there was an error running the analysis.", false);
         return;
       }
       
       // Add results tab IMMEDIATELY (graph displays right away)
       addResultsTab(currentProjectId, { ...data, testType: blockMode });
       
-      // Handle async Noira processing
-      if (data.noira_notification?.processing && data.noira_notification?.analysis_id) {
-        const analysisId = data.noira_notification.analysis_id;
-        
-        // Start polling for Noira response (will update the thinking message when ready)
-        pollForNoiraResponse(analysisId, userMessage);
-      } else if (data.noira_notification?.sent && data.noira_notification?.brief_message) {
-        // Legacy: immediate Noira response (shouldn't happen anymore)
-        triggerNoiraMessage(userMessage, data.noira_notification.llm_response, false);
-      }
+      // Backend will handle all Noira messages through display history
+      // NoiraPanel will poll for updates automatically
       
       setIsRunningModel(false);
     } catch (err) {
       setIsRunningModel(false);
       alert('Error running model: ' + (err instanceof Error ? err.message : 'Unknown error'));
-      // Clear thinking state on error
-      triggerNoiraMessage(userMessage, "Sorry, there was an error running the analysis.", false);
     }
-  }
-
-  // Function to poll for async Noira response
-  async function pollForNoiraResponse(analysisId: string, userMessage: string) {
-    const maxAttempts = 30; // Poll for up to 30 seconds
-    let attempts = 0;
-    
-    const poll = async () => {
-      try {
-        const response = await fetch(`http://localhost:5001/api/chat/async-response/${analysisId}`);
-        const data = await response.json();
-        
-        if (data.success && data.response_data) {
-          // Noira response is ready! Update the message with the actual response
-          triggerNoiraMessage(userMessage, data.response_data.llm_response, false);
-          return;
-        }
-        
-        // Response not ready yet, continue polling
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 1000); // Poll every 1 second
-        } else {
-          console.warn(`Polling timeout for analysis ${analysisId}`);
-          // Show timeout message
-          triggerNoiraMessage(userMessage, "Analysis is taking longer than expected. Please try again.", false);
-        }
-      } catch (error) {
-        console.error('Error polling for Noira response:', error);
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 1000);
-        } else {
-          // Show error message
-          triggerNoiraMessage(userMessage, "There was an error getting the analysis. Please try again.", false);
-        }
-      }
-    };
-    
-    // Start polling after a 2-second delay to give the backend time to process
-    setTimeout(poll, 2000);
-  }
-
-      // Add function to trigger Noira message
-    function triggerNoiraMessage(briefMessage: string, llmResponse?: string | null, showThinkingState = false) {
-    // We'll need to communicate with NoiraPanel component
-    // For now, we can dispatch a custom event that NoiraPanel can listen to
-    const event = new CustomEvent('noiraAutoMessage', { 
-      detail: { 
-        message: briefMessage,
-        response: llmResponse,
-        showThinkingState
-      } 
-    });
-    window.dispatchEvent(event);
   }
 
   // Helper to add a results tab
