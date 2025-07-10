@@ -6,10 +6,12 @@ Backend API entry point for KANOSYM. Exposes endpoints for portfolio input, pert
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from chat_controller import chat_controller
+from noira.chat_controller import chat_controller
 import os
 from dotenv import load_dotenv
-from quantum_sensitivity.engine import quantum_sensitivity_test
+from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
+from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
+from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
 
 # Load environment variables
 load_dotenv()
@@ -124,17 +126,13 @@ def classical_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
-    # For now, use the same engine but with classical processing
-    result = quantum_sensitivity_test(
+    result = classical_sensitivity_test(
         portfolio=portfolio,
         param=param,
         asset=asset,
         range_vals=range_vals,
         steps=steps
     )
-    # Add classical-specific metadata
-    result['processing_mode'] = 'classical'
-    result['description'] = 'Classical Monte Carlo simulation for portfolio sensitivity analysis'
     return jsonify(result)
 
 @app.route('/api/hybrid_sensitivity_test', methods=['POST'])
@@ -145,17 +143,13 @@ def hybrid_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
-    # For now, use the same engine but with hybrid processing
-    result = quantum_sensitivity_test(
+    result = hybrid_sensitivity_test(
         portfolio=portfolio,
         param=param,
         asset=asset,
         range_vals=range_vals,
         steps=steps
     )
-    # Add hybrid-specific metadata
-    result['processing_mode'] = 'hybrid'
-    result['description'] = 'Hybrid classical-quantum simulation for portfolio sensitivity analysis'
     return jsonify(result)
 
 if __name__ == '__main__':
