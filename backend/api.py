@@ -635,6 +635,18 @@ def update_project(project_name):
             "timestamp": datetime.now().isoformat()
         }), 500
 
+@app.route('/api/projects/<project_name>/rename', methods=['PUT'])
+def rename_project(project_name):
+    data = request.get_json()
+    new_name = data.get('new_name')
+    if not new_name:
+        return jsonify({"success": False, "error": "New project name is required"}), 400
+    success = file_manager.rename_project(project_name, new_name)
+    if success:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"success": False, "error": "Failed to rename project"}), 500
+
 @app.route('/api/projects/<project_name>', methods=['DELETE'])
 def delete_project(project_name):
     """Delete a project"""

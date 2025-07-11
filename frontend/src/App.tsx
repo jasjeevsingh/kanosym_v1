@@ -662,6 +662,7 @@ function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira,
       >
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="4" height="12" rx="1" fill="#B0BEC5"/><rect x="7" y="2" width="7" height="12" rx="1" fill="#B0BEC5"/></svg>
       </button>
+      {/*
       <button
         className={`w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-800 ${showExplorer ? 'bg-zinc-700' : ''}`}
         title="Toggle File Explorer"
@@ -669,6 +670,7 @@ function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira,
       >
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="4" height="12" rx="1" fill="#B0BEC5"/><rect x="7" y="2" width="7" height="12" rx="1" fill="#B0BEC5"/></svg>
       </button>
+      */}
       <button
         className={`w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-800 ${showNoira ? 'bg-zinc-700' : ''}`}
         title="Toggle Noira Panel"
@@ -2002,6 +2004,7 @@ function App() {
             />
           </SubtleResizableBorder>
           {/* File Explorer */}
+          {/*
           <SubtleResizableBorder direction="left" show={showExplorer} min={minExplorer} max={400} initial={224}>
             <FileExplorer
               files={fsFiles}
@@ -2016,6 +2019,7 @@ function App() {
               onProjectFolderContextMenu={handleProjectFolderContextMenu}
             />
           </SubtleResizableBorder>
+          */}
           {/* Main Page */}
           <div className="flex-1 min-w-0 relative" style={{ minWidth: minMain }}>
             <ProjectTabs
@@ -2047,8 +2051,8 @@ function App() {
             />
             ) : (
               <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
-                <div className="text-2xl font-bold mb-2">Select a project to open</div>
-                <div className="text-zinc-400">Double click a .ksm file in the explorer to get started.</div>
+                <div className="text-2xl font-bold mb-2">Select a project to get started</div>
+                <div className="text-zinc-400">Create or open an existing project from the left panel.</div>
               </div>
             )}
           </div>

@@ -448,3 +448,37 @@ class FileManager:
         except Exception as e:
             logger.error(f"Failed to save project state for {project_name}: {e}")
             return False 
+
+    def rename_project(self, old_name: str, new_name: str) -> bool:
+        """
+        Rename a project file (.ksm) and update the project name in metadata.
+        Args:
+            old_name: Current project name (without .ksm)
+            new_name: New project name (without .ksm)
+        Returns:
+            True if successful, False otherwise
+        """
+        old_filename = f"{old_name}.ksm"
+        new_filename = f"{new_name}.ksm"
+        old_filepath = self.projects_dir / old_filename
+        new_filepath = self.projects_dir / new_filename
+        try:
+            if not old_filepath.exists():
+                logger.warning(f"Project file not found for renaming: {old_filepath}")
+                return False
+            # Load project config
+            with open(old_filepath, 'r') as f:
+                project_config = json.load(f)
+            # Update name in metadata
+            project_config["metadata"]["name"] = new_name
+            project_config["metadata"]["last_modified"] = datetime.now().isoformat()
+            # Save to new file
+            with open(new_filepath, 'w') as f:
+                json.dump(project_config, f, indent=2)
+            # Remove old file
+            old_filepath.unlink()
+            logger.info(f"Renamed project file: {old_filepath} -> {new_filepath}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to rename project file {old_filepath} to {new_filepath}: {e}")
+            return False 

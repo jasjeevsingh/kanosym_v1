@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FlipMove from 'react-flip-move';
 
 interface Project {
   name: string;
@@ -40,6 +41,9 @@ export default function FileManagerPanel({
   const [activeTab, setActiveTab] = useState<'projects' | 'test-runs'>('projects');
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [editProjectName, setEditProjectName] = useState('');
 
   // Load projects and test runs on mount
   useEffect(() => {
@@ -168,6 +172,15 @@ export default function FileManagerPanel({
     }
   };
 
+  // Sort projects so open projects are at the top, in the order of openProjects
+  const openProjectIds = openProjects.map(p => p.id);
+  const sortedProjects = [
+    ...openProjectIds
+      .map(id => projects.find(p => p.project_id === id))
+      .filter(Boolean),
+    ...projects.filter(p => !openProjectIds.includes(p.project_id))
+  ];
+
   return (
     <div className="h-full bg-zinc-900 text-zinc-100 flex flex-col">
       {/* Header */}
@@ -225,52 +238,56 @@ export default function FileManagerPanel({
 
         {activeTab === 'projects' && (
           <div className="space-y-2">
-            {projects.map(project => {
-              const isOpen = openProjects.some(p => p.id === project.project_id);
-              return (
-                <div key={project.project_id} className="bg-zinc-800 rounded p-3 border border-zinc-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-zinc-100 truncate">{project.name}</h3>
-                    <div className="flex items-center space-x-2">
-                      {isOpen && (
-                        <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
-                          Open
-                        </span>
-                      )}
+            <FlipMove type="div" className="space-y-2">
+              {sortedProjects.filter((project): project is Project => !!project).map(project => {
+                const isOpen = openProjects.some(p => p.id === project.project_id);
+                return (
+                  <div key={project.project_id} className={`bg-zinc-800 rounded p-3 border border-zinc-700 mb-2 transition-shadow ${isOpen ? 'border-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]' : ''}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium text-zinc-100 truncate">{project.name}</h3>
+                      <div className="flex items-center space-x-2">
+                        {isOpen ? (
+                          <>
+                            <button
+                              onClick={() => { setEditProject(project); setEditProjectName(project.name); }}
+                              className="text-xs px-2 py-1 rounded bg-yellow-400 text-zinc-900 font-semibold hover:bg-yellow-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => onCloseProject(project.project_id)}
+                              className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
+                            >
+                              Close
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => onOpenProject(project.name)}
+                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
+                          >
+                            Open
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-xs text-zinc-400 space-y-1">
+                      <div>Created: {formatDate(project.created)}</div>
+                      <div>Modified: {formatDate(project.last_modified)}</div>
+                    </div>
+                    <div className="mt-2 flex justify-end">
                       <button
-                        onClick={() => onOpenProject(project.name)}
-                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
-                        disabled={isOpen}
+                        onClick={() => setProjectToDelete(project)}
+                        className="text-xs text-red-400 hover:text-red-300"
+                        title="Delete Project"
                       >
-                        {isOpen ? 'Opened' : 'Open'}
+                        Delete
                       </button>
-                      {isOpen && (
-                        <button
-                          onClick={() => onCloseProject(project.project_id)}
-                          className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
-                        >
-                          Close
-                        </button>
-                      )}
                     </div>
                   </div>
-                  <div className="text-xs text-zinc-400 space-y-1">
-                    <div>Created: {formatDate(project.created)}</div>
-                    <div>Modified: {formatDate(project.last_modified)}</div>
-                    <div className="truncate">{project.description}</div>
-                  </div>
-                  <div className="mt-2 flex justify-end">
-                    <button
-                      onClick={() => handleDeleteProject(project.name)}
-                      className="text-xs text-red-400 hover:text-red-300"
-                      title="Delete Project"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </FlipMove>
             {projects.length === 0 && !loading && (
               <div className="text-center py-8 text-zinc-400">
                 <p>No projects found</p>
@@ -366,6 +383,99 @@ export default function FileManagerPanel({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {editProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-8 min-w-[320px] min-h-[120px] relative">
+            <button
+              className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+              onClick={() => setEditProject(null)}
+            >
+              ×
+            </button>
+            <div className="text-lg font-bold mb-4 text-zinc-800">Rename Project</div>
+            <form onSubmit={async e => {
+              e.preventDefault();
+              if (!editProjectName.trim()) return;
+              // Call backend to rename project
+              try {
+                const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(editProject.name)}/rename`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ new_name: editProjectName.trim() })
+                });
+                const data = await response.json();
+                if (data.success) {
+                  setProjects(prev => prev.map(p => p.project_id === editProject.project_id ? { ...p, name: editProjectName.trim() } : p));
+                  setEditProject(null);
+                } else {
+                  alert('Failed to rename project: ' + data.error);
+                }
+              } catch (error) {
+                alert('Error renaming project');
+              }
+            }}>
+              <input
+                className="w-full border border-zinc-300 rounded px-3 py-2 outline-none focus:border-blue-500"
+                placeholder="Project Name"
+                value={editProjectName}
+                onChange={e => setEditProjectName(e.target.value)}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                  onClick={() => setEditProject(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded bg-yellow-500 text-white font-bold hover:bg-yellow-400"
+                  disabled={!editProjectName.trim()}
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {projectToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-8 min-w-[320px] min-h-[120px] relative">
+            <button
+              className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+              onClick={() => setProjectToDelete(null)}
+            >
+              ×
+            </button>
+            <div className="text-lg font-bold mb-4 text-zinc-800">Delete Project</div>
+            <div className="mb-4 text-zinc-700">Are you sure you want to delete <span className="font-bold">{projectToDelete.name}</span>? This action cannot be undone.</div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="px-4 py-2 rounded bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                onClick={() => setProjectToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700"
+                onClick={async () => {
+                  await handleDeleteProject(projectToDelete.name);
+                  setProjectToDelete(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
