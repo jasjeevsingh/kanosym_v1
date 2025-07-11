@@ -10,6 +10,8 @@ import PortfolioInput from './PortfolioInput';
 import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
 import NoiraPanel from './NoiraPanel';
+import FileManagerPanel from './FileManagerPanel';
+import { triggerProjectAutosave, autosaveManager } from './autosave';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -649,9 +651,16 @@ function ResizablePane({ children, min = 160, max = 400, initial = 224, onResize
   );
 }
 
-function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira, showBlockBar, setShowBlockBar }: { showExplorer: boolean; setShowExplorer: (v: boolean) => void; showNoira: boolean; setShowNoira: (v: boolean) => void; showBlockBar: boolean; setShowBlockBar: (v: boolean) => void; }) {
+function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira, showBlockBar, setShowBlockBar, showFileManager, setShowFileManager }: { showExplorer: boolean; setShowExplorer: (v: boolean) => void; showNoira: boolean; setShowNoira: (v: boolean) => void; showBlockBar: boolean; setShowBlockBar: (v: boolean) => void; showFileManager: boolean; setShowFileManager: (v: boolean) => void; }) {
   return (
     <div className="absolute top-2 right-4 z-30 flex gap-2">
+      <button
+        className={`w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-800 ${showFileManager ? 'bg-zinc-700' : ''}`}
+        title="Toggle File Manager"
+        onClick={() => setShowFileManager(!showFileManager)}
+      >
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="4" height="12" rx="1" fill="#B0BEC5"/><rect x="7" y="2" width="7" height="12" rx="1" fill="#B0BEC5"/></svg>
+      </button>
       <button
         className={`w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-800 ${showExplorer ? 'bg-zinc-700' : ''}`}
         title="Toggle File Explorer"
@@ -740,7 +749,7 @@ function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; blockType?: 'classical' | 'hybrid' | 'quantum' } | null>(null);
-  const [showExplorer, setShowExplorer] = useState(true);
+  const [showExplorer, setShowExplorer] = useState(false); // Disable old FileExplorer, use FileManagerPanel instead
   const [showNoira, setShowNoira] = useState(true);
   const [showBlockBar, setShowBlockBar] = useState(true);
   const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null);
@@ -797,6 +806,37 @@ function App() {
     };
   }, [blockMoveCount]);
 
+  // Effect to cancel autosaves on unmount
+  useEffect(() => {
+    return () => {
+      autosaveManager.cancelAllAutosaves();
+    };
+  }, []);
+
+  // Effect to load projects from backend on mount
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const response = await fetch('http://localhost:5001/api/projects');
+        const data = await response.json();
+        if (data.success) {
+          const projectsList = data.projects.map((project: any) => ({
+            id: project.metadata.project_id,
+            name: project.metadata.name
+          }));
+          setProjects(projectsList);
+          
+          // If no projects are open and we have projects, don't auto-open the first one
+          // Let the user choose which project to open
+        }
+      } catch (error) {
+        console.error('Error loading projects:', error);
+      }
+    }
+    
+    loadProjects();
+  }, []);
+
   // Add mode state to App
   const [mode, setMode] = useState<'classical' | 'hybrid' | 'quantum'>('classical');
   // Store block mode per project
@@ -817,26 +857,20 @@ function App() {
   const [isRunningModel, setIsRunningModel] = useState(false);
   const [projectBlockParams, setProjectBlockParams] = useState<{ [projectId: string]: any }>({});
 
-  // In App, add state for mockProjects and mockFiles
-  const [mockProjects, setMockProjects] = useState([
-    { id: 'proj-1', name: 'Project Alpha' },
-    { id: 'proj-2', name: 'Project Beta' },
-    { id: 'proj-3', name: 'Project Gamma' },
-  ]);
-  const [mockFiles, setMockFiles] = useState<FileNode[]>([
-    { id: 'folder-proj-1', name: 'Project Alpha', type: 'folder', children: [ { id: 'ksm-proj-1', name: 'Project Alpha.ksm', type: 'file' } ] },
-    { id: 'folder-proj-2', name: 'Project Beta', type: 'folder', children: [ { id: 'ksm-proj-2', name: 'Project Beta.ksm', type: 'file' } ] },
-    { id: 'folder-proj-3', name: 'Project Gamma', type: 'folder', children: [ { id: 'ksm-proj-3', name: 'Project Gamma.ksm', type: 'file' } ] },
-  ]);
+  // File Manager state
+  const [showFileManager, setShowFileManager] = useState(true);
+
+  // Real projects state loaded from backend
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fsFiles, setFsFiles] = useState<FileNode[]>([]);
   const [fsPath, setFsPath] = useState<string | null>(null);
 
   // Project tab state
-  const [openProjects, setOpenProjects] = useState([mockProjects[0]]);
-  const [currentProjectId, setCurrentProjectId] = useState(mockProjects[0].id);
+  const [openProjects, setOpenProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string>('');
   // Per-project block state - change from single block to multiple block types
-  const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> }>({ [mockProjects[0].id]: new Set() });
+  const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> }>({});
   const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>({});
   
   // Legacy function for backward compatibility - check if any block is placed
@@ -871,11 +905,129 @@ function App() {
   
   // Replace openProject logic with onKsmDoubleClick
   function onKsmDoubleClick(projectId: string) {
-    if (!openProjects.find(p => p.id === projectId)) {
-      setOpenProjects([...openProjects, mockProjects.find(p => p.id === projectId)!]);
+    const project = projects.find(p => p.id === projectId);
+    if (project && !openProjects.find(p => p.id === projectId)) {
+      setOpenProjects([...openProjects, project]);
     }
     setCurrentProjectId(projectId);
     setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
+  }
+
+  // File Manager handlers
+  async function handleOpenProject(projectName: string) {
+    try {
+      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
+      const data = await response.json();
+      if (data.success) {
+        const project = data.project;
+        const projectId = project.metadata.project_id;
+        
+        // Add to open projects if not already open
+        if (!openProjects.find(p => p.id === projectId)) {
+          setOpenProjects(prev => [...prev, { id: projectId, name: projectName }]);
+        }
+        setCurrentProjectId(projectId);
+        
+        // Initialize project state if not exists
+        setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
+        
+        // Load project configuration
+        if (project.configuration) {
+          // Load block positions
+          const blockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } } = {};
+          Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
+            if (blockConfig.placed && blockConfig.position) {
+              if (!blockPositions[projectId]) blockPositions[projectId] = {};
+              blockPositions[projectId][blockType] = blockConfig.position;
+            }
+          });
+          setProjectBlockPositions(prev => ({ ...prev, ...blockPositions }));
+          
+          // Load block modes
+          const blockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' } = {};
+          if (project.configuration.ui_state?.current_block_mode) {
+            blockModes[projectId] = project.configuration.ui_state.current_block_mode;
+          }
+          setProjectBlockModes(prev => ({ ...prev, ...blockModes }));
+          
+          // Load block parameters
+          const blockParams: { [projectId: string]: any } = {};
+          Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
+            if (blockConfig.parameters) {
+              blockParams[projectId] = blockConfig.parameters;
+            }
+          });
+          setProjectBlockParams(prev => ({ ...prev, ...blockParams }));
+        }
+      }
+    } catch (error) {
+      console.error('Error opening project:', error);
+    }
+  }
+
+  async function handleOpenTestRun(testRunId: string) {
+    try {
+      const response = await fetch(`http://localhost:5001/api/test-runs/${testRunId}`);
+      const data = await response.json();
+      if (data.success) {
+        const testRun = data.test_run;
+        
+        // Find the associated project
+        const projectId = testRun.project_id;
+        if (projectId) {
+          // Find the project by ID
+          const project = projects.find(p => p.id === projectId);
+          if (project) {
+            // Open the project if not already open
+            if (!openProjects.find(p => p.id === projectId)) {
+              await handleOpenProject(project.name);
+            }
+            
+            // Set the project as current
+            setCurrentProjectId(projectId);
+            
+            // Create a results tab for this test run
+            const tabData = {
+              ...testRun.results,
+              testType: testRun.block_type,
+              test_run_id: testRunId
+            };
+            
+            setResultsTabs(prev => {
+              const tabs = prev[projectId] || [];
+              const existingTab = tabs.find(tab => tab.id === testRunId);
+              if (!existingTab) {
+                const newTab = { 
+                  id: testRunId, 
+                  label: `${testRun.block_type} - ${new Date(testRun.timestamp).toLocaleTimeString()}`, 
+                  data: tabData 
+                };
+                return { ...prev, [projectId]: [...tabs, newTab] };
+              }
+              return prev;
+            });
+            
+            // Set this tab as active
+            setCurrentResultsTab(prev => ({ ...prev, [projectId]: testRunId }));
+          } else {
+            console.warn(`Project with ID ${projectId} not found in projects list`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error opening test run:', error);
+    }
+  }
+
+  function handleCloseTestRun(testRunId: string) {
+    // Close the results tab for this test run in the appropriate project
+    for (const [projectId, tabs] of Object.entries(resultsTabs)) {
+      const tabToClose = tabs.find(tab => tab.id === testRunId);
+      if (tabToClose) {
+        closeResultsTab(projectId, testRunId);
+        break;
+      }
+    }
   }
   
   function closeProject(id: string) {
@@ -1009,6 +1161,22 @@ function App() {
             }
           }));
           setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
+          
+          // Trigger autosave after block placement
+          const currentProject = openProjects.find(p => p.id === currentProjectId);
+          if (currentProject) {
+            triggerProjectAutosave(
+              currentProjectId,
+              currentProject.name,
+              projectBlocks[currentProjectId] || new Set(),
+              projectBlockPositions,
+              projectBlockModes,
+              projectBlockParams,
+              blockMoveCount,
+              resultsTabs,
+              currentResultsTab
+            );
+          }
         }
         // end of current change
         
@@ -1036,6 +1204,22 @@ function App() {
           return copy;
         });
         setSelectedBlockProject(null);
+        
+        // Trigger autosave after block removal
+        const currentProject = openProjects.find(p => p.id === currentProjectId);
+        if (currentProject) {
+          triggerProjectAutosave(
+            currentProjectId,
+            currentProject.name,
+            projectBlocks[currentProjectId] || new Set(),
+            projectBlockPositions,
+            projectBlockModes,
+            projectBlockParams,
+            blockMoveCount,
+            resultsTabs,
+            currentResultsTab
+          );
+        }
       }
     }
     setActiveId(null);
@@ -1071,6 +1255,13 @@ function App() {
     // Get the current block mode for this project
     const blockMode = projectBlockModes[currentProjectId] || 'classical';
     
+    // Get current project info for autosave
+    const currentProject = openProjects.find(p => p.id === currentProjectId);
+    if (!currentProject) {
+      alert('No active project found');
+      return;
+    }
+    
     // Determine the appropriate endpoint based on block mode
     let endpoint;
     switch (blockMode) {
@@ -1092,10 +1283,17 @@ function App() {
     // Backend will handle all message generation and display // true = show thinking state
     
     try {
+      // Add project_id and project_name to the request for autosave
+      const requestData = {
+        ...blockParams,
+        project_id: currentProjectId,
+        project_name: currentProject.name
+      };
+      
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(blockParams),
+        body: JSON.stringify(requestData),
       });
       const data = await res.json();
       
@@ -1109,6 +1307,19 @@ function App() {
       
       // Add results tab IMMEDIATELY (graph displays right away)
       addResultsTab(currentProjectId, { ...data, testType: blockMode });
+      
+      // Trigger project autosave after successful test run
+      triggerProjectAutosave(
+        currentProjectId,
+        currentProject.name,
+        projectBlocks[currentProjectId] || new Set(),
+        projectBlockPositions,
+        projectBlockModes,
+        projectBlockParams,
+        blockMoveCount,
+        resultsTabs,
+        currentResultsTab
+      );
       
       // Backend will handle all Noira messages through display history
       // NoiraPanel will poll for updates automatically
@@ -1199,13 +1410,31 @@ function App() {
       if (!selectedBlockType || !projectPositions[selectedBlockType]) return prev;
       
       const pos = projectPositions[selectedBlockType];
-      return { 
+      const newPositions = { 
         ...prev, 
         [currentProjectId]: { 
           ...projectPositions, 
           [selectedBlockType]: { x: pos.x + dx, y: pos.y + dy } 
         } 
       };
+      
+      // Trigger autosave after position update
+      const currentProject = openProjects.find(p => p.id === currentProjectId);
+      if (currentProject) {
+        triggerProjectAutosave(
+          currentProjectId,
+          currentProject.name,
+          projectBlocks[currentProjectId] || new Set(),
+          newPositions,
+          projectBlockModes,
+          projectBlockParams,
+          blockMoveCount,
+          resultsTabs,
+          currentResultsTab
+        );
+      }
+      
+      return newPositions;
     });
     // Increment move count when user drags it within the main area
     setBlockMoveCount(prev => {
@@ -1263,25 +1492,33 @@ function App() {
   }
 
   // Add handler to create a new project
-  function handleCreateProject() {
+  async function handleCreateProject() {
     if (!newProjectName.trim()) return;
-    const name = newProjectName.trim();
-    const id = `proj-${Date.now()}`;
-    const newProject = { id, name };
-    setMockProjects(prev => [...prev, newProject]);
-    setMockFiles(prev => [
-      ...prev,
-      {
-        id: `folder-${id}`,
-        name,
-        type: 'folder',
-        children: [
-          { id: `ksm-${id}`, name: `${name}.ksm`, type: 'file' },
-        ],
-      },
-    ]);
-    setShowNewProjectModal(false);
-    setNewProjectName('');
+    
+    try {
+      const response = await fetch('http://localhost:5001/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newProjectName.trim() })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        const newProject = {
+          id: data.project.metadata.project_id,
+          name: newProjectName.trim()
+        };
+        
+        setProjects(prev => [...prev, newProject]);
+        setShowNewProjectModal(false);
+        setNewProjectName('');
+      } else {
+        alert('Failed to create project: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      alert('Error creating project');
+    }
   }
 
   // In App, add handler for project folder context menu
@@ -1289,28 +1526,42 @@ function App() {
   function handleProjectFolderContextMenu(project: { id: string; name: string }, e: React.MouseEvent) {
     setProjectFolderMenu({ x: e.clientX, y: e.clientY, project });
   }
-  function handleDeleteProjectConfirm() {
+  async function handleDeleteProjectConfirm() {
     if (!projectToDelete) return;
-    setMockProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
-    setMockFiles(prev => prev.filter(f => f.id !== `folder-${projectToDelete.id}`));
-    // Close tab if open
-    setOpenProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
-    setProjectBlocks(prev => {
-      const copy = { ...prev };
-      delete copy[projectToDelete.id];
-      return copy;
-    });
-    setProjectBlockPositions(prev => {
-      const copy = { ...prev };
-      delete copy[projectToDelete.id];
-      return copy;
-    });
-    setProjectBlockModes(prev => {
-      const copy = { ...prev };
-      delete copy[projectToDelete.id];
-      return copy;
-    });
-    setProjectToDelete(null);
+    
+    try {
+      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectToDelete.name)}`, {
+        method: 'DELETE'
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+        // Close tab if open
+        setOpenProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+        setProjectBlocks(prev => {
+          const copy = { ...prev };
+          delete copy[projectToDelete.id];
+          return copy;
+        });
+        setProjectBlockPositions(prev => {
+          const copy = { ...prev };
+          delete copy[projectToDelete.id];
+          return copy;
+        });
+        setProjectBlockModes(prev => {
+          const copy = { ...prev };
+          delete copy[projectToDelete.id];
+          return copy;
+        });
+        setProjectToDelete(null);
+      } else {
+        alert('Failed to delete project: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      alert('Error deleting project');
+    }
   }
 
   // Add state for block edit modal
@@ -1734,18 +1985,31 @@ function App() {
           setShowNoira={setShowNoira}
           showBlockBar={showBlockBar}
           setShowBlockBar={setShowBlockBar}
+          showFileManager={showFileManager}
+          setShowFileManager={setShowFileManager}
         />
         <div className="flex flex-1 min-h-0 relative">
+          {/* File Manager */}
+          <SubtleResizableBorder direction="left" show={showFileManager} min={200} max={400} initial={280}>
+            <FileManagerPanel
+              onOpenProject={handleOpenProject}
+              onCloseProject={closeProject}
+              onOpenTestRun={handleOpenTestRun}
+              onCloseTestRun={handleCloseTestRun}
+              openProjects={openProjects}
+              currentProjectId={currentProjectId}
+            />
+          </SubtleResizableBorder>
           {/* File Explorer */}
           <SubtleResizableBorder direction="left" show={showExplorer} min={minExplorer} max={400} initial={224}>
             <FileExplorer
-              files={fsFiles.length > 0 ? fsFiles : mockFiles}
+              files={fsFiles}
               selected={selectedFile}
               onSelect={setSelectedFile}
               onChooseFolder={handleChooseFolder}
               currentPath={fsPath}
               onKsmDoubleClick={onKsmDoubleClick}
-              projects={mockProjects}
+              projects={projects}
               onBack={() => { setFsFiles([]); setFsPath(null); }}
               onShowNewProject={() => setShowNewProjectModal(true)}
               onProjectFolderContextMenu={handleProjectFolderContextMenu}
@@ -1917,7 +2181,25 @@ function App() {
             open={showBlockEditModal}
             onClose={() => setShowBlockEditModal(false)}
             params={projectBlockParams[currentProjectId]}
-            onSave={params => setProjectBlockParams(prev => ({ ...prev, [currentProjectId]: params }))}
+            onSave={params => {
+              setProjectBlockParams(prev => ({ ...prev, [currentProjectId]: params }));
+              
+              // Trigger autosave after parameter changes
+              const currentProject = openProjects.find(p => p.id === currentProjectId);
+              if (currentProject) {
+                triggerProjectAutosave(
+                  currentProjectId,
+                  currentProject.name,
+                  projectBlocks[currentProjectId] || new Set(),
+                  projectBlockPositions,
+                  projectBlockModes,
+                  projectBlockParams,
+                  blockMoveCount,
+                  resultsTabs,
+                  currentResultsTab
+                );
+              }
+            }}
           />
         )}
         {isRunningModel && (
