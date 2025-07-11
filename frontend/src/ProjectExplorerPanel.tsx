@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import FlipMove from 'react-flip-move';
 
 interface Project {
@@ -44,6 +44,12 @@ export default function ProjectExplorerPanel({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editProjectName, setEditProjectName] = useState('');
+
+  // Add at the top of the component
+  const [expandedFileTreeProjectId, setExpandedFileTreeProjectId] = useState<string | null>(null);
+  const [fileTrees, setFileTrees] = useState<{ [projectId: string]: any }>({});
+  const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
+  const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; projectId: string; filePath: string } | null>(null);
 
   // Load projects and test runs on mount
   useEffect(() => {
@@ -181,6 +187,132 @@ export default function ProjectExplorerPanel({
     ...projects.filter(p => !openProjectIds.includes(p.project_id))
   ];
 
+  const [uploadStatus, setUploadStatus] = useState<{ [projectId: string]: string | null }>({});
+  const fileInputRefs = useRef<{ [projectId: string]: HTMLInputElement | null }>({});
+
+  const handleFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    projectId: string,
+    projectName: string
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadStatus(prev => ({ ...prev, [projectId]: null }));
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUploadStatus(prev => ({ ...prev, [projectId]: 'File uploaded successfully!' }));
+      } else {
+        setUploadStatus(prev => ({ ...prev, [projectId]: data.error || 'Upload failed' }));
+      }
+    } catch (err) {
+      setUploadStatus(prev => ({ ...prev, [projectId]: 'Upload failed' }));
+    }
+  };
+
+  const handleToggleFileTree = async (projectId: string, projectName: string) => {
+    if (expandedFileTreeProjectId === projectId) {
+      setExpandedFileTreeProjectId(null);
+      return;
+    }
+    // Fetch file tree if not already loaded
+    if (!fileTrees[projectId]) {
+      try {
+        const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+        const data = await res.json();
+        setFileTrees(prev => ({ ...prev, [projectId]: data }));
+      } catch {
+        setFileTrees(prev => ({ ...prev, [projectId]: null }));
+      }
+    }
+    setExpandedFileTreeProjectId(projectId);
+  };
+
+  const handleToggleFolder = (folderKey: string) => {
+    setExpandedFolders(prev => ({ ...prev, [folderKey]: !prev[folderKey] }));
+  };
+
+  const handleFileDelete = async (projectId: string, projectName: string, filePath: string) => {
+    console.log('Deleting file:', { projectId, projectName, filePath });
+    try {
+      const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: filePath })
+      });
+      if (res.ok) {
+        // Refresh file tree
+        const res2 = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+        const data2 = await res2.json();
+        setFileTrees(prev => ({ ...prev, [projectId]: data2 }));
+      }
+    } catch {}
+    setFileContextMenu(null);
+  };
+
+  // Recursive file tree renderer
+  const renderFileTree = (node: any, parentKey: string, projectId?: string, projectName?: string) => {
+    if (!node) return null;
+    const isFolder = node.type === 'folder';
+    const folderKey = parentKey + '/' + node.name;
+    if (isFolder) {
+      const expanded = expandedFolders[folderKey] ?? true; // root expanded by default
+      return (
+        <div key={folderKey} className="mb-1">
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => handleToggleFolder(folderKey)}
+          >
+            <span className="mr-1 text-xs" style={{ width: 14, display: 'inline-block', textAlign: 'center' }}>{expanded ? '▼' : '▶'}</span>
+            <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#FFD700" stroke="#B8860B"/></svg>
+            </span>
+            <span className="font-semibold text-zinc-200 text-xs">{node.name}</span>
+          </div>
+          {expanded && node.children && (
+            <ul className="pl-6 mt-1">
+              {node.children.map((child: any) => (
+                <li key={child.name}>
+                  {renderFileTree(child, folderKey, projectId, projectName)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div
+          key={parentKey + '/' + node.name}
+          className="text-xs text-zinc-300 py-0.5 rounded hover:bg-zinc-700 cursor-pointer transition-colors"
+          onContextMenu={e => {
+            e.preventDefault();
+            if (projectId && projectName) {
+              // Compute the relative path inside the project folder
+              let relPath = parentKey.replace(/^.*?\//, '') + '/' + node.name;
+              // Remove the project name if present at the start
+              relPath = relPath.replace(new RegExp(`^${projectName}/?`), '');
+              setFileContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                projectId,
+                filePath: relPath
+              });
+            }
+          }}
+        >
+          {node.name}
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="h-full bg-zinc-900 text-zinc-100 flex flex-col">
       {/* Header */}
@@ -239,8 +371,10 @@ export default function ProjectExplorerPanel({
         {activeTab === 'projects' && (
           <div className="space-y-2">
             <FlipMove className="space-y-2">
-              {sortedProjects.filter((project): project is Project => !!project).map(project => {
+              {sortedProjects.filter((project): project is Project => !!project && !!project.project_id).map(project => {
                 const isOpen = openProjects.some(p => p.id === project.project_id);
+                const showFileTree = expandedFileTreeProjectId === project.project_id;
+                const fileTree = fileTrees[project.project_id];
                 return (
                   <div key={project.project_id} className={`bg-zinc-800 rounded p-3 border border-zinc-700 mb-2 transition-shadow ${isOpen ? 'border-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -256,7 +390,7 @@ export default function ProjectExplorerPanel({
                             </button>
                             <button
                               onClick={() => onCloseProject(project.project_id)}
-                              className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
+                              className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded"
                             >
                               Close
                             </button>
@@ -275,10 +409,49 @@ export default function ProjectExplorerPanel({
                       <div>Created: {formatDate(project.created)}</div>
                       <div>Modified: {formatDate(project.last_modified)}</div>
                     </div>
-                    <div className="mt-2 flex justify-end">
+                    {isOpen && uploadStatus[project.project_id] && (
+                      <div className={`mt-2 text-xs ${uploadStatus[project.project_id]?.includes('success') ? 'text-green-400' : 'text-red-400'}`}>{uploadStatus[project.project_id]}</div>
+                    )}
+                    {/* View Project Files button and file tree */}
+                    {isOpen && (
+                      <div className="mt-2">
+                        <button
+                          className="text-xs text-blue-400 hover:underline focus:outline-none"
+                          onClick={() => handleToggleFileTree(project.project_id, project.name)}
+                        >
+                          {showFileTree ? 'Hide Project Files' : 'View Project Files'}
+                        </button>
+                        {showFileTree && fileTree && (
+                          <div className="mt-2 pl-2">
+                            {renderFileTree(fileTree, project.project_id, project.project_id, project.name)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="mt-2 flex items-center justify-between">
+                      {/* Import File Button bottom left */}
+                      {isOpen ? (
+                        <div>
+                          <button
+                            className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded"
+                            onClick={() => fileInputRefs.current[project.project_id]?.click()}
+                            title="Import file into project"
+                          >
+                            Import File
+                          </button>
+                          <input
+                            type="file"
+                            ref={el => { fileInputRefs.current[project.project_id] = el; }}
+                            style={{ display: 'none' }}
+                            onChange={e => handleFileChange(e, project.project_id, project.name)}
+                          />
+                        </div>
+                      ) : <div />}
                       <button
                         onClick={() => setProjectToDelete(project)}
-                        className="text-xs text-red-400 hover:text-red-300"
+                        className={isOpen
+                          ? "text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
+                          : "text-xs text-red-400 hover:text-red-300"}
                         title="Delete Project"
                       >
                         Delete
@@ -477,6 +650,24 @@ export default function ProjectExplorerPanel({
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Render file context menu */}
+      {fileContextMenu && (
+        <div
+          style={{ position: 'fixed', left: fileContextMenu.x, top: fileContextMenu.y, zIndex: 1000 }}
+          className="bg-white rounded shadow border border-zinc-200 min-w-[120px]"
+          onClick={() => setFileContextMenu(null)}
+        >
+          <button
+            className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-700"
+            onClick={e => {
+              e.stopPropagation();
+              handleFileDelete(fileContextMenu.projectId, openProjects.find(p => p.id === fileContextMenu.projectId)?.name || '', fileContextMenu.filePath);
+            }}
+          >
+            Delete
+          </button>
         </div>
       )}
     </div>

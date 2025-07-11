@@ -1,0 +1,29 @@
+Traceback (most recent call last):
+  File "/Users/jasjeev/Documents/GitHub/kanosym_test1/backend/api.py", line 7, in <module>
+    from flask import Flask, request, jsonify, send_from_directory
+ModuleNotFoundError: No module named 'flask'
+Traceback (most recent call last):
+  File "/Users/jasjeev/Documents/GitHub/kanosym_test1/backend/api.py", line 7, in <module>
+    from flask import Flask, request, jsonify, send_from_directory
+ModuleNotFoundError: No module named 'flask'
+INFO:file_manager:FileManager initialized with base_dir: /Users/jasjeev/Documents/GitHub/kanosym_test1
+INFO:file_manager:Projects directory: /Users/jasjeev/Documents/GitHub/kanosym_test1/projects
+INFO:file_manager:Test runs directory: /Users/jasjeev/Documents/GitHub/kanosym_test1/test-runs
+ * Serving Flask app 'api'
+ * Debug mode: on
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug: * Restarting with watchdog (fsevents)
+INFO:file_manager:FileManager initialized with base_dir: /Users/jasjeev/Documents/GitHub/kanosym_test1
+INFO:file_manager:Projects directory: /Users/jasjeev/Documents/GitHub/kanosym_test1/projects
+INFO:file_manager:Test runs directory: /Users/jasjeev/Documents/GitHub/kanosym_test1/test-runs
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 272-885-029
+INFO:file_manager:FileManager initialized with base_dir: /Users/jasjeev/Documents/GitHub/kanosym_test1/backend
+INFO:file_manager:Projects directory: /Users/jasjeev/Documents/GitHub/kanosym_test1/backend/projects
+INFO:file_manager:Test runs directory: /Users/jasjeev/Documents/GitHub/kanosym_test1/backend/test-runs
+ * Serving Flask app 'api'
+ * Debug mode: on
+Address already in use
+Port 5001 is in use by another program. Either identify and stop that program, or start the server with a different port.

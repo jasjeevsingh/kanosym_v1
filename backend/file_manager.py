@@ -24,11 +24,11 @@ class FileManager:
         
         Args:
             base_dir: Base directory for projects and test runs. 
-                     Defaults to workspace root.
+                     Defaults to backend directory.
         """
         if base_dir is None:
-            # Default to workspace root (one level up from backend)
-            self.base_dir = Path(__file__).parent.parent
+            # Default to backend directory
+            self.base_dir = Path(__file__).parent
         else:
             self.base_dir = Path(base_dir)
         
@@ -45,20 +45,16 @@ class FileManager:
     
     def create_project(self, name: str, project_id: str = None) -> Dict[str, Any]:
         """
-        Create a new project file (.ksm).
-        
+        Create a new project folder and .ksm file inside it.
         Args:
             name: Project name
             project_id: Optional project ID (generated if not provided)
-            
         Returns:
             Project configuration dictionary
         """
         if project_id is None:
             project_id = f"proj-{int(datetime.now().timestamp())}"
-        
         now = datetime.now().isoformat()
-        
         project_config = {
             "version": "1.0.0",
             "metadata": {
@@ -70,161 +66,125 @@ class FileManager:
             },
             "configuration": {
                 "blocks": {
-                    "classical": {
-                        "placed": False,
-                        "position": None,
-                        "parameters": None
-                    },
-                    "hybrid": {
-                        "placed": False,
-                        "position": None,
-                        "parameters": None
-                    },
-                    "quantum": {
-                        "placed": False,
-                        "position": None,
-                        "parameters": None
-                    }
+                    "classical": {"placed": False, "position": None, "parameters": None},
+                    "hybrid": {"placed": False, "position": None, "parameters": None},
+                    "quantum": {"placed": False, "position": None, "parameters": None}
                 },
-                "ui_state": {
-                    "current_block_mode": "classical",
-                    "selected_block": None,
-                    "block_move_count": 0
-                }
+                "ui_state": {"current_block_mode": "classical", "selected_block": None, "block_move_count": 0}
             },
-            "results": {
-                "test_runs": [],
-                "current_tab": None
-            }
+            "results": {"test_runs": [], "current_tab": None}
         }
-        
-        # Save project file
+        # Create project folder
+        project_folder = self.projects_dir / name
+        project_folder.mkdir(exist_ok=True)
+        # Save project file inside folder
         filename = f"{name}.ksm"
-        filepath = self.projects_dir / filename
-        
+        filepath = project_folder / filename
         try:
             with open(filepath, 'w') as f:
                 json.dump(project_config, f, indent=2)
-            
             logger.info(f"Created project file: {filepath}")
             return project_config
-            
         except Exception as e:
             logger.error(f"Failed to create project file {filepath}: {e}")
             raise
-    
+
     def load_project(self, name: str) -> Optional[Dict[str, Any]]:
         """
-        Load a project file (.ksm).
-        
+        Load a project file (.ksm) from its folder.
         Args:
             name: Project name (without .ksm extension)
-            
         Returns:
             Project configuration dictionary or None if not found
         """
+        project_folder = self.projects_dir / name
         filename = f"{name}.ksm"
-        filepath = self.projects_dir / filename
-        
+        filepath = project_folder / filename
         try:
             if not filepath.exists():
                 logger.warning(f"Project file not found: {filepath}")
                 return None
-            
             with open(filepath, 'r') as f:
                 project_config = json.load(f)
-            
             logger.info(f"Loaded project file: {filepath}")
             return project_config
-            
         except Exception as e:
             logger.error(f"Failed to load project file {filepath}: {e}")
             return None
-    
+
     def save_project(self, name: str, project_config: Dict[str, Any]) -> bool:
         """
-        Save a project file (.ksm).
-        
+        Save a project file (.ksm) inside its folder.
         Args:
             name: Project name (without .ksm extension)
             project_config: Project configuration dictionary
-            
         Returns:
             True if successful, False otherwise
         """
+        project_folder = self.projects_dir / name
         filename = f"{name}.ksm"
-        filepath = self.projects_dir / filename
-        
+        filepath = project_folder / filename
         try:
             # Update last_modified timestamp
             project_config["metadata"]["last_modified"] = datetime.now().isoformat()
-            
             with open(filepath, 'w') as f:
                 json.dump(project_config, f, indent=2)
-            
             logger.info(f"Saved project file: {filepath}")
             return True
-            
         except Exception as e:
             logger.error(f"Failed to save project file {filepath}: {e}")
             return False
-    
+
     def delete_project(self, name: str) -> bool:
         """
-        Delete a project file (.ksm).
-        
+        Delete a project folder and its .ksm file.
         Args:
             name: Project name (without .ksm extension)
-            
         Returns:
             True if successful, False otherwise
         """
+        project_folder = self.projects_dir / name
         filename = f"{name}.ksm"
-        filepath = self.projects_dir / filename
-        
+        filepath = project_folder / filename
         try:
             if filepath.exists():
                 filepath.unlink()
-                logger.info(f"Deleted project file: {filepath}")
-                return True
-            else:
-                logger.warning(f"Project file not found for deletion: {filepath}")
-                return False
-                
+            # Remove the folder if empty
+            if project_folder.exists() and not any(project_folder.iterdir()):
+                project_folder.rmdir()
+            logger.info(f"Deleted project file and folder: {filepath}, {project_folder}")
+            return True
         except Exception as e:
-            logger.error(f"Failed to delete project file {filepath}: {e}")
+            logger.error(f"Failed to delete project file or folder {filepath}: {e}")
             return False
-    
+
     def list_projects(self) -> List[Dict[str, Any]]:
         """
-        List all available projects.
-        
+        List all available projects (folders with .ksm files inside).
         Returns:
             List of project metadata dictionaries
         """
         projects = []
-        
         try:
-            for filepath in self.projects_dir.glob("*.ksm"):
-                try:
-                    with open(filepath, 'r') as f:
-                        project_config = json.load(f)
-                    
-                    projects.append({
-                        "name": filepath.stem,  # filename without extension
-                        "project_id": project_config["metadata"]["project_id"],
-                        "created": project_config["metadata"]["created"],
-                        "last_modified": project_config["metadata"]["last_modified"],
-                        "description": project_config["metadata"]["description"]
-                    })
-                    
-                except Exception as e:
-                    logger.error(f"Failed to read project file {filepath}: {e}")
-                    continue
-            
+            for project_folder in self.projects_dir.iterdir():
+                if project_folder.is_dir():
+                    ksm_file = project_folder / f"{project_folder.name}.ksm"
+                    if ksm_file.exists():
+                        try:
+                            with open(ksm_file, 'r') as f:
+                                project_config = json.load(f)
+                            projects.append({
+                                "name": project_folder.name,
+                                "project_id": project_config["metadata"]["project_id"],
+                                "created": project_config["metadata"]["created"],
+                                "last_modified": project_config["metadata"]["last_modified"],
+                                "description": project_config["metadata"]["description"]
+                            })
+                        except Exception as e:
+                            logger.error(f"Failed to read project file {ksm_file}: {e}")
+                            continue
             logger.info(f"Found {len(projects)} projects")
             return projects
-            
         except Exception as e:
             logger.error(f"Failed to list projects: {e}")
             return []
@@ -460,8 +420,8 @@ class FileManager:
         """
         old_filename = f"{old_name}.ksm"
         new_filename = f"{new_name}.ksm"
-        old_filepath = self.projects_dir / old_filename
-        new_filepath = self.projects_dir / new_filename
+        old_filepath = self.projects_dir / old_name / old_filename
+        new_filepath = self.projects_dir / new_name / new_filename
         try:
             if not old_filepath.exists():
                 logger.warning(f"Project file not found for renaming: {old_filepath}")

@@ -4,7 +4,7 @@ api.py
 Backend API entry point for KANOSYM. Exposes endpoints for portfolio input, perturbation, QAE, and results formatting.
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from noira.chat_controller import chat_controller
 import os
@@ -857,6 +857,62 @@ def autosave_project(project_name):
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }), 500
+
+@app.route('/api/projects/<project_name>/files', methods=['POST'])
+def upload_project_file(project_name):
+    project_folder = file_manager.projects_dir / project_name
+    if not project_folder.exists() or not project_folder.is_dir():
+        return jsonify({"success": False, "error": "Project not found"}), 404
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file part in request"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No selected file"}), 400
+    # Optionally, add file type/size checks here
+    save_path = project_folder / file.filename
+    try:
+        file.save(str(save_path))
+        return jsonify({"success": True, "filename": file.filename}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/projects/<project_name>/files', methods=['GET'])
+def list_project_files(project_name):
+    project_folder = file_manager.projects_dir / project_name
+    if not project_folder.exists() or not project_folder.is_dir():
+        return jsonify({"success": False, "error": "Project not found"}), 404
+    def list_files(folder):
+        entries = []
+        for entry in os.scandir(folder):
+            if entry.is_file():
+                entries.append({"name": entry.name, "type": "file"})
+            elif entry.is_dir():
+                # Only recurse one level for now
+                entries.append({"name": entry.name, "type": "folder", "children": []})
+        return entries
+    tree = {
+        "name": project_name,
+        "type": "folder",
+        "children": list_files(project_folder)
+    }
+    return jsonify(tree)
+
+@app.route('/api/projects/<project_name>/files', methods=['DELETE'])
+def delete_project_file(project_name):
+    data = request.get_json()
+    rel_path = data.get('file')
+    if not rel_path:
+        return jsonify({"success": False, "error": "No file specified"}), 400
+    project_folder = file_manager.projects_dir / project_name
+    file_path = project_folder / rel_path
+    try:
+        if file_path.exists() and file_path.is_file():
+            file_path.unlink()
+            return jsonify({"success": True}), 200
+        else:
+            return jsonify({"success": False, "error": "File not found"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 class NoPollingRequestFilter(logging.Filter):
     """Filter out frequent polling requests from Flask logs"""
