@@ -10,7 +10,7 @@ import PortfolioInput from './PortfolioInput';
 import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
 import NoiraPanel from './NoiraPanel';
-import FileManagerPanel from './FileManagerPanel';
+import ProjectExplorerPanel from './ProjectExplorerPanel';
 import { triggerProjectAutosave, autosaveManager } from './autosave';
 
 // Block color scheme by mode (move to top-level scope)
@@ -1994,7 +1994,7 @@ function App() {
         <div className={`flex ${showBlockBar ? 'flex-1 min-h-0' : 'h-full'} relative`}>
           {/* File Manager */}
           <SubtleResizableBorder direction="left" show={showFileManager} min={200} max={400} initial={280}>
-            <FileManagerPanel
+            <ProjectExplorerPanel
               onOpenProject={handleOpenProject}
               onCloseProject={closeProject}
               onOpenTestRun={handleOpenTestRun}

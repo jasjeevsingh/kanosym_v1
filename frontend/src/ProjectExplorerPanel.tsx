@@ -17,7 +17,7 @@ interface TestRun {
   parameters: any;
 }
 
-interface FileManagerPanelProps {
+interface ProjectExplorerPanelProps {
   onOpenProject: (projectName: string) => void;
   onCloseProject: (projectId: string) => void;
   onOpenTestRun: (testRunId: string) => void;
@@ -26,14 +26,14 @@ interface FileManagerPanelProps {
   currentProjectId: string;
 }
 
-export default function FileManagerPanel({
+export default function ProjectExplorerPanel({
   onOpenProject,
   onCloseProject,
   onOpenTestRun,
   onCloseTestRun: _onCloseTestRun,
   openProjects,
   currentProjectId: _currentProjectId
-}: FileManagerPanelProps) {
+}: ProjectExplorerPanelProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [testRuns, setTestRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,7 +186,7 @@ export default function FileManagerPanel({
       {/* Header */}
       <div className="p-4 border-b border-zinc-800">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">File Manager</h2>
+          <h2 className="text-lg font-bold">Project Explorer</h2>
           <button
             onClick={() => setShowNewProjectModal(true)}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
@@ -238,7 +238,7 @@ export default function FileManagerPanel({
 
         {activeTab === 'projects' && (
           <div className="space-y-2">
-            <FlipMove type="div" className="space-y-2">
+            <FlipMove className="space-y-2">
               {sortedProjects.filter((project): project is Project => !!project).map(project => {
                 const isOpen = openProjects.some(p => p.id === project.project_id);
                 return (
