@@ -14,11 +14,8 @@ from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
 import sys
 import os
-import threading
-import uuid
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics import AnalyticsCollector
-from ..noira_utils import send_message_to_noira, format_analysis_summary
 import logging
 from qiskit.circuit.library import WeightedAdder
 from qiskit.algorithms import EstimationProblem
@@ -129,7 +126,7 @@ def quantum_sensitivity_test(
     steps: int
 ) -> Dict[str, Any]:
     """
-    Main function for quantum sensitivity testing (volatility only, with Noira async and analytics).
+    Main function for quantum sensitivity testing (volatility only).
     """
     analytics = AnalyticsCollector('quantum')
     analytics.start_collection()
@@ -175,34 +172,7 @@ def quantum_sensitivity_test(
         analytics=analytics.get_analytics_summary()
     )
 
-    # 6. Start Noira processing in background (non-blocking)
-    logger.info(f"Quantum analysis complete: {format_analysis_summary(output)}")
-    analysis_id = str(uuid.uuid4())
-    def process_noira_async():
-        try:
-            noira_sent, brief_message, llm_response = send_message_to_noira(
-                analysis_type="quantum",
-                portfolio=portfolio,
-                param=param,
-                asset=asset,
-                range_vals=range_vals,
-                steps=steps,
-                results=output
-            )
-            if noira_sent and llm_response:
-                from noira.chat_controller import chat_controller
-                chat_controller.store_async_response(analysis_id, brief_message, llm_response)
-                logger.info(f"Noira response stored for quantum analysis: {analysis_id}")
-        except Exception as e:
-            logger.error(f"Error processing Noira response: {e}")
-    threading.Thread(target=process_noira_async, daemon=True).start()
-
-    # 7. Return results immediately (without waiting for Noira)
-    output["noira_notification"] = {
-        "processing": True,
-        "analysis_id": analysis_id,
-        "brief_message": f"Tell me about this quantum sensitivity test for {asset} {param}."
-    }
+    logger.info(f"Quantum analysis complete")
     return output
 
 
