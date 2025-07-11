@@ -14,6 +14,7 @@ import werkzeug.serving
 from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
 from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
+from file_manager import FileManager
 import numpy as np
 from datetime import datetime
 
@@ -22,6 +23,17 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+# Initialize file manager
+file_manager = FileManager()
+
+# Custom logger to filter out thinking-status polling noise
+class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
+    def log_request(self, code='-', size='-'):
+        # Filter out thinking-status endpoint logs since they're just polling
+        if self.path and '/thinking-status' in self.path:
+            return
+        super().log_request(code, size)
 
 def validate_portfolio(portfolio):
     """
@@ -233,6 +245,7 @@ def quantum_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
+    project_id = data.get('project_id')  # New: project_id for autosave
     
     # Validate portfolio
     is_valid, error_msg = validate_portfolio(portfolio)
@@ -252,6 +265,73 @@ def quantum_sensitivity_test_api():
             range_vals=range_vals,
             steps=steps
         )
+        
+        # Auto-save test run if project_id is provided
+        if project_id:
+            try:
+                test_run_data = {
+                    "block_type": "quantum",
+                    "parameters": {
+                        "portfolio": portfolio,
+                        "param": param,
+                        "asset": asset,
+                        "range": range_vals,
+                        "steps": steps
+                    },
+                    "results": result,
+                    "analytics": {
+                        "mode": "quantum",
+                        "performance_metrics": {
+                            "total_execution_time": result.get("execution_time", 0),
+                            "throughput": result.get("throughput", 0),
+                            "steps_processed": steps,
+                            "memory_usage_mb": result.get("memory_usage", 0),
+                            "cpu_usage_percent": result.get("cpu_usage", 0)
+                        },
+                        "statistical_metrics": {
+                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
+                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
+                            "skewness": result.get("skewness", 0),
+                            "kurtosis": result.get("kurtosis", 0),
+                            "standard_error": result.get("standard_error", 0),
+                            "statistical_significance": result.get("statistical_significance", 0)
+                        },
+                        "quantum_metrics": {
+                            "qubits_used": result.get("qubits_used", 0),
+                            "quantum_volume": result.get("quantum_volume", 0),
+                            "circuit_depth": result.get("circuit_depth", 0),
+                            "quantum_efficiency": result.get("quantum_efficiency", 0),
+                            "coherence_time": result.get("coherence_time", 0),
+                            "gate_fidelity": result.get("gate_fidelity", 0)
+                        },
+                        "sensitivity_metrics": {
+                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
+                            "curve_steepness": result.get("curve_steepness", 0),
+                            "risk_return_ratio": result.get("risk_return_ratio", 0),
+                            "portfolio_beta": result.get("portfolio_beta", 0),
+                            "var_95": result.get("var_95", 0),
+                            "expected_shortfall": result.get("expected_shortfall", 0)
+                        }
+                    },
+                    "noira_analysis": {
+                        "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                        "messages": []
+                    }
+                }
+                
+                test_run_id = file_manager.save_test_run(project_id, test_run_data)
+                result["test_run_id"] = test_run_id
+                result["saved_to_file"] = True
+                
+                # Update project with test run reference
+                project_name = data.get('project_name')
+                if project_name:
+                    file_manager.update_project_test_runs(project_name, test_run_id)
+                
+            except Exception as save_error:
+                logger.error(f"Failed to auto-save test run: {save_error}")
+                result["save_error"] = str(save_error)
+        
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -264,6 +344,7 @@ def classical_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
+    project_id = data.get('project_id')  # New: project_id for autosave
     
     # Validate portfolio
     is_valid, error_msg = validate_portfolio(portfolio)
@@ -283,6 +364,71 @@ def classical_sensitivity_test_api():
             range_vals=range_vals,
             steps=steps
         )
+        
+        # Auto-save test run if project_id is provided
+        if project_id:
+            try:
+                test_run_data = {
+                    "block_type": "classical",
+                    "parameters": {
+                        "portfolio": portfolio,
+                        "param": param,
+                        "asset": asset,
+                        "range": range_vals,
+                        "steps": steps
+                    },
+                    "results": result,
+                    "analytics": {
+                        "mode": "classical",
+                        "performance_metrics": {
+                            "total_execution_time": result.get("execution_time", 0),
+                            "throughput": result.get("throughput", 0),
+                            "steps_processed": steps,
+                            "memory_usage_mb": result.get("memory_usage", 0),
+                            "cpu_usage_percent": result.get("cpu_usage", 0)
+                        },
+                        "statistical_metrics": {
+                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
+                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
+                            "skewness": result.get("skewness", 0),
+                            "kurtosis": result.get("kurtosis", 0),
+                            "standard_error": result.get("standard_error", 0),
+                            "statistical_significance": result.get("statistical_significance", 0)
+                        },
+                        "classical_metrics": {
+                            "simulations_per_second": result.get("simulations_per_second", 0),
+                            "iterations_per_second": result.get("iterations_per_second", 0),
+                            "convergence_rate": result.get("convergence_rate", 0),
+                            "monte_carlo_efficiency": result.get("monte_carlo_efficiency", 0)
+                        },
+                        "sensitivity_metrics": {
+                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
+                            "curve_steepness": result.get("curve_steepness", 0),
+                            "risk_return_ratio": result.get("risk_return_ratio", 0),
+                            "portfolio_beta": result.get("portfolio_beta", 0),
+                            "var_95": result.get("var_95", 0),
+                            "expected_shortfall": result.get("expected_shortfall", 0)
+                        }
+                    },
+                    "noira_analysis": {
+                        "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                        "messages": []
+                    }
+                }
+                
+                test_run_id = file_manager.save_test_run(project_id, test_run_data)
+                result["test_run_id"] = test_run_id
+                result["saved_to_file"] = True
+                
+                # Update project with test run reference
+                project_name = data.get('project_name')
+                if project_name:
+                    file_manager.update_project_test_runs(project_name, test_run_id)
+                
+            except Exception as save_error:
+                logger.error(f"Failed to auto-save test run: {save_error}")
+                result["save_error"] = str(save_error)
+        
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -295,6 +441,7 @@ def hybrid_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
+    project_id = data.get('project_id')  # New: project_id for autosave
     
     # Validate portfolio
     is_valid, error_msg = validate_portfolio(portfolio)
@@ -314,9 +461,402 @@ def hybrid_sensitivity_test_api():
             range_vals=range_vals,
             steps=steps
         )
+        
+        # Auto-save test run if project_id is provided
+        if project_id:
+            try:
+                test_run_data = {
+                    "block_type": "hybrid",
+                    "parameters": {
+                        "portfolio": portfolio,
+                        "param": param,
+                        "asset": asset,
+                        "range": range_vals,
+                        "steps": steps
+                    },
+                    "results": result,
+                    "analytics": {
+                        "mode": "hybrid",
+                        "performance_metrics": {
+                            "total_execution_time": result.get("execution_time", 0),
+                            "throughput": result.get("throughput", 0),
+                            "steps_processed": steps,
+                            "memory_usage_mb": result.get("memory_usage", 0),
+                            "cpu_usage_percent": result.get("cpu_usage", 0)
+                        },
+                        "statistical_metrics": {
+                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
+                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
+                            "skewness": result.get("skewness", 0),
+                            "kurtosis": result.get("kurtosis", 0),
+                            "standard_error": result.get("standard_error", 0),
+                            "statistical_significance": result.get("statistical_significance", 0)
+                        },
+                        "hybrid_metrics": {
+                            "quantum_classical_ratio": result.get("quantum_classical_ratio", 0),
+                            "hybrid_efficiency": result.get("hybrid_efficiency", 0),
+                            "optimization_iterations": result.get("optimization_iterations", 0),
+                            "convergence_threshold": result.get("convergence_threshold", 0)
+                        },
+                        "sensitivity_metrics": {
+                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
+                            "curve_steepness": result.get("curve_steepness", 0),
+                            "risk_return_ratio": result.get("risk_return_ratio", 0),
+                            "portfolio_beta": result.get("portfolio_beta", 0),
+                            "var_95": result.get("var_95", 0),
+                            "expected_shortfall": result.get("expected_shortfall", 0)
+                        }
+                    },
+                    "noira_analysis": {
+                        "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                        "messages": []
+                    }
+                }
+                
+                test_run_id = file_manager.save_test_run(project_id, test_run_data)
+                result["test_run_id"] = test_run_id
+                result["saved_to_file"] = True
+                
+                # Update project with test run reference
+                project_name = data.get('project_name')
+                if project_name:
+                    file_manager.update_project_test_runs(project_name, test_run_id)
+                
+            except Exception as save_error:
+                logger.error(f"Failed to auto-save test run: {save_error}")
+                result["save_error"] = str(save_error)
+        
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+# File Manager API Endpoints
+
+@app.route('/api/projects', methods=['GET'])
+def list_projects():
+    """List all available projects"""
+    try:
+        projects = file_manager.list_projects()
+        return jsonify({
+            "success": True,
+            "projects": projects,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects', methods=['POST'])
+def create_project():
+    """Create a new project"""
+    data = request.get_json()
+    name = data.get('name')
+    project_id = data.get('project_id')
+    
+    if not name:
+        return jsonify({
+            "success": False,
+            "error": "Project name is required",
+            "timestamp": datetime.now().isoformat()
+        }), 400
+    
+    try:
+        project_config = file_manager.create_project(name, project_id)
+        return jsonify({
+            "success": True,
+            "project": project_config,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects/<project_name>', methods=['GET'])
+def get_project(project_name):
+    """Get a specific project"""
+    try:
+        project_config = file_manager.load_project(project_name)
+        if project_config:
+            return jsonify({
+                "success": True,
+                "project": project_config,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Project not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects/<project_name>', methods=['PUT'])
+def update_project(project_name):
+    """Update a project"""
+    data = request.get_json()
+    project_config = data.get('project')
+    
+    if not project_config:
+        return jsonify({
+            "success": False,
+            "error": "Project configuration is required",
+            "timestamp": datetime.now().isoformat()
+        }), 400
+    
+    try:
+        success = file_manager.save_project(project_name, project_config)
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Project updated successfully",
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to update project",
+                "timestamp": datetime.now().isoformat()
+            }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects/<project_name>', methods=['DELETE'])
+def delete_project(project_name):
+    """Delete a project"""
+    try:
+        success = file_manager.delete_project(project_name)
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Project deleted successfully",
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Project not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects/<project_name>/state', methods=['GET'])
+def get_project_state(project_name):
+    """Get complete project state including all test runs"""
+    try:
+        project_state = file_manager.get_project_state(project_name)
+        if project_state:
+            return jsonify({
+                "success": True,
+                "project_state": project_state,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Project not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects/<project_name>/state', methods=['PUT'])
+def save_project_state(project_name):
+    """Save complete project state"""
+    data = request.get_json()
+    project_state = data.get('project_state')
+    
+    if not project_state:
+        return jsonify({
+            "success": False,
+            "error": "Project state is required",
+            "timestamp": datetime.now().isoformat()
+        }), 400
+    
+    try:
+        success = file_manager.save_project_state(project_name, project_state)
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Project state saved successfully",
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to save project state",
+                "timestamp": datetime.now().isoformat()
+            }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/test-runs', methods=['GET'])
+def list_test_runs():
+    """List all test runs, optionally filtered by project"""
+    project_id = request.args.get('project_id')
+    
+    try:
+        test_runs = file_manager.list_test_runs(project_id)
+        return jsonify({
+            "success": True,
+            "test_runs": test_runs,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/test-runs/<test_run_id>', methods=['GET'])
+def get_test_run(test_run_id):
+    """Get a specific test run"""
+    try:
+        test_run_data = file_manager.load_test_run(test_run_id)
+        if test_run_data:
+            return jsonify({
+                "success": True,
+                "test_run": test_run_data,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Test run not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/test-runs', methods=['POST'])
+def create_test_run():
+    """Create a new test run"""
+    data = request.get_json()
+    project_id = data.get('project_id')
+    test_run_data = data.get('test_run_data')
+    
+    if not project_id or not test_run_data:
+        return jsonify({
+            "success": False,
+            "error": "Project ID and test run data are required",
+            "timestamp": datetime.now().isoformat()
+        }), 400
+    
+    try:
+        test_run_id = file_manager.save_test_run(project_id, test_run_data)
+        return jsonify({
+            "success": True,
+            "test_run_id": test_run_id,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/test-runs/<test_run_id>', methods=['DELETE'])
+def delete_test_run(test_run_id):
+    """Delete a test run"""
+    try:
+        success = file_manager.delete_test_run(test_run_id)
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Test run deleted successfully",
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Test run not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/projects/<project_name>/autosave', methods=['POST'])
+def autosave_project(project_name):
+    """Auto-save project state"""
+    data = request.get_json()
+    project_state = data.get('project_state')
+    
+    if not project_state:
+        return jsonify({
+            "success": False,
+            "error": "Project state is required",
+            "timestamp": datetime.now().isoformat()
+        }), 400
+    
+    try:
+        success = file_manager.save_project(project_name, project_state)
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Project auto-saved successfully",
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to auto-save project",
+                "timestamp": datetime.now().isoformat()
+            }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+class NoPollingRequestFilter(logging.Filter):
+    """Filter out frequent polling requests from Flask logs"""
+    
+    def filter(self, record):
+        # Filter out GET requests to polling endpoints
+        if hasattr(record, 'getMessage'):
+            message = record.getMessage()
+            if ('GET /api/chat/display-updates' in message or 
+                'GET /api/chat/thinking-status' in message):
+                return False
+        return True
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

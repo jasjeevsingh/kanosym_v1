@@ -98,3 +98,7 @@ pids
 # Temporary folders
 tmp/
 temp/ 
+
+# Local Stuff
+test-runs/
+projects/
