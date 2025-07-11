@@ -13,11 +13,8 @@ from typing import Dict, Any, List
 import random
 import sys
 import os
-import threading
-import uuid
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics import AnalyticsCollector
-from ..noira_utils import send_message_to_noira, format_analysis_summary
 import logging
 
 # Configure logging
@@ -42,7 +39,7 @@ def hybrid_sensitivity_test(
         steps: Number of steps in the range
         
     Returns:
-        Dictionary with sensitivity analysis results and Noira notification info
+        Dictionary with sensitivity analysis results
     """
     # Initialize analytics collector
     analytics = AnalyticsCollector('hybrid')
@@ -81,48 +78,7 @@ def hybrid_sensitivity_test(
         analytics=analytics.get_analytics_summary()
     )
     
-    # 7. Start Noira processing in background (non-blocking)
-    logger.info(f"Hybrid analysis complete: {format_analysis_summary(output)}")
-    
-    # Generate unique analysis ID
-    analysis_id = str(uuid.uuid4())
-    
-    # Add brief message to display history immediately
-    from noira.chat_controller import chat_controller
-    brief_message = chat_controller.add_brief_message("hybrid", param, asset, analysis_id)
-    
-    def process_noira_async():
-        """Process Noira explanation in background thread"""
-        try:
-            noira_sent, _, llm_response = send_message_to_noira(
-                analysis_type="hybrid",
-                portfolio=portfolio,
-                param=param,
-                asset=asset,
-                range_vals=range_vals,
-                steps=steps,
-                results=output,
-                analysis_id=analysis_id  # Pass analysis_id for context
-            )
-            if noira_sent and llm_response:
-                # Update display history with actual response
-                chat_controller.update_display_with_response(analysis_id, llm_response)
-                logger.info(f"Updated display history with LLM response for hybrid analysis: {analysis_id}")
-        except Exception as e:
-            logger.error(f"Error processing Noira response: {e}")
-            # Update with error message
-            chat_controller.update_display_with_response(analysis_id, 
-                f"Sorry, there was an error analyzing the results: {str(e)}")
-    
-    # Start background thread for Noira processing
-    threading.Thread(target=process_noira_async, daemon=True).start()
-    
-    # 8. Return results immediately (without waiting for Noira)
-    output["noira_notification"] = {
-        "processing": True,
-        "analysis_id": analysis_id,
-        "brief_message": brief_message
-    }
+    logger.info(f"Hybrid analysis complete")
     
     return output
 

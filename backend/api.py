@@ -23,14 +23,6 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Custom logger to filter out thinking-status polling noise
-class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
-    def log_request(self, code='-', size='-'):
-        # Filter out thinking-status endpoint logs since they're just polling
-        if self.path and '/thinking-status' in self.path:
-            return
-        super().log_request(code, size)
-
 def validate_portfolio(portfolio):
     """
     Validate portfolio data structure and constraints.
@@ -217,84 +209,6 @@ def update_chat_settings():
     )
     return jsonify(result)
 
-@app.route('/api/chat/pending-responses', methods=['GET'])
-def get_pending_responses():
-    """Get all pending Noira responses"""
-    try:
-        pending = chat_controller.get_pending_responses()
-        return jsonify({
-            "success": True,
-            "pending_responses": pending,
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "message": f"Error getting pending responses: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }), 500
-
-@app.route('/api/chat/async-response/<analysis_id>', methods=['GET'])
-def get_async_response(analysis_id):
-    """Get a specific async Noira response by analysis ID"""
-    try:
-        response_data = chat_controller.get_async_response(analysis_id)
-        if response_data:
-            return jsonify({
-                "success": True,
-                "response_data": response_data,
-                "timestamp": datetime.now().isoformat()
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "message": "No response found for this analysis ID",
-                "timestamp": datetime.now().isoformat()
-            }), 404
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "message": f"Error getting async response: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }), 500
-
-@app.route('/api/chat/display-updates', methods=['GET'])
-def get_display_updates():
-    """Poll for display history updates"""
-    client_id = request.args.get('client_id', 'default')
-    full_history = request.args.get('full_history', 'false').lower() == 'true'
-    
-    result = chat_controller.get_display_updates(client_id, full_history)
-    return jsonify(result)
-
-@app.route('/api/chat/thinking-status', methods=['GET'])
-def get_thinking_status():
-    """Check if there are any pending responses (thinking state)"""
-    try:
-        has_pending = chat_controller.has_pending_responses()
-        pending_ids = chat_controller.get_pending_analysis_ids()
-        
-        return jsonify({
-            "success": True,
-            "is_thinking": has_pending,
-            "pending_analysis_ids": pending_ids,
-            "pending_count": len(pending_ids),
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "message": f"Error checking thinking status: {str(e)}",
-            "is_thinking": False,
-            "timestamp": datetime.now().isoformat()
-        }), 500
-
-@app.route('/api/chat/reset-display', methods=['POST'])
-def reset_display_history():
-    """Reset display history"""
-    result = chat_controller.reset_display_history()
-    return jsonify(result)
-
 # Placeholder endpoints for other functionality
 @app.route('/api/portfolio', methods=['POST'])
 def portfolio_input():
@@ -404,21 +318,5 @@ def hybrid_sensitivity_test_api():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-class NoPollingRequestFilter(logging.Filter):
-    """Filter out frequent polling requests from Flask logs"""
-    
-    def filter(self, record):
-        # Filter out GET requests to polling endpoints
-        if hasattr(record, 'getMessage'):
-            message = record.getMessage()
-            if ('GET /api/chat/display-updates' in message or 
-                'GET /api/chat/thinking-status' in message):
-                return False
-        return True
-
 if __name__ == '__main__':
-    # Configure logging to filter out polling requests
-    werkzeug_logger = logging.getLogger('werkzeug')
-    werkzeug_logger.addFilter(NoPollingRequestFilter())
-    
-    app.run(debug=True, port=5001, request_handler=FilteredRequestHandler)
+    app.run(debug=True, port=5001)

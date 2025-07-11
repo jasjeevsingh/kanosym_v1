@@ -1110,9 +1110,6 @@ function App() {
       // Add results tab IMMEDIATELY (graph displays right away)
       addResultsTab(currentProjectId, { ...data, testType: blockMode });
       
-      // Backend will handle all Noira messages through display history
-      // NoiraPanel will poll for updates automatically
-      
       setIsRunningModel(false);
     } catch (err) {
       setIsRunningModel(false);

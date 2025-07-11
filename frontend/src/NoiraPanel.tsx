@@ -170,22 +170,18 @@ class ChatApiService {
     }
   }
 
-  async getDisplayUpdates(clientId: string = 'default', fullHistory: boolean = false): Promise<any> {
+  async getChatHistory(): Promise<any> {
     try {
-      const params = new URLSearchParams({
-        client_id: clientId,
-        full_history: fullHistory.toString()
-      });
-      const response = await fetch(`${this.baseUrl}/display-updates?${params}`);
+      const response = await fetch(`${this.baseUrl}/history`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       return await response.json();
     } catch (error) {
-      console.error('Display updates error:', error);
+      console.error('Chat history error:', error);
       return {
-        messages: [],
-        has_updates: false,
+        history: [],
+        length: 0,
         timestamp: new Date().toISOString()
       };
     }
@@ -604,51 +600,35 @@ export default function NoiraPanel() {
     refreshStatus();
   }, []);
 
+  // Load chat history on mount
+  useEffect(() => {
+    if (status?.api_key_set) {
+      const loadInitialHistory = async () => {
+        try {
+          const historyData = await apiService.current.getChatHistory();
+          if (historyData.history) {
+            const formattedMessages = historyData.history.map((msg: any) => ({
+              sender: msg.role === 'user' ? 'user' : 'noira',
+              text: msg.content,
+              timestamp: msg.timestamp
+            }));
+            setMessages(formattedMessages);
+          }
+        } catch (error) {
+          console.error('Error loading chat history:', error);
+        }
+      };
+      
+      loadInitialHistory();
+    }
+  }, [status?.api_key_set]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Poll for display updates from backend
-  useEffect(() => {
-    if (!status?.api_key_set) return;
-    
-    // Get full history on mount
-    const loadInitialHistory = async () => {
-      const updates = await apiService.current.getDisplayUpdates('default', true);
-      if (updates.messages) {
-        const formattedMessages = updates.messages.map((msg: any) => ({
-          sender: msg.role === 'user' ? 'user' : 'noira',
-          text: msg.content,
-          timestamp: msg.timestamp
-        }));
-        setMessages(formattedMessages);
-      }
-    };
-    
-    loadInitialHistory();
-    
-    // Poll for updates every second
-    const pollInterval = setInterval(async () => {
-      const updates = await apiService.current.getDisplayUpdates('default', false);
-      if (updates.has_updates && updates.messages) {
-        setMessages(prev => {
-          const newMessages = updates.messages.map((msg: any) => ({
-            sender: msg.role === 'user' ? 'user' : 'noira',
-            text: msg.content,
-            timestamp: msg.timestamp
-          }));
-          
-          return [...prev, ...newMessages];
-        });
-      }
-    }, 1000);
-    
-    return () => clearInterval(pollInterval);
-  }, [status?.api_key_set]);
-
-  // No longer polling for thinking status since endpoint was removed
-  // Analysis thinking indicator is handled by the backend via display-updates polling
+  // Chat now works with direct message sending and receiving
 
   const refreshStatus = async () => {
     console.log('Refreshing status...');

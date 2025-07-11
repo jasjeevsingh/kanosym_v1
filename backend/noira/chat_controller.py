@@ -32,16 +32,9 @@ class ChatController:
         self.model: str = "gpt-4o"
         self.max_tokens: int = 1000
         self.temperature: float = 0.7
-        # Storage for async Noira responses
-        self.pending_responses: Dict[str, Dict[str, Any]] = {}  # analysis_id -> response_data
-        
-        # NEW: Separate display history for what users see
-        self.display_history: List[Dict[str, Any]] = []
-        # Track last poll position for efficient updates
-        self.display_history_positions: Dict[str, int] = {}  # client_id -> last_position
         
         # Add welcome message
-        self.display_history.append({
+        self.chat_history.append({
             "role": "assistant",
             "content": """Hi! I am **Noira**, your quantum portfolio modeling assistant. How can I help you today?""",
             "timestamp": datetime.now().isoformat()
@@ -194,9 +187,6 @@ class ChatController:
             self.chat_history.append({"role": "user", "content": message})
             self.chat_history.append({"role": "assistant", "content": assistant_response})
             
-            # Note: Regular chat messages are handled directly by the frontend
-            # Display history is only used for analysis operations with async responses
-            
             logger.info(f"\n📚 Chat History Updated: {len(self.chat_history)} total messages")
             logger.info("=" * 60)
             
@@ -233,7 +223,7 @@ class ChatController:
         Returns:
             System message string
         """
-        base_message = """You are Noira, an AI assistant specialized in quantum portfolio analysis and the KANOSYM platform. 
+        base_message = """You are Noira, an AI chatbot specialized in quantum portfolio analysis and the KANOSYM platform. 
         
 You help users understand:
 - Portfolio optimization and risk analysis
@@ -248,7 +238,7 @@ IMPORTANT FORMATTING GUIDELINES:
 - Include mathematical equations using $$ for display math and $ for inline variables. Do not use parentheses for inline variables.
 - Be quantitative and reference specific numerical results when available
 - Explain complex concepts clearly with both intuitive explanations and technical mathematical details
-- Prioritize clarity and conciseness in your responses
+- Keep your responses as short as possible without sacrificing clarity or detail. If you can respond in a single sentence, do so.
 
 When discussing financial metrics, always include relevant mathematical formulas using proper LaTeX notation."""
         
@@ -266,8 +256,6 @@ When discussing financial metrics, always include relevant mathematical formulas
             Dictionary with reset confirmation
         """
         self.chat_history.clear()
-        self.display_history.clear()
-        self.display_history_positions.clear()
         return {
             "success": True,
             "message": "Chat history reset successfully",
@@ -390,219 +378,6 @@ When discussing financial metrics, always include relevant mathematical formulas
                 "max_tokens": self.max_tokens,
                 "temperature": self.temperature
             },
-            "timestamp": datetime.now().isoformat()
-        }
-
-    def store_async_response(self, analysis_id: str, brief_message: str, llm_response: str) -> None:
-        """
-        Store an async Noira response for later retrieval.
-        
-        Args:
-            analysis_id: Unique ID for the analysis
-            brief_message: Brief message for frontend display
-            llm_response: Full LLM response
-        """
-        self.pending_responses[analysis_id] = {
-            "brief_message": brief_message,
-            "llm_response": llm_response,
-            "timestamp": datetime.now().isoformat(),
-            "retrieved": False
-        }
-        logger.info(f"Stored async response for analysis {analysis_id}")
-    
-    def get_async_response(self, analysis_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve and mark as retrieved an async Noira response.
-        
-        Args:
-            analysis_id: Unique ID for the analysis
-            
-        Returns:
-            Response data if available, None otherwise
-        """
-        if analysis_id in self.pending_responses:
-            response_data = self.pending_responses[analysis_id]
-            if not response_data["retrieved"]:
-                response_data["retrieved"] = True
-                logger.info(f"Retrieved async response for analysis {analysis_id}")
-                return response_data
-        return None
-    
-    def get_pending_responses(self) -> List[Dict[str, Any]]:
-        """
-        Get all unretrieved pending responses.
-        
-        Returns:
-            List of pending response data with analysis IDs
-        """
-        pending = []
-        for analysis_id, response_data in self.pending_responses.items():
-            if not response_data["retrieved"]:
-                pending.append({
-                    "analysis_id": analysis_id,
-                    **response_data
-                })
-        return pending
-
-    def add_brief_message(self, analysis_type: str, param: str, asset: str, analysis_id: str) -> str:
-        """
-        Add a brief message to display history for an analysis.
-        
-        Args:
-            analysis_type: Type of analysis (quantum/classical/hybrid)
-            param: Parameter being tested
-            asset: Asset being tested
-            analysis_id: Unique analysis ID for tracking
-            
-        Returns:
-            The brief message that was added
-        """
-        brief_message = f"Tell me about this {analysis_type} sensitivity test for {asset} {param}."
-        
-        # Add to display history - just the user message, no thinking state
-        self.display_history.append({
-            "role": "user",
-            "content": brief_message,
-            "timestamp": datetime.now().isoformat(),
-            "is_brief": True,
-            "analysis_id": analysis_id
-        })
-        
-        # Mark as pending for thinking indicator
-        self.pending_responses[analysis_id] = {
-            "brief_message": brief_message,
-            "llm_response": None,  # Will be filled when response arrives
-            "timestamp": datetime.now().isoformat(),
-            "retrieved": False,
-            "is_pending": True  # Flag to indicate this is still processing
-        }
-        
-        logger.info(f"Added brief message to display history for {analysis_type} analysis {analysis_id}")
-        return brief_message
-    
-    def update_display_with_response(self, analysis_id: str, llm_response: str) -> None:
-        """
-        Update display history by adding the actual LLM response and marking as complete.
-        
-        Args:
-            analysis_id: Analysis ID to update
-            llm_response: The actual LLM response
-        """
-        # Add the assistant response to display history
-        self.display_history.append({
-            "role": "assistant",
-            "content": llm_response,
-            "timestamp": datetime.now().isoformat(),
-            "analysis_id": analysis_id
-        })
-        
-        # Update pending response and mark as complete
-        if analysis_id in self.pending_responses:
-            self.pending_responses[analysis_id].update({
-                "llm_response": llm_response,
-                "is_pending": False,
-                "completed_timestamp": datetime.now().isoformat()
-            })
-        
-        logger.info(f"Added LLM response to display history for analysis {analysis_id}")
-    
-    def has_pending_responses(self) -> bool:
-        """
-        Check if there are any responses currently being processed.
-        
-        Returns:
-            True if there are pending responses, False otherwise
-        """
-        return any(
-            response_data.get("is_pending", False) 
-            for response_data in self.pending_responses.values()
-        )
-    
-    def get_pending_analysis_ids(self) -> List[str]:
-        """
-        Get list of analysis IDs that are currently pending.
-        
-        Returns:
-            List of analysis IDs that are still processing
-        """
-        return [
-            analysis_id 
-            for analysis_id, response_data in self.pending_responses.items()
-            if response_data.get("is_pending", False)
-        ]
-    
-    def add_user_message(self, message: str) -> None:
-        """
-        Add a regular user message to both histories.
-        
-        Args:
-            message: User message
-        """
-        msg_obj = {
-            "role": "user",
-            "content": message,
-            "timestamp": datetime.now().isoformat()
-        }
-        self.display_history.append(msg_obj)
-        # Regular messages also go to chat history for LLM context
-        self.chat_history.append({"role": "user", "content": message})
-    
-    def add_assistant_message(self, message: str) -> None:
-        """
-        Add assistant message to both histories.
-        
-        Args:
-            message: Assistant message
-        """
-        msg_obj = {
-            "role": "assistant",
-            "content": message,
-            "timestamp": datetime.now().isoformat()
-        }
-        self.display_history.append(msg_obj)
-        # Assistant messages also go to chat history
-        self.chat_history.append({"role": "assistant", "content": message})
-    
-    def get_display_updates(self, client_id: str = "default", full_history: bool = False) -> Dict[str, Any]:
-        """
-        Get display history updates for a client.
-        
-        Args:
-            client_id: Client identifier for tracking position
-            full_history: If True, return full history regardless of position
-            
-        Returns:
-            Dictionary with messages and metadata
-        """
-        last_position = self.display_history_positions.get(client_id, 0) if not full_history else 0
-        current_position = len(self.display_history)
-        
-        # Get new messages since last position
-        new_messages = self.display_history[last_position:current_position]
-        
-        # Update position for this client
-        self.display_history_positions[client_id] = current_position
-        
-        return {
-            "messages": new_messages,
-            "last_position": last_position,
-            "current_position": current_position,
-            "has_updates": len(new_messages) > 0,
-            "timestamp": datetime.now().isoformat()
-        }
-    
-    def reset_display_history(self) -> Dict[str, Any]:
-        """
-        Reset display history and positions.
-        
-        Returns:
-            Confirmation dictionary
-        """
-        self.display_history.clear()
-        self.display_history_positions.clear()
-        return {
-            "success": True,
-            "message": "Display history reset successfully",
             "timestamp": datetime.now().isoformat()
         }
 
