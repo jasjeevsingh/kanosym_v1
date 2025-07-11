@@ -343,6 +343,7 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
       ref={setNodeRef}
       className={`h-full w-full text-zinc-100 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
       style={{
+        height: 'calc(100% - 36px)',
         position: 'relative',
         backgroundColor: '#27272a',
         backgroundSize: '20px 20px',
@@ -736,7 +737,7 @@ function RunModelButton({ onClick }: { onClick?: () => void }) {
   return (
     <button
       className="absolute bottom-6 right-8 z-40 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded shadow-lg transition"
-      style={{ position: 'absolute', bottom: 75, right: 10 }}
+      style={{ position: 'absolute', bottom: 14, right: 12 }}
       onClick={onClick}
     >
       Run
@@ -1988,7 +1989,7 @@ function App() {
           showFileManager={showFileManager}
           setShowFileManager={setShowFileManager}
         />
-        <div className="flex flex-1 min-h-0 relative">
+        <div className={`flex ${showBlockBar ? 'flex-1 min-h-0' : 'h-full'} relative`}>
           {/* File Manager */}
           <SubtleResizableBorder direction="left" show={showFileManager} min={200} max={400} initial={280}>
             <FileManagerPanel
