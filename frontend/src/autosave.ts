@@ -36,7 +36,7 @@ class AutosaveManager {
 
   constructor(options: AutosaveOptions = {}) {
     this.options = {
-      delay: 2000, // 2 second debounce
+      delay: 500, // 500ms debounce for faster saves
       maxRetries: 3,
       retryDelay: 1000,
       ...options
@@ -157,9 +157,7 @@ export function createProjectState(
     const position = projectBlockPositions[projectId]?.[blockType];
     
     // Get parameters for this specific block type
-    // For now, we'll use the project-level parameters, but this should be enhanced
-    // to store parameters per block type in the future
-    const parameters = projectBlockParams[projectId];
+    const parameters = projectBlockParams[projectId]?.[blockType] || null;
     
     blocks[blockType] = {
       placed: isPlaced,
