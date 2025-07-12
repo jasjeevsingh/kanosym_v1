@@ -47,15 +47,19 @@ class AutosaveManager {
    * Debounced autosave for project state
    */
   async autosaveProject(projectName: string, projectState: ProjectState): Promise<void> {
+    console.log('autosaveProject called for:', projectName);
     const key = `project-${projectName}`;
     
     // Clear existing timeout
     if (this.saveTimeouts.has(key)) {
+      console.log('Clearing existing timeout for:', projectName);
       clearTimeout(this.saveTimeouts.get(key)!);
     }
 
     // Set new timeout
+    console.log('Setting new timeout for:', projectName, 'delay:', this.options.delay);
     const timeout = setTimeout(async () => {
+      console.log('Timeout fired for:', projectName);
       await this.performProjectSave(projectName, projectState);
       this.saveTimeouts.delete(key);
     }, this.options.delay!);
@@ -151,6 +155,10 @@ export function createProjectState(
   ['classical', 'hybrid', 'quantum'].forEach(blockType => {
     const isPlaced = projectBlocks.has(blockType as 'classical' | 'hybrid' | 'quantum');
     const position = projectBlockPositions[projectId]?.[blockType];
+    
+    // Get parameters for this specific block type
+    // For now, we'll use the project-level parameters, but this should be enhanced
+    // to store parameters per block type in the future
     const parameters = projectBlockParams[projectId];
     
     blocks[blockType] = {
@@ -163,7 +171,7 @@ export function createProjectState(
   // Get test run IDs from results tabs
   const testRuns = resultsTabs[projectId]?.map(tab => tab.id) || [];
 
-  return {
+  const projectState = {
     project_id: projectId,
     project_name: projectName,
     blocks,
@@ -177,6 +185,15 @@ export function createProjectState(
       current_tab: currentResultsTab[projectId] || undefined
     }
   };
+
+  console.log('Created project state with blocks:', Object.keys(blocks).map(blockType => ({
+    blockType,
+    placed: blocks[blockType].placed,
+    hasPosition: !!blocks[blockType].position,
+    hasParameters: !!blocks[blockType].parameters
+  })));
+
+  return projectState;
 }
 
 /**
@@ -193,6 +210,13 @@ export function triggerProjectAutosave(
   resultsTabs: { [projectId: string]: Array<{ id: string; label: string; data: any }> },
   currentResultsTab: { [projectId: string]: string | null }
 ): void {
+  console.log('triggerProjectAutosave called for project:', projectName);
+  console.log('projectId:', projectId);
+  console.log('projectBlocks Set:', Array.from(projectBlocks));
+  console.log('projectBlockPositions:', JSON.stringify(projectBlockPositions, null, 2));
+  console.log('projectBlockModes:', JSON.stringify(projectBlockModes, null, 2));
+  console.log('projectBlockParams being sent:', JSON.stringify(projectBlockParams, null, 2));
+  
   const projectState = createProjectState(
     projectId,
     projectName,
@@ -205,5 +229,6 @@ export function triggerProjectAutosave(
     currentResultsTab
   );
 
+  console.log('Final projectState being sent:', JSON.stringify(projectState, null, 2));
   autosaveManager.autosaveProject(projectName, projectState);
 } 
