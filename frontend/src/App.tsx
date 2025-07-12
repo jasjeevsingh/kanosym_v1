@@ -11,7 +11,7 @@ import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
 import NoiraPanel from './NoiraPanel';
 import ProjectExplorerPanel from './ProjectExplorerPanel';
-import { triggerProjectAutosave, autosaveManager } from './autosave';
+import { triggerProjectAutosave, autosaveManager, createProjectState } from './autosave';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -247,7 +247,7 @@ function DraggableBlock({ id, onContextMenu, mode = 'classical' }: { id: string;
   );
 }
 
-function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onBlockDrag, onBlockDragEnd, onDeselect, blockMode, currentProjectId, isBlockTypePlaced, projectBlockPositions, projectBlockModes }: {
+function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onDeselect, blockMode, currentProjectId, isBlockTypePlaced, projectBlockPositions, projectBlockModes, openProjects, projectBlocks, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, setProjectBlockPositions, setBlockMoveCount, triggerProjectAutosave }: {
   hasBlock: boolean;
   blockPosition: { x: number; y: number } | null;
   onEditRequest: (e: React.MouseEvent, blockType?: 'classical' | 'hybrid' | 'quantum') => void;
@@ -255,14 +255,21 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   onRunModel?: () => void;
   isSelected: boolean;
   onSelect: () => void;
-  onBlockDrag: (dx: number, dy: number) => void;
-  onBlockDragEnd: () => void;
   onDeselect: () => void;
   blockMode: 'classical' | 'hybrid' | 'quantum';
   currentProjectId: string;
   isBlockTypePlaced: (projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') => boolean;
   projectBlockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } };
   projectBlockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' };
+  openProjects: Array<{ id: string; name: string }>;
+  projectBlocks: { [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> };
+  projectBlockParams: { [projectId: string]: { [blockType: string]: any } };
+  blockMoveCount: { [projectId: string]: number };
+  resultsTabs: { [projectId: string]: Array<{ id: string; label: string; data: any }> };
+  currentResultsTab: { [projectId: string]: string | null };
+  setProjectBlockPositions: React.Dispatch<React.SetStateAction<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>>;
+  setBlockMoveCount: React.Dispatch<React.SetStateAction<{ [projectId: string]: number }>>;
+  triggerProjectAutosave: typeof triggerProjectAutosave;
 }) {
   // Add CSS for hiding scrollbars
   useEffect(() => {
@@ -298,30 +305,113 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   const hasAnyBlocks = Object.keys(placedBlocks).length > 0;
   // Drag logic for block
   const [dragging, setDragging] = useState(false);
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
-  function handleMouseDown(e: React.MouseEvent) {
-    console.log('handleMouseDown called, isSelected:', isSelected);
-    if (!isSelected) return;
-    console.log('Starting drag');
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    e.stopPropagation();
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStart = useRef<{ mouseX: number; mouseY: number; blockX: number; blockY: number } | null>(null);
+  const [tempDragPosition, setTempDragPosition] = useState<{ [blockType: string]: { x: number; y: number } } | null>(null);
+  
+  function handleMouseDown(e: React.MouseEvent, blockType: string) {
+    console.log('handleMouseDown called for block:', blockType);
+    const blockPos = placedBlocks[blockType];
+    if (blockPos) {
+      // Get the block element to calculate click offset
+      const blockElement = e.currentTarget.parentElement;
+      const rect = blockElement?.getBoundingClientRect();
+      const parentRect = blockElement?.parentElement?.getBoundingClientRect();
+      
+      if (rect && parentRect) {
+        // Calculate where in the block the user clicked
+        const clickOffsetX = e.clientX - rect.left;
+        const clickOffsetY = e.clientY - rect.top;
+        
+        console.log('Starting drag from position:', blockPos, 'with click offset:', clickOffsetX, clickOffsetY);
+        setDragging(true);
+        dragStart.current = { 
+          mouseX: e.clientX, 
+          mouseY: e.clientY,
+          blockX: blockPos.x,
+          blockY: blockPos.y
+        };
+        // Store the offset so we can maintain it during drag
+        setDragOffset({ x: clickOffsetX, y: clickOffsetY });
+      }
+      e.stopPropagation();
+    }
   }
 
-  // might not being used, commenting out for now
   function handleMouseMove(e: MouseEvent) {
-    // if (dragging && dragStart.current && blockPosition) {
-    //   const dx = e.clientX - dragStart.current.x;
-    //   const dy = e.clientY - dragStart.current.y;
-    //   onBlockDrag(dx, dy);
-    //   dragStart.current = { x: e.clientX, y: e.clientY };
-    // }
+    if (dragging && dragStart.current && selectedBlockType) {
+      // Calculate the total mouse movement from start
+      const dx = e.clientX - dragStart.current.mouseX;
+      const dy = e.clientY - dragStart.current.mouseY;
+      
+      // Apply movement to the original block position, accounting for click offset
+      const newX = dragStart.current.blockX + dx;
+      const newY = dragStart.current.blockY + dy;
+      
+      // Ensure block stays within reasonable bounds
+      const boundedX = Math.max(0, Math.min(1900, newX));
+      const boundedY = Math.max(0, Math.min(1900, newY));
+      
+      // Update temporary position for smooth dragging
+      setTempDragPosition({
+        [selectedBlockType]: { x: boundedX, y: boundedY }
+      });
+    }
   }
   function handleMouseUp() {
-    if (dragging) {
+    console.log('handleMouseUp called, dragging:', dragging);
+    if (dragging && selectedBlockType && tempDragPosition) {
+      console.log('Ending drag for block:', selectedBlockType);
       setDragging(false);
-      onBlockDragEnd();
+      
+      // Apply the final position from tempDragPosition
+      const finalPosition = tempDragPosition[selectedBlockType];
+      if (finalPosition) {
+        setProjectBlockPositions(prev => ({
+          ...prev,
+          [currentProjectId]: {
+            ...prev[currentProjectId],
+            [selectedBlockType]: finalPosition
+          }
+        }));
+      }
+      
+      // Clear temporary position
+      setTempDragPosition(null);
+      
+      // Trigger autosave with the updated positions
+      const currentProject = openProjects.find(p => p.id === currentProjectId);
+      if (currentProject) {
+        console.log('Triggering autosave after drag');
+        const updatedPositions = {
+          ...projectBlockPositions,
+          [currentProjectId]: {
+            ...projectBlockPositions[currentProjectId],
+            [selectedBlockType]: finalPosition
+          }
+        };
+        triggerProjectAutosave(
+          currentProjectId,
+          currentProject.name,
+          projectBlocks[currentProjectId] || new Set(),
+          updatedPositions,
+          projectBlockModes,
+          projectBlockParams,
+          blockMoveCount,
+          resultsTabs,
+          currentResultsTab
+        );
+      }
+      
+      // Also increment move count
+      setBlockMoveCount(prev => ({
+        ...prev,
+        [currentProjectId]: (prev[currentProjectId] || 0) + 1
+      }));
     }
+    dragStart.current = null;
+    setDragOffset({ x: 0, y: 0 });
+    setTempDragPosition(null);
   }
   useEffect(() => {
     if (dragging) {
@@ -335,7 +425,7 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging]);
+  }, [dragging, selectedBlockType, currentProjectId, openProjects, projectBlocks, projectBlockPositions, projectBlockModes, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, dragOffset]);
 
   return (
     <div
@@ -369,22 +459,32 @@ style={{
   }}
 >
   {hasAnyBlocks ? (
-    Object.entries(placedBlocks).map(([blockType, position]) => (
-      <div
-        key={blockType}
-        style={{ 
-          position: 'absolute', 
-          left: position.x, 
-          top: position.y, 
-          cursor: isSelected && selectedBlockType === blockType ? 'grab' : 'pointer', 
-          zIndex: 10 
+    Object.entries(placedBlocks).map(([blockType, position]) => {
+      // Use temporary position during drag, otherwise use actual position
+      const displayPosition = (dragging && tempDragPosition && tempDragPosition[blockType]) ? tempDragPosition[blockType] : position;
+      
+      return (
+        <div
+          key={blockType}
+          style={{ 
+            position: 'absolute', 
+            left: displayPosition.x, 
+            top: displayPosition.y, 
+            cursor: isSelected && selectedBlockType === blockType ? 'grab' : 'pointer', 
+            zIndex: 10,
+            transition: dragging && selectedBlockType === blockType ? 'none' : 'all 0.1s ease'
+          }}
+          onClick={e => { 
+            e.stopPropagation(); 
+            setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+            onSelect(); 
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+          onSelect();
+          handleMouseDown(e, blockType);
         }}
-        onClick={e => { 
-          e.stopPropagation(); 
-          setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
-          onSelect(); 
-        }}
-        onMouseDown={isSelected && selectedBlockType === blockType ? handleMouseDown : undefined}
       >
         <div className={`transition border-2 rounded ${isSelected && selectedBlockType === blockType ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
           <DraggableBlock 
@@ -394,7 +494,8 @@ style={{
           />
         </div>
       </div>
-    ))
+      );
+    })
   ) : (
     <div className="flex flex-col items-center justify-center h-full">
       <div className="text-3xl font-bold mb-4">Model Building Environment</div>
@@ -752,6 +853,7 @@ function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; blockType?: 'classical' | 'hybrid' | 'quantum' } | null>(null);
+  const [editingBlockType, setEditingBlockType] = useState<'classical' | 'hybrid' | 'quantum' | null>(null);
   const [showExplorer, setShowExplorer] = useState(false); // Disable old FileExplorer, use FileManagerPanel instead
   const [showNoira, setShowNoira] = useState(true);
   const [showBlockBar, setShowBlockBar] = useState(true);
@@ -858,7 +960,7 @@ function App() {
 
   // Add isRunningModel and projectBlockParams state (mock for now)
   const [isRunningModel, setIsRunningModel] = useState(false);
-  const [projectBlockParams, setProjectBlockParams] = useState<{ [projectId: string]: any }>({});
+  const [projectBlockParams, setProjectBlockParams] = useState<{ [projectId: string]: { [blockType: string]: any } }>({});
 
   // File Manager state
   const [showFileManager, setShowFileManager] = useState(true);
@@ -936,15 +1038,23 @@ function App() {
         
         // Load project configuration
         if (project.configuration) {
+          // Load placed blocks
+          const placedBlocks = new Set<'classical' | 'hybrid' | 'quantum'>();
+          
           // Load block positions
           const blockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } } = {};
           Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
             if (blockConfig.placed && blockConfig.position) {
               if (!blockPositions[projectId]) blockPositions[projectId] = {};
               blockPositions[projectId][blockType] = blockConfig.position;
+              // Add to placed blocks set
+              placedBlocks.add(blockType as 'classical' | 'hybrid' | 'quantum');
             }
           });
           setProjectBlockPositions(prev => ({ ...prev, ...blockPositions }));
+          
+          // Update the projectBlocks state with placed blocks
+          setProjectBlocks(prev => ({ ...prev, [projectId]: placedBlocks }));
           
           // Load block modes
           const blockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' } = {};
@@ -953,14 +1063,19 @@ function App() {
           }
           setProjectBlockModes(prev => ({ ...prev, ...blockModes }));
           
-          // Load block parameters
-          const blockParams: { [projectId: string]: any } = {};
+          // Load block parameters - new structure with per-block-type parameters
+          const blockParams: { [blockType: string]: any } = {};
           Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
             if (blockConfig.parameters) {
-              blockParams[projectId] = blockConfig.parameters;
+              blockParams[blockType] = blockConfig.parameters;
             }
           });
-          setProjectBlockParams(prev => ({ ...prev, ...blockParams }));
+          
+          // Set the parameters in the new structure
+          setProjectBlockParams(prev => ({ 
+            ...prev, 
+            [projectId]: blockParams 
+          }));
         }
       }
     } catch (error) {
@@ -1156,30 +1271,41 @@ function App() {
           const finalDropY = dropY + offset;
 
           addBlockTypeToProject(currentProjectId, blockMode);
-          setProjectBlockPositions(prev => ({
-            ...prev,
-            [currentProjectId]: {
-              ...(prev[currentProjectId] || {}),
-              [blockMode]: { x: finalDropX, y: finalDropY }
+          setProjectBlockPositions(prev => {
+            const newPositions = {
+              ...prev,
+              [currentProjectId]: {
+                ...(prev[currentProjectId] || {}),
+                [blockMode]: { x: finalDropX, y: finalDropY }
+              }
+            };
+            
+            // Trigger autosave with the UPDATED state
+            const currentProject = openProjects.find(p => p.id === currentProjectId);
+            if (currentProject) {
+              // Create updated projectBlocks Set
+              const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
+              updatedProjectBlocks.add(blockMode);
+              
+              // Create updated projectBlockModes
+              const updatedProjectBlockModes = { ...projectBlockModes, [currentProjectId]: blockMode };
+              
+              triggerProjectAutosave(
+                currentProjectId,
+                currentProject.name,
+                updatedProjectBlocks,
+                newPositions,
+                updatedProjectBlockModes,
+                projectBlockParams,
+                blockMoveCount,
+                resultsTabs,
+                currentResultsTab
+              );
             }
-          }));
+            
+            return newPositions;
+          });
           setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
-          
-          // Trigger autosave after block placement
-          const currentProject = openProjects.find(p => p.id === currentProjectId);
-          if (currentProject) {
-            triggerProjectAutosave(
-              currentProjectId,
-              currentProject.name,
-              projectBlocks[currentProjectId] || new Set(),
-              projectBlockPositions,
-              projectBlockModes,
-              projectBlockParams,
-              blockMoveCount,
-              resultsTabs,
-              currentResultsTab
-            );
-          }
         }
         // end of current change
         
@@ -1198,6 +1324,53 @@ function App() {
                 delete newPositions[currentProjectId];
               }
             }
+            
+            // Clean up block parameters
+            setProjectBlockParams(prev => {
+              const newParams = { ...prev };
+              if (newParams[currentProjectId]) {
+                delete newParams[currentProjectId][currentBlockMode];
+                // Remove the project entry if no block params remain
+                if (Object.keys(newParams[currentProjectId]).length === 0) {
+                  delete newParams[currentProjectId];
+                }
+              }
+              return newParams;
+            });
+            
+            // Trigger autosave with the UPDATED state
+            const currentProject = openProjects.find(p => p.id === currentProjectId);
+            if (currentProject) {
+              // Create updated projectBlocks Set
+              const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
+              updatedProjectBlocks.delete(currentBlockMode);
+              
+              // Create updated projectBlockModes
+              const updatedProjectBlockModes = { ...projectBlockModes };
+              delete updatedProjectBlockModes[currentProjectId];
+              
+              // Create updated params
+              const updatedParams = { ...projectBlockParams };
+              if (updatedParams[currentProjectId]) {
+                delete updatedParams[currentProjectId][currentBlockMode];
+                if (Object.keys(updatedParams[currentProjectId]).length === 0) {
+                  delete updatedParams[currentProjectId];
+                }
+              }
+              
+              triggerProjectAutosave(
+                currentProjectId,
+                currentProject.name,
+                updatedProjectBlocks,
+                newPositions,
+                updatedProjectBlockModes,
+                updatedParams,
+                blockMoveCount,
+                resultsTabs,
+                currentResultsTab
+              );
+            }
+            
             return newPositions;
           });
         }
@@ -1207,22 +1380,6 @@ function App() {
           return copy;
         });
         setSelectedBlockProject(null);
-        
-        // Trigger autosave after block removal
-        const currentProject = openProjects.find(p => p.id === currentProjectId);
-        if (currentProject) {
-          triggerProjectAutosave(
-            currentProjectId,
-            currentProject.name,
-            projectBlocks[currentProjectId] || new Set(),
-            projectBlockPositions,
-            projectBlockModes,
-            projectBlockParams,
-            blockMoveCount,
-            resultsTabs,
-            currentResultsTab
-          );
-        }
       }
     }
     setActiveId(null);
@@ -1234,6 +1391,9 @@ function App() {
   }
 
   function handleEdit() {
+    if (contextMenu?.blockType) {
+      setEditingBlockType(contextMenu.blockType);
+    }
     setShowBlockEditModal(true);
     setContextMenu(null);
   }
@@ -1402,54 +1562,18 @@ function App() {
   function handleBlockSelect() {
     setSelectedBlockProject(currentProjectId);
   }
-  function handleBlockDrag(dx: number, dy: number) {
-    console.log('handleBlockDrag called with dx:', dx, 'dy:', dy, 'for project:', currentProjectId);
-    setProjectBlockPositions(prev => {
-      const projectPositions = prev[currentProjectId];
-      if (!projectPositions) return prev;
-      
-      // Update the position of the currently selected block type
-      const selectedBlockType = selectedBlockProject === currentProjectId ? projectBlockModes[currentProjectId] : null;
-      if (!selectedBlockType || !projectPositions[selectedBlockType]) return prev;
-      
-      const pos = projectPositions[selectedBlockType];
-      const newPositions = { 
-        ...prev, 
-        [currentProjectId]: { 
-          ...projectPositions, 
-          [selectedBlockType]: { x: pos.x + dx, y: pos.y + dy } 
-        } 
-      };
-      
-      // Trigger autosave after position update
-      const currentProject = openProjects.find(p => p.id === currentProjectId);
-      if (currentProject) {
-        triggerProjectAutosave(
-          currentProjectId,
-          currentProject.name,
-          projectBlocks[currentProjectId] || new Set(),
-          newPositions,
-          projectBlockModes,
-          projectBlockParams,
-          blockMoveCount,
-          resultsTabs,
-          currentResultsTab
-        );
-      }
-      
-      return newPositions;
-    });
-    // Increment move count when user drags it within the main area
-    setBlockMoveCount(prev => {
-      const currentCount = prev[currentProjectId] || 0;
-      const newCount = currentCount + 1;
-      console.log('Incrementing move count for project:', currentProjectId, 'from', currentCount, 'to', newCount);
-      return { ...prev, [currentProjectId]: newCount };
-    });
+  // handleBlockDrag is no longer used - we handle dragging directly in MainPage
+  /*
+  function handleBlockDrag(dx: number, dy: number, selectedBlockType?: 'classical' | 'hybrid' | 'quantum') {
+    // This function is deprecated - dragging is now handled in MainPage component
   }
+  */
+  // handleBlockDragEnd is no longer used - we handle drag end in MainPage
+  /*
   function handleBlockDragEnd() {
-    // Could add snap-to-grid or bounds logic here
+    // This function is deprecated - drag end is now handled in MainPage component
   }
+  */
 
   // Set minimums to ensure main pane never gets too small
   const minExplorer = 200;
@@ -1481,6 +1605,19 @@ function App() {
         return newPositions;
       });
       
+      // Clean up block parameters
+      setProjectBlockParams(prev => {
+        const newParams = { ...prev };
+        if (newParams[currentProjectId]) {
+          delete newParams[currentProjectId][blockTypeToDelete];
+          // Remove the project entry if no block params remain
+          if (Object.keys(newParams[currentProjectId]).length === 0) {
+            delete newParams[currentProjectId];
+          }
+        }
+        return newParams;
+      });
+      
       // Also remove from projectBlockModes if it was the current mode
       if (projectBlockModes[currentProjectId] === blockTypeToDelete) {
         setProjectBlockModes(prev => {
@@ -1488,6 +1625,47 @@ function App() {
           delete copy[currentProjectId];
           return copy;
         });
+      }
+      
+      // Trigger autosave after deletion
+      const currentProject = openProjects.find(p => p.id === currentProjectId);
+      if (currentProject) {
+        // Get updated state values
+        const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
+        updatedProjectBlocks.delete(blockTypeToDelete);
+        
+        const updatedPositions = { ...projectBlockPositions };
+        if (updatedPositions[currentProjectId]) {
+          delete updatedPositions[currentProjectId][blockTypeToDelete];
+          if (Object.keys(updatedPositions[currentProjectId]).length === 0) {
+            delete updatedPositions[currentProjectId];
+          }
+        }
+        
+        const updatedParams = { ...projectBlockParams };
+        if (updatedParams[currentProjectId]) {
+          delete updatedParams[currentProjectId][blockTypeToDelete];
+          if (Object.keys(updatedParams[currentProjectId]).length === 0) {
+            delete updatedParams[currentProjectId];
+          }
+        }
+        
+        const updatedModes = { ...projectBlockModes };
+        if (updatedModes[currentProjectId] === blockTypeToDelete) {
+          delete updatedModes[currentProjectId];
+        }
+        
+        triggerProjectAutosave(
+          currentProjectId,
+          currentProject.name,
+          updatedProjectBlocks,
+          updatedPositions,
+          updatedModes,
+          updatedParams,
+          blockMoveCount,
+          resultsTabs,
+          currentResultsTab
+        );
       }
     }
     setSelectedBlockProject(null);
@@ -2040,14 +2218,21 @@ function App() {
               onRunModel={handleRunModel}
               isSelected={isBlockSelected}
               onSelect={handleBlockSelect}
-              onBlockDrag={handleBlockDrag}
-              onBlockDragEnd={handleBlockDragEnd}
               onDeselect={handleBlockDeselect}
               blockMode={projectBlockModes[currentProjectId] || mode}
               currentProjectId={currentProjectId}
               isBlockTypePlaced={isBlockTypePlaced}
               projectBlockPositions={projectBlockPositions}
               projectBlockModes={projectBlockModes}
+              openProjects={openProjects}
+              projectBlocks={projectBlocks}
+              projectBlockParams={projectBlockParams}
+              blockMoveCount={blockMoveCount}
+              resultsTabs={resultsTabs}
+              currentResultsTab={currentResultsTab}
+              setProjectBlockPositions={setProjectBlockPositions}
+              setBlockMoveCount={setBlockMoveCount}
+              triggerProjectAutosave={triggerProjectAutosave}
             />
             ) : (
               <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
@@ -2184,26 +2369,46 @@ function App() {
         {showBlockEditModal && (
           <BlockEditModal
             open={showBlockEditModal}
-            onClose={() => setShowBlockEditModal(false)}
-            params={projectBlockParams[currentProjectId]}
+            onClose={() => {
+              setShowBlockEditModal(false);
+              setEditingBlockType(null);
+            }}
+            params={projectBlockParams[currentProjectId]?.[editingBlockType || projectBlockModes[currentProjectId] || mode]}
             onSave={params => {
-              setProjectBlockParams(prev => ({ ...prev, [currentProjectId]: params }));
+              const blockType = editingBlockType || projectBlockModes[currentProjectId] || mode;
+              setProjectBlockParams(prev => ({
+                ...prev,
+                [currentProjectId]: {
+                  ...(prev[currentProjectId] || {}),
+                  [blockType]: params
+                }
+              }));
               
-              // Trigger autosave after parameter changes
+              // Trigger autosave after parameter changes with UPDATED parameters
               const currentProject = openProjects.find(p => p.id === currentProjectId);
               if (currentProject) {
+                // Create updated projectBlockParams with the new parameters
+                const updatedProjectBlockParams = {
+                  ...projectBlockParams,
+                  [currentProjectId]: {
+                    ...(projectBlockParams[currentProjectId] || {}),
+                    [blockType]: params
+                  }
+                };
+                
                 triggerProjectAutosave(
                   currentProjectId,
                   currentProject.name,
                   projectBlocks[currentProjectId] || new Set(),
                   projectBlockPositions,
                   projectBlockModes,
-                  projectBlockParams,
+                  updatedProjectBlockParams, // Use the updated parameters
                   blockMoveCount,
                   resultsTabs,
                   currentResultsTab
                 );
               }
+              setEditingBlockType(null);
             }}
           />
         )}

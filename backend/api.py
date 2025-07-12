@@ -838,7 +838,36 @@ def autosave_project(project_name):
         }), 400
     
     try:
-        success = file_manager.save_project(project_name, project_state)
+        # Load existing project configuration
+        project_config = file_manager.load_project(project_name)
+        if not project_config:
+            return jsonify({
+                "success": False,
+                "error": "Project not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+        
+        # Debug: Log what blocks are being received
+        if 'blocks' in project_state:
+            print(f"Autosave for {project_name} - Received blocks:")
+            for block_type, block_data in project_state['blocks'].items():
+                print(f"  {block_type}: placed={block_data.get('placed')}, position={block_data.get('position')}, has_params={block_data.get('parameters') is not None}")
+        
+        # Merge the state into the configuration
+        if 'blocks' in project_state:
+            project_config['configuration']['blocks'] = project_state['blocks']
+        if 'ui_state' in project_state:
+            project_config['configuration']['ui_state'] = project_state['ui_state']
+        if 'results' in project_state:
+            project_config['results'] = project_state['results']
+        
+        # Debug: Log what blocks are being saved
+        print(f"Autosave for {project_name} - Saving blocks:")
+        for block_type, block_data in project_config['configuration']['blocks'].items():
+            print(f"  {block_type}: placed={block_data.get('placed')}, position={block_data.get('position')}, has_params={block_data.get('parameters') is not None}")
+        
+        # Save the updated configuration
+        success = file_manager.save_project(project_name, project_config)
         if success:
             return jsonify({
                 "success": True,
