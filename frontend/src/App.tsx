@@ -684,11 +684,13 @@ function App() {
         const response = await fetch('http://localhost:5001/api/projects');
         const data = await response.json();
         if (data.success) {
+          // Projects API returns flat structure with project_id and name
           const projectsList = data.projects.map((project: any) => ({
-            id: project.metadata.project_id,
-            name: project.metadata.name
+            id: project.project_id,
+            name: project.name
           }));
           setProjects(projectsList);
+          console.log('Loaded projects:', projectsList);
           
           // If no projects are open and we have projects, don't auto-open the first one
           // Let the user choose which project to open
@@ -837,9 +839,13 @@ function App() {
       const data = await response.json();
       if (data.success) {
         const testRun = data.test_run;
+        console.log('handleOpenTestRun - received test run:', testRun);
         
         // Find the associated project
         const projectId = testRun.project_id;
+        console.log('Looking for project ID:', projectId);
+        console.log('Available projects:', projects.map(p => ({ id: p.id, name: p.name })));
+        
         if (projectId) {
           // Find the project by ID
           const project = projects.find(p => p.id === projectId);
@@ -853,8 +859,9 @@ function App() {
             setCurrentProjectId(projectId);
             
             // Create a results tab for this test run
+            // Test run data is now saved in the same format as returned from API
             const tabData = {
-              ...testRun.results,
+              ...testRun,
               testType: testRun.block_type,
               test_run_id: testRunId
             };
@@ -1289,6 +1296,10 @@ function App() {
     const activeTabId = currentResultsTab[projectId];
     const tab = tabs.find(t => t.id === activeTabId);
     if (!tab) return null;
+    
+    // Debug logging
+    console.log('ResultsTabContent - tab data:', tab.data);
+    
     return <ResultsChart data={tab.data} />;
   }
 
@@ -1925,9 +1936,11 @@ function App() {
             />
             {/* Results tabs bar and content */}
             <ResultsTabsBar projectId={currentProjectId} />
-            <ResultsTabContent projectId={currentProjectId} />
-            {openProjects.length > 0 ? (
-                          <MainPage
+            {/* Show either results or main page */}
+            {currentResultsTab[currentProjectId] && resultsTabs[currentProjectId]?.length > 0 ? (
+              <ResultsTabContent projectId={currentProjectId} />
+            ) : openProjects.length > 0 ? (
+              <MainPage
               onEditRequest={handleEditRequest}
               showRunButton={hasAnyBlock(currentProjectId)}
               onRunModel={handleRunModel}

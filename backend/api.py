@@ -269,7 +269,9 @@ def quantum_sensitivity_test_api():
         # Auto-save test run if project_id is provided
         if project_id:
             try:
+                # Save test run data in the same format as returned to frontend
                 test_run_data = {
+                    **result,  # Include all result data at the top level
                     "block_type": "quantum",
                     "parameters": {
                         "portfolio": portfolio,
@@ -278,7 +280,6 @@ def quantum_sensitivity_test_api():
                         "range": range_vals,
                         "steps": steps
                     },
-                    "results": result,
                     "analytics": {
                         "mode": "quantum",
                         "performance_metrics": {
@@ -368,7 +369,9 @@ def classical_sensitivity_test_api():
         # Auto-save test run if project_id is provided
         if project_id:
             try:
+                # Save test run data in the same format as returned to frontend
                 test_run_data = {
+                    **result,  # Include all result data at the top level
                     "block_type": "classical",
                     "parameters": {
                         "portfolio": portfolio,
@@ -377,7 +380,6 @@ def classical_sensitivity_test_api():
                         "range": range_vals,
                         "steps": steps
                     },
-                    "results": result,
                     "analytics": {
                         "mode": "classical",
                         "performance_metrics": {
@@ -465,7 +467,9 @@ def hybrid_sensitivity_test_api():
         # Auto-save test run if project_id is provided
         if project_id:
             try:
+                # Save test run data in the same format as returned to frontend
                 test_run_data = {
+                    **result,  # Include all result data at the top level
                     "block_type": "hybrid",
                     "parameters": {
                         "portfolio": portfolio,
@@ -474,7 +478,6 @@ def hybrid_sensitivity_test_api():
                         "range": range_vals,
                         "steps": steps
                     },
-                    "results": result,
                     "analytics": {
                         "mode": "hybrid",
                         "performance_metrics": {
