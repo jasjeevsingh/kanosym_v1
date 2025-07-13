@@ -397,8 +397,11 @@ export default function ProjectExplorerPanel({
                 return (
                   <div key={project.project_id} className={`bg-zinc-800 rounded p-3 border border-zinc-700 mb-2 transition-shadow ${isOpen ? 'border-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium text-zinc-100 truncate">{project.name}</h3>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-zinc-100 truncate">{project.name}</h3>
+                        <div className="text-xs text-zinc-500 font-mono">{project.project_id}</div>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-2">
                         {isOpen ? (
                           <>
                             <button
