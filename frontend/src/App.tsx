@@ -1408,15 +1408,15 @@ function App() {
 
   // On Run Model, POST to backend and add results tab
   async function handleRunModel() {
-    // Gather block params from state (replace with your actual state)
-    const blockParams = projectBlockParams[currentProjectId]; // e.g. { portfolio, param, asset, range, steps }
+    // Get the current block mode for this project
+    const blockMode = projectBlockModes[currentProjectId] || 'classical';
+    
+    // Gather block params from state for the CURRENT block type only
+    const blockParams = projectBlockParams[currentProjectId]?.[blockMode];
     if (!blockParams) {
       alert('Please configure the block parameters first');
       return;
     }
-    
-    // Get the current block mode for this project
-    const blockMode = projectBlockModes[currentProjectId] || 'classical';
     
     // Get current project info for autosave
     const currentProject = openProjects.find(p => p.id === currentProjectId);
@@ -1875,8 +1875,20 @@ function App() {
     function handleAssetChange(idx: number, value: string) {
       setForm((prev: any) => {
         const assets = [...prev.portfolio.assets];
+        const oldAsset = assets[idx];
         assets[idx] = value;
-        return { ...prev, portfolio: { ...prev.portfolio, assets } };
+        
+        // If the currently selected asset for analysis is the one being changed, update it
+        let newAsset = prev.asset;
+        if (prev.asset === oldAsset) {
+          newAsset = value;
+        }
+        
+        return { 
+          ...prev, 
+          portfolio: { ...prev.portfolio, assets },
+          asset: newAsset
+        };
       });
     }
     
