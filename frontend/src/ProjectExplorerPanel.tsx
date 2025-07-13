@@ -24,6 +24,7 @@ interface ProjectExplorerPanelProps {
   onCloseTestRun: (testRunId: string) => void;
   openProjects: { id: string; name: string }[];
   currentProjectId: string;
+  refreshTrigger?: number;
 }
 
 export default function ProjectExplorerPanel({
@@ -32,7 +33,8 @@ export default function ProjectExplorerPanel({
   onOpenTestRun,
   onCloseTestRun: _onCloseTestRun,
   openProjects,
-  currentProjectId: _currentProjectId
+  currentProjectId: _currentProjectId,
+  refreshTrigger
 }: ProjectExplorerPanelProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [testRuns, setTestRuns] = useState<TestRun[]>([]);
@@ -51,18 +53,21 @@ export default function ProjectExplorerPanel({
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; projectId: string; filePath: string } | null>(null);
 
-  // Load projects and test runs on mount
+  // Load projects and test runs on mount and when refreshTrigger changes
   useEffect(() => {
+    console.log('ProjectExplorerPanel: refreshTrigger changed to', refreshTrigger);
     loadProjects();
     loadTestRuns();
-  }, []);
+  }, [refreshTrigger]);
 
   const loadProjects = async () => {
+    console.log('Loading projects...');
     setLoading(true);
     setError(null);
     try {
       const response = await fetch('http://localhost:5001/api/projects');
       const data = await response.json();
+      console.log('Loaded projects:', data);
       if (data.success) {
         setProjects(data.projects);
       } else {
@@ -107,8 +112,22 @@ export default function ProjectExplorerPanel({
         body: JSON.stringify({ name: newProjectName.trim() })
       });
       const data = await response.json();
-      if (data.success) {
-        setProjects(prev => [...prev, data.project]);
+      console.log('Create project response:', data);
+      if (data.success && data.project && data.project.metadata) {
+        // Extract the project data from the nested structure
+        const newProject: Project = {
+          name: data.project.metadata.name,
+          project_id: data.project.metadata.project_id,
+          created: data.project.metadata.created,
+          last_modified: data.project.metadata.last_modified,
+          description: data.project.metadata.description
+        };
+        console.log('Adding project to list:', newProject);
+        setProjects(prev => {
+          const updated = [...prev, newProject];
+          console.log('Updated projects list:', updated);
+          return updated;
+        });
         setShowNewProjectModal(false);
         setNewProjectName('');
       } else {
@@ -499,7 +518,7 @@ export default function ProjectExplorerPanel({
                 </div>
                 <div className="text-xs text-zinc-400 space-y-1">
                   <div>Created: {formatDate(testRun.timestamp)}</div>
-                  <div>Project: {testRun.project_id}</div>
+                  <div>Project: {projects.find(p => p.project_id === testRun.project_id)?.name || testRun.project_id}</div>
                   {testRun.parameters && (
                     <div className="truncate">
                       {testRun.parameters.param} of {testRun.parameters.asset}

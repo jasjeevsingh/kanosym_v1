@@ -726,6 +726,7 @@ function App() {
 
   // Real projects state loaded from backend
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [projectRefreshTrigger, setProjectRefreshTrigger] = useState(0);
 
   // Project tab state
   const [openProjects, setOpenProjects] = useState<Array<{ id: string; name: string }>>([]);
@@ -1214,6 +1215,9 @@ function App() {
         currentResultsTab
       );
       
+      // Trigger refresh of ProjectExplorerPanel to show new test run
+      setProjectRefreshTrigger(prev => prev + 1);
+      
       // Backend will handle all Noira messages through display history
       // NoiraPanel will poll for updates automatically
       
@@ -1410,6 +1414,11 @@ function App() {
         setProjects(prev => [...prev, newProject]);
         setShowNewProjectModal(false);
         setNewProjectName('');
+        // Trigger refresh of ProjectExplorerPanel with a small delay
+        console.log('Triggering ProjectExplorerPanel refresh');
+        setTimeout(() => {
+          setProjectRefreshTrigger(prev => prev + 1);
+        }, 100);
       } else {
         alert('Failed to create project: ' + data.error);
       }
@@ -1903,6 +1912,7 @@ function App() {
               onCloseTestRun={handleCloseTestRun}
               openProjects={openProjects}
               currentProjectId={currentProjectId}
+              refreshTrigger={projectRefreshTrigger}
             />
           </SubtleResizableBorder>
           {/* Main Page */}
