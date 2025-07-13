@@ -6,12 +6,10 @@ import {
   DragOverlay,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import PortfolioInput from './PortfolioInput';
-import PerturbControls from './PerturbControls';
 import ResultsChart from './ResultsChart';
 import NoiraPanel from './NoiraPanel';
 import ProjectExplorerPanel from './ProjectExplorerPanel';
-import { triggerProjectAutosave, autosaveManager, createProjectState } from './autosave';
+import { triggerProjectAutosave, autosaveManager } from './autosave';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -19,143 +17,6 @@ const blockModeStyles = {
   hybrid: 'bg-purple-700 text-white border-purple-400',
   quantum: 'bg-blue-700 text-white border-blue-400',
 };
-
-function FileExplorer({ files, selected, onSelect, onChooseFolder, currentPath, onKsmDoubleClick, projects, onBack, onShowNewProject, onProjectFolderContextMenu }: { files: FileNode[]; selected: string | null; onSelect: (id: string) => void; onChooseFolder: () => void; currentPath: string | null; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; onBack: () => void; onShowNewProject: () => void; onProjectFolderContextMenu?: (project: { id: string; name: string }, e: React.MouseEvent) => void }) {
-  return (
-    <div className="h-full w-full bg-zinc-900 text-zinc-200 flex flex-col overflow-y-auto border-r border-zinc-800" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
-      <div className="flex items-center justify-between px-4 pt-4">
-        <span className="font-bold text-xs tracking-widest text-zinc-400" style={{ letterSpacing: 1 }}>EXPLORER</span>
-        <button
-          className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded ml-2"
-          onClick={onChooseFolder}
-        >
-          Choose Folder
-        </button>
-      </div>
-      {currentPath && (
-        <div className="flex items-center px-4 mt-2 mb-1">
-          <button
-            className="mr-2 text-zinc-400 hover:text-blue-500 text-lg font-bold"
-            title="Back"
-            onClick={onBack}
-          >
-            ←
-          </button>
-          <span className="text-xs text-zinc-400 break-all">{currentPath}</span>
-        </div>
-      )}
-      <div className="flex-1 overflow-y-auto px-2 pb-2 flex flex-col">
-        {/* Folder contents (if any) */}
-        {files.length > 0 && currentPath && (
-          <FileTree nodes={files} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} onProjectFolderContextMenu={onProjectFolderContextMenu} />
-        )}
-        {/* Projects heading and plus button */}
-        <div className="flex items-center mt-2 mb-1">
-          <span className="text-xs font-bold text-zinc-400 tracking-widest">PROJECTS</span>
-          <button
-            className="ml-auto text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center"
-            title="New Project"
-            onClick={onShowNewProject}
-          >
-            <span className="text-lg font-bold">+</span>
-          </button>
-        </div>
-        {/* Projects list (when not in a folder, or always show) */}
-        {!currentPath && (
-          <FileTree nodes={files} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} onProjectFolderContextMenu={onProjectFolderContextMenu} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// File/folder node type
-interface FileNode {
-  id: string;
-  name: string;
-  type: 'file' | 'folder';
-  children?: FileNode[];
-}
-
-function FileTree({ nodes, selected, onSelect, onKsmDoubleClick, projects, level = 0, onProjectFolderContextMenu }: { nodes: FileNode[]; selected: string | null; onSelect: (id: string) => void; onKsmDoubleClick: (projectId: string) => void; projects: { id: string; name: string }[]; level?: number; onProjectFolderContextMenu?: (project: { id: string; name: string }, e: React.MouseEvent) => void }) {
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
-
-  function toggleFolder(id: string) {
-    setOpenFolders(prev => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  return (
-    <ul className="pl-0">
-      {nodes.map(node => {
-        // Is this a project folder?
-        const project = projects.find(p => node.name === p.name && node.type === 'folder');
-        return (
-          <li key={node.id} className="mb-0.5">
-            {node.type === 'folder' ? (
-              <div
-                className={`flex items-center cursor-pointer select-none rounded px-1 py-0.5 hover:bg-zinc-800 ${level === 0 ? 'font-semibold' : ''}`}
-                style={{ paddingLeft: `${level * 16 + 4}px`, minHeight: 22 }}
-                onClick={() => toggleFolder(node.id)}
-                onContextMenu={project ? (e => { e.preventDefault(); onProjectFolderContextMenu && onProjectFolderContextMenu(project, e); }) : undefined}
-              >
-                <span className="mr-1 text-xs" style={{ width: 14, display: 'inline-block', textAlign: 'center' }}>{openFolders[node.id] ? '▼' : '▶'}</span>
-                <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
-                  {openFolders[node.id] ? (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#FFD700" stroke="#B8860B"/></svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 13V3.5A1.5 1.5 0 0 1 3.5 2h3.379a1.5 1.5 0 0 1 1.06.44l.621.62A1.5 1.5 0 0 0 9.62 3.5H13.5A1.5 1.5 0 0 1 15 5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="#F4E2B6" stroke="#B8860B"/></svg>
-                  )}
-                </span>
-                <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis">{node.name}</span>
-              </div>
-            ) : (
-              <div
-                className={`flex items-center pl-7 cursor-pointer rounded px-1 py-0.5 ${selected === node.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'} transition`}
-                style={{ paddingLeft: `${level * 16 + 28}px`, minHeight: 22 }}
-                onClick={() => onSelect(node.id)}
-                onDoubleClick={() => {
-                  if (node.name.endsWith('.ksm')) {
-                    const projectName = node.name.replace(/\.ksm$/, '');
-                    const project = projects.find((p: { id: string; name: string }) => p.name === projectName);
-                    if (project) onKsmDoubleClick(project.id);
-                  }
-                }}
-              >
-                <span className="mr-1" style={{ width: 16, display: 'inline-block', textAlign: 'center' }}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="2" fill="#B0BEC5" stroke="#607D8B"/></svg>
-                </span>
-                <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis">{node.name}</span>
-              </div>
-            )}
-            {node.type === 'folder' && openFolders[node.id] && node.children && (
-              <FileTree nodes={node.children} selected={selected} onSelect={onSelect} onKsmDoubleClick={onKsmDoubleClick} projects={projects} level={level + 1} onProjectFolderContextMenu={onProjectFolderContextMenu} />
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function ProjectsSidebar({ projects, openProject, currentProjectId }: { projects: { id: string; name: string }[]; openProject: (id: string) => void; currentProjectId: string }) {
-  return (
-    <div className="mb-4">
-      <div className="text-xs font-bold text-zinc-400 px-2 mb-1 tracking-widest">PROJECTS</div>
-      <ul>
-        {projects.map(p => (
-          <li key={p.id}>
-            <button
-              className={`w-full text-left px-3 py-1 rounded text-sm ${currentProjectId === p.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800 text-zinc-200'}`}
-              onClick={() => openProject(p.id)}
-            >
-              {p.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, closeProject }: { openProjects: { id: string; name: string }[]; currentProjectId: string; setCurrentProjectId: (id: string) => void; closeProject: (id: string) => void }) {
   return (
@@ -177,43 +38,6 @@ function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, clos
           </button>
         </div>
       ))}
-    </div>
-  );
-}
-
-function ResizableSidebar({ children, min = 160, max = 400, initial = 224 }: { children: React.ReactNode; min?: number; max?: number; initial?: number }) {
-  const [width, setWidth] = useState(initial);
-  const dragging = useRef(false);
-
-  function onMouseDown(e: React.MouseEvent) {
-    dragging.current = true;
-    document.body.style.cursor = 'col-resize';
-  }
-  function onMouseMove(e: MouseEvent) {
-    if (dragging.current) {
-      setWidth(w => Math.max(min, Math.min(max, e.clientX)));
-    }
-  }
-  function onMouseUp() {
-    dragging.current = false;
-    document.body.style.cursor = '';
-  }
-  React.useEffect(() => {
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, []);
-  return (
-    <div style={{ width, minWidth: min, maxWidth: max }} className="relative h-full flex-shrink-0">
-      {children}
-      <div
-        className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 bg-zinc-800 hover:bg-blue-500 transition"
-        onMouseDown={onMouseDown}
-        style={{ userSelect: 'none' }}
-      />
     </div>
   );
 }
@@ -247,18 +71,14 @@ function DraggableBlock({ id, onContextMenu, mode = 'classical' }: { id: string;
   );
 }
 
-function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onDeselect, blockMode, currentProjectId, isBlockTypePlaced, projectBlockPositions, projectBlockModes, openProjects, projectBlocks, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, setProjectBlockPositions, setBlockMoveCount, triggerProjectAutosave }: {
-  hasBlock: boolean;
-  blockPosition: { x: number; y: number } | null;
+function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onDeselect, currentProjectId, projectBlockPositions, projectBlockModes, openProjects, projectBlocks, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, setProjectBlockPositions, setBlockMoveCount, triggerProjectAutosave }: {
   onEditRequest: (e: React.MouseEvent, blockType?: 'classical' | 'hybrid' | 'quantum') => void;
   showRunButton?: boolean;
   onRunModel?: () => void;
   isSelected: boolean;
   onSelect: () => void;
   onDeselect: () => void;
-  blockMode: 'classical' | 'hybrid' | 'quantum';
   currentProjectId: string;
-  isBlockTypePlaced: (projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') => boolean;
   projectBlockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } };
   projectBlockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' };
   openProjects: Array<{ id: string; name: string }>;
@@ -269,7 +89,17 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
   currentResultsTab: { [projectId: string]: string | null };
   setProjectBlockPositions: React.Dispatch<React.SetStateAction<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>>;
   setBlockMoveCount: React.Dispatch<React.SetStateAction<{ [projectId: string]: number }>>;
-  triggerProjectAutosave: typeof triggerProjectAutosave;
+  triggerProjectAutosave: (
+    projectId: string,
+    projectName: string,
+    projectBlocks: Set<'classical' | 'hybrid' | 'quantum'>,
+    projectBlockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } },
+    projectBlockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' },
+    projectBlockParams: { [projectId: string]: any },
+    blockMoveCount: { [projectId: string]: number },
+    resultsTabs: { [projectId: string]: Array<{ id: string; label: string; data: any }> },
+    currentResultsTab: { [projectId: string]: string | null }
+  ) => void;
 }) {
   // Add CSS for hiding scrollbars
   useEffect(() => {
@@ -512,8 +342,7 @@ style={{
   );
 }
 
-function BlockBar({ hasBlock, mode, setMode, currentProjectId, isBlockTypePlaced }: { 
-  hasBlock: boolean; 
+function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: { 
   mode: 'classical' | 'hybrid' | 'quantum'; 
   setMode: (m: 'classical' | 'hybrid' | 'quantum') => void;
   currentProjectId: string;
@@ -692,68 +521,8 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
   );
 }
 
-function ToggleButton({ onClick, icon, position }: { onClick: () => void; icon: React.ReactNode; position: 'left' | 'right' }) {
-  return (
-    <button
-      className={`absolute top-4 z-20 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700 rounded w-6 h-6 flex items-center justify-center shadow ${position === 'left' ? 'left-0' : 'right-0'}`}
-      style={{ transform: position === 'left' ? 'translateX(-50%)' : 'translateX(50%)' }}
-      onClick={onClick}
-    >
-      {icon}
-    </button>
-  );
-}
 
-function ResizablePane({ children, min = 160, max = 400, initial = 224, onResize, show, onToggle, position, toggleIcon }: { children: React.ReactNode; min?: number; max?: number; initial?: number; onResize?: (w: number) => void; show: boolean; onToggle: () => void; position: 'left' | 'right'; toggleIcon: React.ReactNode }) {
-  const [width, setWidth] = useState(initial);
-  const dragging = useRef(false);
-
-  function onMouseDown(e: React.MouseEvent) {
-    dragging.current = true;
-    document.body.style.cursor = 'col-resize';
-  }
-  function onMouseMove(e: MouseEvent) {
-    if (dragging.current) {
-      setWidth(w => {
-        const newW = Math.max(min, Math.min(max, position === 'left' ? e.clientX : window.innerWidth - e.clientX));
-        if (onResize) onResize(newW);
-        return newW;
-      });
-    }
-  }
-  function onMouseUp() {
-    dragging.current = false;
-    document.body.style.cursor = '';
-  }
-  React.useEffect(() => {
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, []);
-  if (!show) {
-    return (
-      <div className="relative h-full flex-shrink-0" style={{ width: 0, minWidth: 0, maxWidth: 0 }}>
-        <ToggleButton onClick={onToggle} icon={toggleIcon} position={position} />
-      </div>
-    );
-  }
-  return (
-    <div style={{ width, minWidth: min, maxWidth: max }} className="relative h-full flex-shrink-0">
-      {children}
-      <div
-        className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 bg-zinc-800 hover:bg-blue-500 transition"
-        onMouseDown={onMouseDown}
-        style={{ userSelect: 'none' }}
-      />
-      <ToggleButton onClick={onToggle} icon={toggleIcon} position={position} />
-    </div>
-  );
-}
-
-function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira, showBlockBar, setShowBlockBar, showFileManager, setShowFileManager }: { showExplorer: boolean; setShowExplorer: (v: boolean) => void; showNoira: boolean; setShowNoira: (v: boolean) => void; showBlockBar: boolean; setShowBlockBar: (v: boolean) => void; showFileManager: boolean; setShowFileManager: (v: boolean) => void; }) {
+function LayoutToggles({ showNoira, setShowNoira, showBlockBar, setShowBlockBar, showFileManager, setShowFileManager }: { showNoira: boolean; setShowNoira: (v: boolean) => void; showBlockBar: boolean; setShowBlockBar: (v: boolean) => void; showFileManager: boolean; setShowFileManager: (v: boolean) => void; }) {
   return (
     <div className="absolute top-2 right-4 z-30 flex gap-2">
       <button
@@ -763,15 +532,6 @@ function LayoutToggles({ showExplorer, setShowExplorer, showNoira, setShowNoira,
       >
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="4" height="12" rx="1" fill="#B0BEC5"/><rect x="7" y="2" width="7" height="12" rx="1" fill="#B0BEC5"/></svg>
       </button>
-      {/*
-      <button
-        className={`w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-800 ${showExplorer ? 'bg-zinc-700' : ''}`}
-        title="Toggle File Explorer"
-        onClick={() => setShowExplorer(!showExplorer)}
-      >
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="4" height="12" rx="1" fill="#B0BEC5"/><rect x="7" y="2" width="7" height="12" rx="1" fill="#B0BEC5"/></svg>
-      </button>
-      */}
       <button
         className={`w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-800 ${showNoira ? 'bg-zinc-700' : ''}`}
         title="Toggle Noira Panel"
@@ -854,7 +614,6 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; blockType?: 'classical' | 'hybrid' | 'quantum' } | null>(null);
   const [editingBlockType, setEditingBlockType] = useState<'classical' | 'hybrid' | 'quantum' | null>(null);
-  const [showExplorer, setShowExplorer] = useState(false); // Disable old FileExplorer, use FileManagerPanel instead
   const [showNoira, setShowNoira] = useState(true);
   const [showBlockBar, setShowBlockBar] = useState(true);
   const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null);
@@ -883,7 +642,7 @@ function App() {
             // Only recenter blocks that haven't been moved by the user (moveCount === 0)
             if (position && moveCount === 0) {
               console.log('Recentering block for project:', projectId, 'moveCount:', moveCount);
-              // Fix: position should be an object with block types, not a single position
+              // position is an object with block types, not a single position
               const blockTypes = Object.keys(position);
               if (blockTypes.length > 0) {
                 const blockType = blockTypes[0];
@@ -967,9 +726,6 @@ function App() {
 
   // Real projects state loaded from backend
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fsFiles, setFsFiles] = useState<FileNode[]>([]);
-  const [fsPath, setFsPath] = useState<string | null>(null);
 
   // Project tab state
   const [openProjects, setOpenProjects] = useState<Array<{ id: string; name: string }>>([]);
@@ -1008,15 +764,6 @@ function App() {
     });
   }
   
-  // Replace openProject logic with onKsmDoubleClick
-  function onKsmDoubleClick(projectId: string) {
-    const project = projects.find(p => p.id === projectId);
-    if (project && !openProjects.find(p => p.id === projectId)) {
-      setOpenProjects([...openProjects, project]);
-    }
-    setCurrentProjectId(projectId);
-    setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
-  }
 
   // File Manager handlers
   async function handleOpenProject(projectName: string) {
@@ -1164,23 +911,6 @@ function App() {
     }
   }
 
-  async function handleChooseFolder() {
-    if (window.electronAPI && window.electronAPI.chooseFolder) {
-      const folder = await window.electronAPI.chooseFolder();
-      if (folder) {
-        setFsPath(folder);
-        const files = await window.electronAPI.readDir(folder);
-        setFsFiles(
-          files.map((f: any, idx: number) => ({
-            id: folder + '/' + f.name,
-            name: f.name,
-            type: f.type,
-            // No children for now; can add recursive loading later
-          }))
-        );
-      }
-    }
-  }
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
@@ -1562,21 +1292,8 @@ function App() {
   function handleBlockSelect() {
     setSelectedBlockProject(currentProjectId);
   }
-  // handleBlockDrag is no longer used - we handle dragging directly in MainPage
-  /*
-  function handleBlockDrag(dx: number, dy: number, selectedBlockType?: 'classical' | 'hybrid' | 'quantum') {
-    // This function is deprecated - dragging is now handled in MainPage component
-  }
-  */
-  // handleBlockDragEnd is no longer used - we handle drag end in MainPage
-  /*
-  function handleBlockDragEnd() {
-    // This function is deprecated - drag end is now handled in MainPage component
-  }
-  */
 
   // Set minimums to ensure main pane never gets too small
-  const minExplorer = 200;
   const minNoira = 260;
   const minMain = 400;
   const [noiraWidth, setNoiraWidth] = useState(320);
@@ -1706,6 +1423,7 @@ function App() {
   const [projectFolderMenu, setProjectFolderMenu] = useState<{ x: number; y: number; project: { id: string; name: string } } | null>(null);
   function handleProjectFolderContextMenu(project: { id: string; name: string }, e: React.MouseEvent) {
     setProjectFolderMenu({ x: e.clientX, y: e.clientY, project });
+    // TODO: Add context menu for project folder
   }
   async function handleDeleteProjectConfirm() {
     if (!projectToDelete) return;
@@ -1855,10 +1573,6 @@ function App() {
       }));
     }
 
-    function handleChangePortfolioField(field: string, value: any) {
-      setForm((prev: any) => ({ ...prev, portfolio: { ...prev.portfolio, [field]: value } }));
-    }
-    
     function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
       const { name, value } = e.target;
       setForm((prev: any) => ({ ...prev, [name]: name === 'steps' ? Number(value) : value }));
@@ -2172,8 +1886,6 @@ function App() {
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-screen w-screen flex flex-col relative" onClick={handleCloseContextMenu}>
         <LayoutToggles
-          showExplorer={showExplorer}
-          setShowExplorer={setShowExplorer}
           showNoira={showNoira}
           setShowNoira={setShowNoira}
           showBlockBar={showBlockBar}
@@ -2193,23 +1905,6 @@ function App() {
               currentProjectId={currentProjectId}
             />
           </SubtleResizableBorder>
-          {/* File Explorer */}
-          {/*
-          <SubtleResizableBorder direction="left" show={showExplorer} min={minExplorer} max={400} initial={224}>
-            <FileExplorer
-              files={fsFiles}
-              selected={selectedFile}
-              onSelect={setSelectedFile}
-              onChooseFolder={handleChooseFolder}
-              currentPath={fsPath}
-              onKsmDoubleClick={onKsmDoubleClick}
-              projects={projects}
-              onBack={() => { setFsFiles([]); setFsPath(null); }}
-              onShowNewProject={() => setShowNewProjectModal(true)}
-              onProjectFolderContextMenu={handleProjectFolderContextMenu}
-            />
-          </SubtleResizableBorder>
-          */}
           {/* Main Page */}
           <div className="flex-1 min-w-0 relative" style={{ minWidth: minMain }}>
             <ProjectTabs
@@ -2223,17 +1918,13 @@ function App() {
             <ResultsTabContent projectId={currentProjectId} />
             {openProjects.length > 0 ? (
                           <MainPage
-              hasBlock={hasAnyBlock(currentProjectId)}
-              blockPosition={projectBlockPositions[currentProjectId]?.[projectBlockModes[currentProjectId] || mode] || null}
               onEditRequest={handleEditRequest}
               showRunButton={hasAnyBlock(currentProjectId)}
               onRunModel={handleRunModel}
               isSelected={isBlockSelected}
               onSelect={handleBlockSelect}
               onDeselect={handleBlockDeselect}
-              blockMode={projectBlockModes[currentProjectId] || mode}
               currentProjectId={currentProjectId}
-              isBlockTypePlaced={isBlockTypePlaced}
               projectBlockPositions={projectBlockPositions}
               projectBlockModes={projectBlockModes}
               openProjects={openProjects}
@@ -2271,7 +1962,6 @@ function App() {
         <SubtleResizableBorder direction="bottom" show={showBlockBar} min={48} max={160} initial={64}>
           <div className="h-full border-t border-zinc-800">
             <BlockBar 
-              hasBlock={hasAnyBlock(currentProjectId)} 
               mode={mode} 
               setMode={setMode} 
               currentProjectId={currentProjectId}
