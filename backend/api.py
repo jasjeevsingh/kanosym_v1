@@ -179,11 +179,14 @@ def send_message():
     data = request.get_json()
     message = data.get('message')
     context = data.get('context')
+    use_tools = data.get('use_tools', True)  # Default to using tools
     
     if not message:
         return jsonify({"success": False, "message": "Message is required"}), 400
     
-    result = chat_controller.send_message(message, context)
+    # Use the consolidated send_message method
+    result = chat_controller.send_message(message, context, use_tools)
+    
     return jsonify(result), 200 if result['success'] else 400
 
 @app.route('/api/chat/reset', methods=['POST'])
