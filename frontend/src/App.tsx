@@ -282,50 +282,52 @@ style={{
 <div 
   className="relative"
   style={{
-    width: hasAnyBlocks ? '2000px' : '100%',
-    height: hasAnyBlocks ? '2000px' : '100%',
+    width: '100%',
+    height: '100%',
     backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
     backgroundSize: '20px 20px',
   }}
 >
   {hasAnyBlocks ? (
-    Object.entries(placedBlocks).map(([blockType, position]) => {
-      // Use temporary position during drag, otherwise use actual position
-      const displayPosition = (dragging && tempDragPosition && tempDragPosition[blockType]) ? tempDragPosition[blockType] : position;
-      
-      return (
-        <div
-          key={blockType}
-          style={{ 
-            position: 'absolute', 
-            left: displayPosition.x, 
-            top: displayPosition.y, 
-            cursor: isSelected && selectedBlockType === blockType ? 'grab' : 'pointer', 
-            zIndex: 10,
-            transition: dragging && selectedBlockType === blockType ? 'none' : 'all 0.1s ease'
+    Object.entries(placedBlocks)
+      .filter(([blockType]) => projectBlocks[currentProjectId]?.has(blockType as 'classical' | 'hybrid' | 'quantum'))
+      .map(([blockType, position]) => {
+        // Use temporary position during drag, otherwise use actual position
+        const displayPosition = (dragging && tempDragPosition && tempDragPosition[blockType]) ? tempDragPosition[blockType] : position;
+        
+        return (
+          <div
+            key={blockType}
+            style={{ 
+              position: 'absolute', 
+              left: displayPosition.x, 
+              top: displayPosition.y, 
+              cursor: isSelected && selectedBlockType === blockType ? 'grab' : 'pointer', 
+              zIndex: 10,
+              transition: dragging && selectedBlockType === blockType ? 'none' : 'all 0.1s ease'
+            }}
+            onClick={e => { 
+              e.stopPropagation(); 
+              setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+              onSelect(); 
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+            onSelect();
+            handleMouseDown(e, blockType);
           }}
-          onClick={e => { 
-            e.stopPropagation(); 
-            setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
-            onSelect(); 
-          }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
-          onSelect();
-          handleMouseDown(e, blockType);
-        }}
-      >
-        <div className={`transition border-2 rounded ${isSelected && selectedBlockType === blockType ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
-          <DraggableBlock 
-            id={`main-${blockType}`} 
-            onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
-            mode={blockType as 'classical' | 'hybrid' | 'quantum'} 
-          />
-        </div>
-      </div>
-      );
-    })
+          >
+            <div className={`transition border-2 rounded ${isSelected && selectedBlockType === blockType ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
+              <DraggableBlock 
+                id={`main-${blockType}`} 
+                onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
+                mode={blockType as 'classical' | 'hybrid' | 'quantum'} 
+              />
+            </div>
+          </div>
+        );
+      })
   ) : (
     <div className="flex flex-col items-center justify-center h-full">
       <div className="text-3xl font-bold mb-4">Model Building Environment</div>
@@ -600,7 +602,7 @@ function RunModelButton({ onClick }: { onClick?: () => void }) {
   return (
     <button
       className="absolute bottom-6 right-8 z-40 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded shadow-lg transition"
-      style={{ position: 'absolute', bottom: 14, right: 12 }}
+      style={{ position: 'absolute', bottom: 40, right: 12 }}
       onClick={onClick}
     >
       Run
@@ -1049,25 +1051,31 @@ function App() {
         
 
       } else if (event.over.id === 'blockbar-dropzone') {
-        // Remove the current block type from the project
-        const currentBlockMode = projectBlockModes[currentProjectId];
-        if (currentBlockMode) {
-          removeBlockTypeFromProject(currentProjectId, currentBlockMode);
+        // Remove the correct block type from the project (the one being dragged)
+        let blockTypeToRemove: 'classical' | 'hybrid' | 'quantum' | undefined;
+        if (activeId?.startsWith('main-')) {
+          blockTypeToRemove = activeId.replace('main-', '') as 'classical' | 'hybrid' | 'quantum';
+        } else if (activeId?.startsWith('blockbar-')) {
+          blockTypeToRemove = activeId.replace('blockbar-', '') as 'classical' | 'hybrid' | 'quantum';
+        } else {
+          blockTypeToRemove = projectBlockModes[currentProjectId];
+        }
+        if (blockTypeToRemove) {
+          removeBlockTypeFromProject(currentProjectId, blockTypeToRemove);
           setProjectBlockPositions(prev => {
             const newPositions = { ...prev };
             if (newPositions[currentProjectId]) {
-              delete newPositions[currentProjectId][currentBlockMode];
+              delete newPositions[currentProjectId][blockTypeToRemove!];
               // Remove the project entry if no blocks remain
               if (Object.keys(newPositions[currentProjectId]).length === 0) {
                 delete newPositions[currentProjectId];
               }
             }
-            
             // Clean up block parameters
             setProjectBlockParams(prev => {
               const newParams = { ...prev };
               if (newParams[currentProjectId]) {
-                delete newParams[currentProjectId][currentBlockMode];
+                delete newParams[currentProjectId][blockTypeToRemove!];
                 // Remove the project entry if no block params remain
                 if (Object.keys(newParams[currentProjectId]).length === 0) {
                   delete newParams[currentProjectId];
@@ -1075,27 +1083,25 @@ function App() {
               }
               return newParams;
             });
-            
             // Trigger autosave with the UPDATED state
             const currentProject = openProjects.find(p => p.id === currentProjectId);
             if (currentProject) {
               // Create updated projectBlocks Set
               const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
-              updatedProjectBlocks.delete(currentBlockMode);
-              
+              updatedProjectBlocks.delete(blockTypeToRemove!);
               // Create updated projectBlockModes
               const updatedProjectBlockModes = { ...projectBlockModes };
-              delete updatedProjectBlockModes[currentProjectId];
-              
+              if (updatedProjectBlockModes[currentProjectId] === blockTypeToRemove) {
+                delete updatedProjectBlockModes[currentProjectId];
+              }
               // Create updated params
               const updatedParams = { ...projectBlockParams };
               if (updatedParams[currentProjectId]) {
-                delete updatedParams[currentProjectId][currentBlockMode];
+                delete updatedParams[currentProjectId][blockTypeToRemove!];
                 if (Object.keys(updatedParams[currentProjectId]).length === 0) {
                   delete updatedParams[currentProjectId];
                 }
               }
-              
               triggerProjectAutosave(
                 currentProjectId,
                 currentProject.name,
@@ -1108,13 +1114,14 @@ function App() {
                 currentResultsTab
               );
             }
-            
             return newPositions;
           });
         }
         setProjectBlockModes(prev => {
           const copy = { ...prev };
-          delete copy[currentProjectId];
+          if (blockTypeToRemove && copy[currentProjectId] === blockTypeToRemove) {
+            delete copy[currentProjectId];
+          }
           return copy;
         });
         setSelectedBlockProject(null);
