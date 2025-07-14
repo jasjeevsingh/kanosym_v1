@@ -824,8 +824,8 @@ function App() {
         const data = await response.json();
         if (data.success) {
           const projectsList = data.projects.map((project: any) => ({
-            id: project.metadata.project_id,
-            name: project.metadata.name
+            id: project.project_id,
+            name: project.name
           }));
           setProjects(projectsList);
           
@@ -919,26 +919,34 @@ function App() {
   // File Manager handlers
   async function handleOpenProject(projectName: string) {
     try {
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
-      const data = await response.json();
-      if (data.success) {
-        const project = data.project;
-        const projectId = project.metadata.project_id;
-        
-        // Add to open projects if not already open
-        if (!openProjects.find(p => p.id === projectId)) {
-          setOpenProjects(prev => [...prev, { id: projectId, name: projectName }]);
-        }
-        setCurrentProjectId(projectId);
-        
-        // Initialize project state if not exists
-        setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
-        
-        // Load project configuration
-        if (project.configuration) {
+      // Find project by name
+      const project = projects.find(p => p.name === projectName);
+      if (!project) {
+        console.error('Project not found:', projectName);
+        return;
+      }
+      
+      const projectId = project.id;
+      
+      // Add to open projects if not already open
+      if (!openProjects.find(p => p.id === projectId)) {
+        setOpenProjects(prev => [...prev, { id: projectId, name: projectName }]);
+      }
+      setCurrentProjectId(projectId);
+      
+      // Initialize project state if not exists
+      setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
+      
+      // Load project state from database
+      const stateResponse = await fetch(`http://localhost:5001/api/projects/${projectId}/state`);
+      if (stateResponse.ok) {
+        const stateData = await stateResponse.json();
+        if (stateData.success) {
+          const projectState = stateData.project_state;
+          
           // Load block positions
           const blockPositions: { [projectId: string]: { [blockType: string]: { x: number; y: number } } } = {};
-          Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
+          Object.entries(projectState.blocks || {}).forEach(([blockType, blockConfig]: [string, any]) => {
             if (blockConfig.placed && blockConfig.position) {
               if (!blockPositions[projectId]) blockPositions[projectId] = {};
               blockPositions[projectId][blockType] = blockConfig.position;
@@ -948,14 +956,14 @@ function App() {
           
           // Load block modes
           const blockModes: { [projectId: string]: 'classical' | 'hybrid' | 'quantum' } = {};
-          if (project.configuration.ui_state?.current_block_mode) {
-            blockModes[projectId] = project.configuration.ui_state.current_block_mode;
+          if (projectState.ui_state?.current_block_mode) {
+            blockModes[projectId] = projectState.ui_state.current_block_mode;
           }
           setProjectBlockModes(prev => ({ ...prev, ...blockModes }));
           
           // Load block parameters
           const blockParams: { [projectId: string]: any } = {};
-          Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
+          Object.entries(projectState.blocks || {}).forEach(([blockType, blockConfig]: [string, any]) => {
             if (blockConfig.parameters) {
               blockParams[projectId] = blockConfig.parameters;
             }
@@ -1507,12 +1515,17 @@ function App() {
       
       const data = await response.json();
       if (data.success) {
-        const newProject = {
-          id: data.project.metadata.project_id,
-          name: newProjectName.trim()
-        };
+        // Reload the entire projects list from backend to ensure consistency
+        const projectsResponse = await fetch('http://localhost:5001/api/projects');
+        const projectsData = await projectsResponse.json();
+        if (projectsData.success) {
+          const projectsList = projectsData.projects.map((project: any) => ({
+            id: project.project_id,
+            name: project.name
+          }));
+          setProjects(projectsList);
+        }
         
-        setProjects(prev => [...prev, newProject]);
         setShowNewProjectModal(false);
         setNewProjectName('');
       } else {
@@ -1533,7 +1546,7 @@ function App() {
     if (!projectToDelete) return;
     
     try {
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectToDelete.name)}`, {
+      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectToDelete.id)}`, {
         method: 'DELETE'
       });
       

@@ -9,12 +9,14 @@ from flask_cors import CORS
 from noira.chat_controller import chat_controller
 import os
 import logging
+logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 import werkzeug.serving
 from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
 from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
 from file_manager import FileManager
+from database import get_db_manager
 import numpy as np
 from datetime import datetime
 
@@ -24,8 +26,9 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Initialize file manager
+# Initialize file manager and database manager
 file_manager = FileManager()
+db_manager = get_db_manager()
 
 # Custom logger to filter out thinking-status polling noise
 class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
@@ -269,64 +272,32 @@ def quantum_sensitivity_test_api():
         # Auto-save test run if project_id is provided
         if project_id:
             try:
-                test_run_data = {
-                    "block_type": "quantum",
-                    "parameters": {
-                        "portfolio": portfolio,
-                        "param": param,
-                        "asset": asset,
-                        "range": range_vals,
-                        "steps": steps
-                    },
-                    "results": result,
-                    "analytics": {
-                        "mode": "quantum",
-                        "performance_metrics": {
-                            "total_execution_time": result.get("execution_time", 0),
-                            "throughput": result.get("throughput", 0),
-                            "steps_processed": steps,
-                            "memory_usage_mb": result.get("memory_usage", 0),
-                            "cpu_usage_percent": result.get("cpu_usage", 0)
-                        },
-                        "statistical_metrics": {
-                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
-                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
-                            "skewness": result.get("skewness", 0),
-                            "kurtosis": result.get("kurtosis", 0),
-                            "standard_error": result.get("standard_error", 0),
-                            "statistical_significance": result.get("statistical_significance", 0)
-                        },
-                        "quantum_metrics": {
-                            "qubits_used": result.get("qubits_used", 0),
-                            "quantum_volume": result.get("quantum_volume", 0),
-                            "circuit_depth": result.get("circuit_depth", 0),
-                            "quantum_efficiency": result.get("quantum_efficiency", 0),
-                            "coherence_time": result.get("coherence_time", 0),
-                            "gate_fidelity": result.get("gate_fidelity", 0)
-                        },
-                        "sensitivity_metrics": {
-                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
-                            "curve_steepness": result.get("curve_steepness", 0),
-                            "risk_return_ratio": result.get("risk_return_ratio", 0),
-                            "portfolio_beta": result.get("portfolio_beta", 0),
-                            "var_95": result.get("var_95", 0),
-                            "expected_shortfall": result.get("expected_shortfall", 0)
-                        }
-                    },
-                    "noira_analysis": {
-                        "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                        "messages": []
-                    }
+                # Create test run in database
+                test_run_meta = {
+                    'test_type': 'quantum',
+                    'parameter_type': param,
+                    'asset_name': asset,
+                    'range_min': range_vals[0],
+                    'range_max': range_vals[1],
+                    'steps': steps,
+                    'baseline_volatility_daily': result.get('baseline_portfolio_volatility_daily'),
+                    'baseline_volatility_annualized': result.get('baseline_portfolio_volatility_annualized'),
+                    'execution_time_seconds': result.get('analytics', {}).get('performance_metrics', {}).get('total_execution_time'),
+                    'status': 'completed'
                 }
                 
-                test_run_id = file_manager.save_test_run(project_id, test_run_data)
-                result["test_run_id"] = test_run_id
-                result["saved_to_file"] = True
+                test_run_id = db_manager.create_test_run(project_id, test_run_meta)
                 
-                # Update project with test run reference
-                project_name = data.get('project_name')
-                if project_name:
-                    file_manager.update_project_test_runs(project_name, test_run_id)
+                # Save test results
+                if 'results' in result:
+                    db_manager.save_test_results(test_run_id, result['results'])
+                
+                # Save analytics
+                if 'analytics' in result:
+                    db_manager.save_analytics_metrics(test_run_id, result['analytics'])
+                
+                result["test_run_id"] = test_run_id
+                result["saved_to_database"] = True
                 
             except Exception as save_error:
                 logger.error(f"Failed to auto-save test run: {save_error}")
@@ -368,62 +339,32 @@ def classical_sensitivity_test_api():
         # Auto-save test run if project_id is provided
         if project_id:
             try:
-                test_run_data = {
-                    "block_type": "classical",
-                    "parameters": {
-                        "portfolio": portfolio,
-                        "param": param,
-                        "asset": asset,
-                        "range": range_vals,
-                        "steps": steps
-                    },
-                    "results": result,
-                    "analytics": {
-                        "mode": "classical",
-                        "performance_metrics": {
-                            "total_execution_time": result.get("execution_time", 0),
-                            "throughput": result.get("throughput", 0),
-                            "steps_processed": steps,
-                            "memory_usage_mb": result.get("memory_usage", 0),
-                            "cpu_usage_percent": result.get("cpu_usage", 0)
-                        },
-                        "statistical_metrics": {
-                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
-                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
-                            "skewness": result.get("skewness", 0),
-                            "kurtosis": result.get("kurtosis", 0),
-                            "standard_error": result.get("standard_error", 0),
-                            "statistical_significance": result.get("statistical_significance", 0)
-                        },
-                        "classical_metrics": {
-                            "simulations_per_second": result.get("simulations_per_second", 0),
-                            "iterations_per_second": result.get("iterations_per_second", 0),
-                            "convergence_rate": result.get("convergence_rate", 0),
-                            "monte_carlo_efficiency": result.get("monte_carlo_efficiency", 0)
-                        },
-                        "sensitivity_metrics": {
-                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
-                            "curve_steepness": result.get("curve_steepness", 0),
-                            "risk_return_ratio": result.get("risk_return_ratio", 0),
-                            "portfolio_beta": result.get("portfolio_beta", 0),
-                            "var_95": result.get("var_95", 0),
-                            "expected_shortfall": result.get("expected_shortfall", 0)
-                        }
-                    },
-                    "noira_analysis": {
-                        "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                        "messages": []
-                    }
+                # Create test run in database
+                test_run_meta = {
+                    'test_type': 'classical',
+                    'parameter_type': param,
+                    'asset_name': asset,
+                    'range_min': range_vals[0],
+                    'range_max': range_vals[1],
+                    'steps': steps,
+                    'baseline_volatility_daily': result.get('baseline_portfolio_volatility_daily'),
+                    'baseline_volatility_annualized': result.get('baseline_portfolio_volatility_annualized'),
+                    'execution_time_seconds': result.get('analytics', {}).get('performance_metrics', {}).get('total_execution_time'),
+                    'status': 'completed'
                 }
                 
-                test_run_id = file_manager.save_test_run(project_id, test_run_data)
-                result["test_run_id"] = test_run_id
-                result["saved_to_file"] = True
+                test_run_id = db_manager.create_test_run(project_id, test_run_meta)
                 
-                # Update project with test run reference
-                project_name = data.get('project_name')
-                if project_name:
-                    file_manager.update_project_test_runs(project_name, test_run_id)
+                # Save test results
+                if 'results' in result:
+                    db_manager.save_test_results(test_run_id, result['results'])
+                
+                # Save analytics
+                if 'analytics' in result:
+                    db_manager.save_analytics_metrics(test_run_id, result['analytics'])
+                
+                result["test_run_id"] = test_run_id
+                result["saved_to_database"] = True
                 
             except Exception as save_error:
                 logger.error(f"Failed to auto-save test run: {save_error}")
@@ -465,62 +406,32 @@ def hybrid_sensitivity_test_api():
         # Auto-save test run if project_id is provided
         if project_id:
             try:
-                test_run_data = {
-                    "block_type": "hybrid",
-                    "parameters": {
-                        "portfolio": portfolio,
-                        "param": param,
-                        "asset": asset,
-                        "range": range_vals,
-                        "steps": steps
-                    },
-                    "results": result,
-                    "analytics": {
-                        "mode": "hybrid",
-                        "performance_metrics": {
-                            "total_execution_time": result.get("execution_time", 0),
-                            "throughput": result.get("throughput", 0),
-                            "steps_processed": steps,
-                            "memory_usage_mb": result.get("memory_usage", 0),
-                            "cpu_usage_percent": result.get("cpu_usage", 0)
-                        },
-                        "statistical_metrics": {
-                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
-                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
-                            "skewness": result.get("skewness", 0),
-                            "kurtosis": result.get("kurtosis", 0),
-                            "standard_error": result.get("standard_error", 0),
-                            "statistical_significance": result.get("statistical_significance", 0)
-                        },
-                        "hybrid_metrics": {
-                            "quantum_classical_ratio": result.get("quantum_classical_ratio", 0),
-                            "hybrid_efficiency": result.get("hybrid_efficiency", 0),
-                            "optimization_iterations": result.get("optimization_iterations", 0),
-                            "convergence_threshold": result.get("convergence_threshold", 0)
-                        },
-                        "sensitivity_metrics": {
-                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
-                            "curve_steepness": result.get("curve_steepness", 0),
-                            "risk_return_ratio": result.get("risk_return_ratio", 0),
-                            "portfolio_beta": result.get("portfolio_beta", 0),
-                            "var_95": result.get("var_95", 0),
-                            "expected_shortfall": result.get("expected_shortfall", 0)
-                        }
-                    },
-                    "noira_analysis": {
-                        "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                        "messages": []
-                    }
+                # Create test run in database
+                test_run_meta = {
+                    'test_type': 'hybrid',
+                    'parameter_type': param,
+                    'asset_name': asset,
+                    'range_min': range_vals[0],
+                    'range_max': range_vals[1],
+                    'steps': steps,
+                    'baseline_volatility_daily': result.get('baseline_portfolio_volatility_daily'),
+                    'baseline_volatility_annualized': result.get('baseline_portfolio_volatility_annualized'),
+                    'execution_time_seconds': result.get('analytics', {}).get('performance_metrics', {}).get('total_execution_time'),
+                    'status': 'completed'
                 }
                 
-                test_run_id = file_manager.save_test_run(project_id, test_run_data)
-                result["test_run_id"] = test_run_id
-                result["saved_to_file"] = True
+                test_run_id = db_manager.create_test_run(project_id, test_run_meta)
                 
-                # Update project with test run reference
-                project_name = data.get('project_name')
-                if project_name:
-                    file_manager.update_project_test_runs(project_name, test_run_id)
+                # Save test results
+                if 'results' in result:
+                    db_manager.save_test_results(test_run_id, result['results'])
+                
+                # Save analytics
+                if 'analytics' in result:
+                    db_manager.save_analytics_metrics(test_run_id, result['analytics'])
+                
+                result["test_run_id"] = test_run_id
+                result["saved_to_database"] = True
                 
             except Exception as save_error:
                 logger.error(f"Failed to auto-save test run: {save_error}")
@@ -536,10 +447,20 @@ def hybrid_sensitivity_test_api():
 def list_projects():
     """List all available projects"""
     try:
-        projects = file_manager.list_projects()
+        projects = db_manager.list_projects()
+        # Convert to expected format
+        formatted_projects = []
+        for project in projects:
+            formatted_projects.append({
+                "name": project['name'],
+                "project_id": str(project['id']),
+                "created": project['created_at'].isoformat(),
+                "last_modified": project['updated_at'].isoformat(),
+                "description": project['description'] or f"Portfolio sensitivity analysis project: {project['name']}"
+            })
         return jsonify({
             "success": True,
-            "projects": projects,
+            "projects": formatted_projects,
             "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
@@ -554,7 +475,7 @@ def create_project():
     """Create a new project"""
     data = request.get_json()
     name = data.get('name')
-    project_id = data.get('project_id')
+    description = data.get('description')
     
     if not name:
         return jsonify({
@@ -564,10 +485,45 @@ def create_project():
         }), 400
     
     try:
-        project_config = file_manager.create_project(name, project_id)
+        # Check if project already exists
+        existing_project = db_manager.get_project_by_name(name)
+        if existing_project:
+            return jsonify({
+                "success": False,
+                "error": "Project with this name already exists",
+                "timestamp": datetime.now().isoformat()
+            }), 400
+        
+        project_id = db_manager.create_project(name, description)
+        project = db_manager.get_project(project_id)
+        
+        # Create initial project state
+        initial_state = {
+            "blocks": {
+                "classical": {"placed": False, "position": None, "parameters": None},
+                "hybrid": {"placed": False, "position": None, "parameters": None},
+                "quantum": {"placed": False, "position": None, "parameters": None}
+            },
+            "ui_state": {
+                "current_block_mode": "classical",
+                "selected_block": None,
+                "block_move_count": 0
+            }
+        }
+        db_manager.save_project_state(project_id, initial_state)
+
+        # Also create the project folder and .ksm file in the file system
+        file_manager.create_project(name, project_id)
+        
         return jsonify({
             "success": True,
-            "project": project_config,
+            "project": {
+                "id": project_id,
+                "name": project['name'],
+                "description": project['description'],
+                "created_at": project['created_at'].isoformat(),
+                "updated_at": project['updated_at'].isoformat()
+            },
             "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
@@ -647,12 +603,24 @@ def rename_project(project_name):
     else:
         return jsonify({"success": False, "error": "Failed to rename project"}), 500
 
-@app.route('/api/projects/<project_name>', methods=['DELETE'])
-def delete_project(project_name):
-    """Delete a project"""
+@app.route('/api/projects/<project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    """Delete a project from the database and all related data, and remove its files from disk"""
     try:
-        success = file_manager.delete_project(project_name)
+        # Fetch project by ID to get the name
+        project = db_manager.get_project(project_id)
+        if not project:
+            return jsonify({
+                "success": False,
+                "error": "Project not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+        project_name = project['name']
+        # Delete from database
+        success = db_manager.delete_project(project_id)
         if success:
+            # Also delete from file system
+            file_manager.delete_project(project_name)
             return jsonify({
                 "success": True,
                 "message": "Project deleted successfully",
@@ -661,25 +629,27 @@ def delete_project(project_name):
         else:
             return jsonify({
                 "success": False,
-                "error": "Project not found",
+                "error": "Project not found in database",
                 "timestamp": datetime.now().isoformat()
             }), 404
     except Exception as e:
+        logger.error(f"Error deleting project: {e}")
         return jsonify({
             "success": False,
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }), 500
 
-@app.route('/api/projects/<project_name>/state', methods=['GET'])
-def get_project_state(project_name):
+@app.route('/api/projects/<project_id>/state', methods=['GET'])
+def get_project_state(project_id):
     """Get complete project state including all test runs"""
     try:
-        project_state = file_manager.get_project_state(project_name)
+        # Get project state from database
+        project_state = db_manager.get_project_state(project_id)
         if project_state:
             return jsonify({
                 "success": True,
-                "project_state": project_state,
+                "project_state": project_state['state_data'],
                 "timestamp": datetime.now().isoformat()
             })
         else:
@@ -695,8 +665,8 @@ def get_project_state(project_name):
             "timestamp": datetime.now().isoformat()
         }), 500
 
-@app.route('/api/projects/<project_name>/state', methods=['PUT'])
-def save_project_state(project_name):
+@app.route('/api/projects/<project_id>/state', methods=['PUT'])
+def save_project_state(project_id):
     """Save complete project state"""
     data = request.get_json()
     project_state = data.get('project_state')
@@ -709,11 +679,12 @@ def save_project_state(project_name):
         }), 400
     
     try:
-        success = file_manager.save_project_state(project_name, project_state)
-        if success:
+        state_id = db_manager.save_project_state(project_id, project_state)
+        if state_id:
             return jsonify({
                 "success": True,
                 "message": "Project state saved successfully",
+                "state_id": state_id,
                 "timestamp": datetime.now().isoformat()
             })
         else:
@@ -735,10 +706,22 @@ def list_test_runs():
     project_id = request.args.get('project_id')
     
     try:
-        test_runs = file_manager.list_test_runs(project_id)
+        test_runs = db_manager.list_test_runs(project_id)
+        # Convert to expected format
+        formatted_test_runs = []
+        for test_run in test_runs:
+            formatted_test_runs.append({
+                "id": str(test_run['id']),
+                "project_id": str(test_run['project_id']),
+                "test_type": test_run['test_type'],
+                "parameter_type": test_run['parameter_type'],
+                "asset_name": test_run['asset_name'],
+                "created_at": test_run['created_at'].isoformat(),
+                "status": test_run['status']
+            })
         return jsonify({
             "success": True,
-            "test_runs": test_runs,
+            "test_runs": formatted_test_runs,
             "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
@@ -752,11 +735,23 @@ def list_test_runs():
 def get_test_run(test_run_id):
     """Get a specific test run"""
     try:
-        test_run_data = file_manager.load_test_run(test_run_id)
+        test_run_data = db_manager.get_test_run(test_run_id)
         if test_run_data:
+            # Convert to expected format
+            formatted_test_run = {
+                "perturbation": test_run_data['parameter_type'],
+                "asset": test_run_data['asset_name'],
+                "range_tested": [float(test_run_data['range_min']), float(test_run_data['range_max'])],
+                "baseline_portfolio_volatility_daily": float(test_run_data['baseline_volatility_daily']) if test_run_data['baseline_volatility_daily'] else None,
+                "baseline_portfolio_volatility_annualized": float(test_run_data['baseline_volatility_annualized']) if test_run_data['baseline_volatility_annualized'] else None,
+                "results": test_run_data['results'],
+                "analytics": test_run_data['analytics'],
+                "processing_mode": test_run_data['test_type'],
+                "description": f"{test_run_data['test_type'].title()} sensitivity analysis for {test_run_data['asset_name']}"
+            }
             return jsonify({
                 "success": True,
-                "test_run": test_run_data,
+                "test_run": formatted_test_run,
                 "timestamp": datetime.now().isoformat()
             })
         else:
@@ -804,7 +799,7 @@ def create_test_run():
 def delete_test_run(test_run_id):
     """Delete a test run"""
     try:
-        success = file_manager.delete_test_run(test_run_id)
+        success = db_manager.delete_test_run(test_run_id)
         if success:
             return jsonify({
                 "success": True,
@@ -927,4 +922,4 @@ class NoPollingRequestFilter(logging.Filter):
         return True
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(host='0.0.0.0', port=5001, debug=False)

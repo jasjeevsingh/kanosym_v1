@@ -122,16 +122,16 @@ export default function ProjectExplorerPanel({
     }
   };
 
-  const handleDeleteProject = async (projectName: string) => {
+  const handleDeleteProject = async (projectId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`, {
+      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectId)}`, {
         method: 'DELETE'
       });
       const data = await response.json();
       if (data.success) {
-        setProjects(prev => prev.filter(p => p.name !== projectName));
+        setProjects(prev => prev.filter(p => p.project_id !== projectId));
       } else {
         setError(data.error || 'Failed to delete project');
       }
@@ -208,6 +208,12 @@ export default function ProjectExplorerPanel({
       const data = await res.json();
       if (res.ok && data.success) {
         setUploadStatus(prev => ({ ...prev, [projectId]: 'File uploaded successfully!' }));
+        // Refresh file tree after upload
+        try {
+          const res2 = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+          const data2 = await res2.json();
+          setFileTrees(prev => ({ ...prev, [projectId]: data2 }));
+        } catch {}
       } else {
         setUploadStatus(prev => ({ ...prev, [projectId]: data.error || 'Upload failed' }));
       }
@@ -642,7 +648,7 @@ export default function ProjectExplorerPanel({
                 type="button"
                 className="px-4 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700"
                 onClick={async () => {
-                  await handleDeleteProject(projectToDelete.name);
+                  await handleDeleteProject(projectToDelete.project_id);
                   setProjectToDelete(null);
                 }}
               >
