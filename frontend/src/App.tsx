@@ -1510,6 +1510,8 @@ function App() {
       asset: 'AAPL',
       range: [0.15, 0.25],
       steps: 6,
+      use_noise_model: false, // Add noise model toggle for quantum blocks
+      noise_model_type: 'fast', // Add noise model type selector
     });
 
     // Helper function to update correlation matrix when assets change
@@ -1658,6 +1660,14 @@ function App() {
       });
     }
 
+    function handleNoiseToggle() {
+      setForm((prev: any) => ({ ...prev, use_noise_model: !prev.use_noise_model }));
+    }
+    
+    function handleNoiseTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+      setForm((prev: any) => ({ ...prev, noise_model_type: e.target.value }));
+    }
+
     const blockTypeLabel =
       projectBlockModes[currentProjectId] === 'classical'
         ? 'Classical Portfolio Sensitivity Test'
@@ -1734,7 +1744,7 @@ function App() {
                           <label className="block text-xs text-zinc-400 mb-1">Symbol</label>
                           <input
                             className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={asset}
+                            value={form.portfolio.assets[idx]}
                             onChange={e => handleAssetChange(idx, e.target.value)}
                             placeholder="AAPL"
                           />
@@ -1882,6 +1892,52 @@ function App() {
                 />
                 <p className="text-xs text-zinc-400 mt-1">Number of points to test in the range (2-20)</p>
               </div>
+              
+              {/* Quantum-specific noise model toggle */}
+              {projectBlockModes[currentProjectId] === 'quantum' && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <label className="block text-zinc-300 text-sm font-medium mb-1">Simulate Hardware Noise</label>
+                      <p className="text-xs text-zinc-400">Use realistic quantum hardware noise model for more accurate results</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleNoiseToggle}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+                        form.use_noise_model ? 'bg-blue-600' : 'bg-zinc-600'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          form.use_noise_model ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  
+                  {/* Noise model type selector */}
+                  {form.use_noise_model && (
+                    <div className="mt-3">
+                      <label className="block text-zinc-300 text-sm font-medium mb-2">Noise Model Type</label>
+                      <select
+                        value={form.noise_model_type}
+                        onChange={handleNoiseTypeChange}
+                        className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="fast">Fast (Basic Noise)</option>
+                        <option value="realistic">Realistic (Full Hardware)</option>
+                      </select>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        {form.noise_model_type === 'fast' 
+                          ? 'Basic depolarizing noise for faster execution'
+                          : 'Full IBM Toronto hardware noise model (slower but more accurate)'
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

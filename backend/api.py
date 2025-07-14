@@ -263,6 +263,8 @@ def quantum_sensitivity_test_api():
     asset = data.get('asset')
     range_vals = data.get('range')
     steps = data.get('steps')
+    use_noise_model = data.get('use_noise_model', False)  # Extract noise model parameter
+    noise_model_type = data.get('noise_model_type', 'fast')  # Extract noise model type
     project_id = data.get('project_id')  # New: project_id for autosave
     
     # Validate portfolio
@@ -283,7 +285,9 @@ def quantum_sensitivity_test_api():
             param=param,
             asset=asset,
             range_vals=range_vals,
-            steps=steps
+            steps=steps,
+            use_noise_model=use_noise_model,
+            noise_model_type=noise_model_type
         )
         logger.info(f"[QUANTUM] Model result: {result}")
         
