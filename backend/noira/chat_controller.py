@@ -10,7 +10,6 @@ import os
 import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-import openai
 from openai import OpenAI
 import sys
 import os
