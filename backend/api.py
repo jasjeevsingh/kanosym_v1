@@ -17,6 +17,7 @@ from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
 from file_manager import FileManager
 import numpy as np
 from datetime import datetime
+import math
 
 # Load environment variables
 load_dotenv()
@@ -26,6 +27,10 @@ CORS(app)
 
 # Initialize file manager
 file_manager = FileManager()
+
+# Set up logger
+logger = logging.getLogger("kanosym")
+logging.basicConfig(level=logging.INFO)
 
 # Custom logger to filter out thinking-status polling noise
 class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
@@ -155,6 +160,18 @@ def validate_sensitivity_params(param, asset, range_vals, steps, portfolio):
     
     return True, ""
 
+def sanitize_for_json(obj):
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(x) for x in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    else:
+        return obj
+
 # Chat endpoints
 @app.route('/api/chat/set-api-key', methods=['POST'])
 def set_api_key():
@@ -240,6 +257,7 @@ def quantum_analysis():
 @app.route('/api/quantum_sensitivity_test', methods=['POST'])
 def quantum_sensitivity_test_api():
     data = request.get_json()
+    logger.info(f"[QUANTUM] Incoming request data: {data}")
     portfolio = data.get('portfolio')
     param = data.get('param')
     asset = data.get('asset')
@@ -250,11 +268,13 @@ def quantum_sensitivity_test_api():
     # Validate portfolio
     is_valid, error_msg = validate_portfolio(portfolio)
     if not is_valid:
+        logger.error(f"[QUANTUM] Portfolio validation failed: {error_msg}")
         return jsonify({"success": False, "error": error_msg}), 400
     
     # Validate sensitivity parameters
     is_valid, error_msg = validate_sensitivity_params(param, asset, range_vals, steps, portfolio)
     if not is_valid:
+        logger.error(f"[QUANTUM] Sensitivity param validation failed: {error_msg}")
         return jsonify({"success": False, "error": error_msg}), 400
     
     try:
@@ -265,6 +285,7 @@ def quantum_sensitivity_test_api():
             range_vals=range_vals,
             steps=steps
         )
+        logger.info(f"[QUANTUM] Model result: {result}")
         
         # Auto-save test run if project_id is provided
         if project_id:
@@ -333,13 +354,17 @@ def quantum_sensitivity_test_api():
                 logger.error(f"Failed to auto-save test run: {save_error}")
                 result["save_error"] = str(save_error)
         
+        # Sanitize for JSON
+        result = sanitize_for_json(result)
         return jsonify(result)
     except Exception as e:
+        logger.error(f"[QUANTUM] Exception: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/classical_sensitivity_test', methods=['POST'])
 def classical_sensitivity_test_api():
     data = request.get_json()
+    logger.info(f"[CLASSICAL] Incoming request data: {data}")
     portfolio = data.get('portfolio')
     param = data.get('param')
     asset = data.get('asset')
@@ -350,11 +375,13 @@ def classical_sensitivity_test_api():
     # Validate portfolio
     is_valid, error_msg = validate_portfolio(portfolio)
     if not is_valid:
+        logger.error(f"[CLASSICAL] Portfolio validation failed: {error_msg}")
         return jsonify({"success": False, "error": error_msg}), 400
     
     # Validate sensitivity parameters
     is_valid, error_msg = validate_sensitivity_params(param, asset, range_vals, steps, portfolio)
     if not is_valid:
+        logger.error(f"[CLASSICAL] Sensitivity param validation failed: {error_msg}")
         return jsonify({"success": False, "error": error_msg}), 400
     
     try:
@@ -365,6 +392,7 @@ def classical_sensitivity_test_api():
             range_vals=range_vals,
             steps=steps
         )
+        logger.info(f"[CLASSICAL] Model result: {result}")
         
         # Auto-save test run if project_id is provided
         if project_id:
@@ -431,13 +459,17 @@ def classical_sensitivity_test_api():
                 logger.error(f"Failed to auto-save test run: {save_error}")
                 result["save_error"] = str(save_error)
         
+        # Sanitize for JSON
+        result = sanitize_for_json(result)
         return jsonify(result)
     except Exception as e:
+        logger.error(f"[CLASSICAL] Exception: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/hybrid_sensitivity_test', methods=['POST'])
 def hybrid_sensitivity_test_api():
     data = request.get_json()
+    logger.info(f"[HYBRID] Incoming request data: {data}")
     portfolio = data.get('portfolio')
     param = data.get('param')
     asset = data.get('asset')
@@ -448,11 +480,13 @@ def hybrid_sensitivity_test_api():
     # Validate portfolio
     is_valid, error_msg = validate_portfolio(portfolio)
     if not is_valid:
+        logger.error(f"[HYBRID] Portfolio validation failed: {error_msg}")
         return jsonify({"success": False, "error": error_msg}), 400
     
     # Validate sensitivity parameters
     is_valid, error_msg = validate_sensitivity_params(param, asset, range_vals, steps, portfolio)
     if not is_valid:
+        logger.error(f"[HYBRID] Sensitivity param validation failed: {error_msg}")
         return jsonify({"success": False, "error": error_msg}), 400
     
     try:
@@ -463,6 +497,7 @@ def hybrid_sensitivity_test_api():
             range_vals=range_vals,
             steps=steps
         )
+        logger.info(f"[HYBRID] Model result: {result}")
         
         # Auto-save test run if project_id is provided
         if project_id:
@@ -529,8 +564,11 @@ def hybrid_sensitivity_test_api():
                 logger.error(f"Failed to auto-save test run: {save_error}")
                 result["save_error"] = str(save_error)
         
+        # Sanitize for JSON
+        result = sanitize_for_json(result)
         return jsonify(result)
     except Exception as e:
+        logger.error(f"[HYBRID] Exception: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # File Manager API Endpoints

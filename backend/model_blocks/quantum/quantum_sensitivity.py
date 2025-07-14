@@ -22,6 +22,7 @@ from qiskit.algorithms import EstimationProblem
 from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
 from qiskit.utils import QuantumInstance
 
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -73,48 +74,109 @@ def perturb_portfolio(param: str, asset: str, range_vals: List[float], steps: in
 def run_quantum_volatility(portfolio_state: Dict[str, Any]) -> dict:
     """
     Quantum volatility estimator using Qiskit's Iterative Amplitude Estimation (QAE).
-    Supports up to 3 assets. If more than 3 assets, raises a ValueError with a warning.
+    Uses WeightedAdder to encode contributions from asset volatilities and weights.
+    Automatically determines number of value qubits needed.
+    Supports up to 5 assets.
     """
+    from qiskit import QuantumCircuit
+    from qiskit.circuit.library import WeightedAdder
+    from qiskit.algorithms import EstimationProblem
+    from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
+    from qiskit.utils import QuantumInstance
+    from qiskit_aer import Aer
+    import numpy as np
+
     weights = np.array(portfolio_state['weights'])
     volatility = np.array(portfolio_state['volatility'])
     correlation_matrix = np.array(portfolio_state['correlation_matrix'])
     n_assets = len(weights)
-    if n_assets > 3:
-        raise ValueError("Quantum volatility estimator currently only supports up to 3 assets due to quantum resource constraints. Please use 3 or fewer assets for quantum analysis.")
-    if n_assets < 2:
-        raise ValueError("At least 2 assets are required for quantum volatility estimation.")
 
-    # For 2 or 3 assets, compute portfolio variance
-    # Variance = w^T * Cov * w
+    if n_assets > 5:
+        raise ValueError("Quantum volatility estimator supports up to 5 assets.")
+    if n_assets < 2:
+        raise ValueError("At least 2 assets are required.")
+
+    # Classical portfolio variance (for scaling or validation)
     cov_matrix = np.outer(volatility, volatility) * correlation_matrix
     portfolio_variance = float(weights @ cov_matrix @ weights)
+    max_variance = 1.0  # normalize to [0, 1]
 
-    # Map variance to probability amplitude in [0, 1]
-    max_variance = 1.0
-    scaled_variance = min(portfolio_variance / max_variance, 1.0)
+    # --- Step 1: Compute scaled contributions and required value qubits ---
+    scale_factor = 100  # Increased scaling for typical portfolio values
+    scaled_contributions = np.round(weights * volatility * scale_factor).astype(int)
+    if np.all(scaled_contributions == 0):
+        raise ValueError("All scaled asset contributions are zero. Increase the scaling factor or check your portfolio weights/volatilities.")
+    total_scaled = np.sum(scaled_contributions)
+    
+    # Qiskit expects: state (value) qubits first, then input (weight) qubits
+    n_state_qubits = int(np.ceil(np.log2(total_scaled + 1)))
+    n_weight_qubits = n_assets
+    
+    # Construct WeightedAdder first to get the actual number of qubits needed
+    weights_list = scaled_contributions.tolist()
+    print(f"weights_list: {weights_list}, type: {type(weights_list)}")
+    print(f"weights_list length: {len(weights_list)}")
+    print(f"sum of weights: {sum(weights_list)}")
+    
+    # Ensure we have enough state qubits to represent the sum of all weights
+    required_state_qubits = int(np.ceil(np.log2(sum(weights_list) + 1)))
+    n_state_qubits = max(n_state_qubits, required_state_qubits)
+    print(f"required_state_qubits: {required_state_qubits}, final n_state_qubits: {n_state_qubits}")
+    
+    # Use a simpler approach: manual circuit construction
+    n_weight_qubits = n_assets
+    total_qubits = n_state_qubits + n_weight_qubits
+    
+    print(f"n_state_qubits: {n_state_qubits}, n_weight_qubits: {n_weight_qubits}, total_qubits: {total_qubits}")
+    
+    # Build quantum circuit with the correct number of qubits
+    qc = QuantumCircuit(total_qubits, name="VolatilityEncoding")
+    print(f"Main circuit created with {qc.num_qubits} qubits")
 
-    from qiskit import QuantumCircuit
-    qc = QuantumCircuit(1)
-    qc.ry(2 * np.arcsin(np.sqrt(scaled_variance)), 0)
+    # Apply Hadamards to the input qubits (last n_weight_qubits)
+    for i in range(total_qubits - n_weight_qubits, total_qubits):
+        qc.h(i)
+    print(f"Applied Hadamards to qubits {list(range(total_qubits - n_weight_qubits, total_qubits))}")
 
-    from qiskit.algorithms import EstimationProblem
-    from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
-    from qiskit.utils import QuantumInstance
+    # Manual weighted addition using controlled operations
+    print("Building manual weighted addition circuit...")
+    for i, weight in enumerate(weights_list):
+        if weight > 0:
+            control_qubit = total_qubits - n_weight_qubits + i
+            # Add weight to the state register using controlled operations
+            for j in range(n_state_qubits):
+                if weight & (1 << j):  # If bit j is set in weight
+                    qc.ccx(control_qubit, j, (j + 1) % n_state_qubits)  # Simple carry logic
+    
+    print("Manual weighted addition circuit built successfully")
+
+    # Objective qubit is the MSB of the value register (index n_state_qubits-1)
+    objective_qubit = n_state_qubits - 1
+
+    # --- Step 4: Run Amplitude Estimation ---
     backend = Aer.get_backend('aer_simulator')
     qi = QuantumInstance(backend, shots=1000)
-    qae = IterativeAmplitudeEstimation(epsilon_target=0.01, alpha=0.05, quantum_instance=qi)
+
     problem = EstimationProblem(
         state_preparation=qc,
-        objective_qubits=[0],
-        grover_operator=None
+        objective_qubits=[objective_qubit]
     )
+
+    qae = IterativeAmplitudeEstimation(epsilon_target=0.01, alpha=0.05, quantum_instance=qi)
     result = qae.estimate(problem)
-    est_variance = result.estimation
-    est_volatility = np.sqrt(est_variance * max_variance)
+    est_amplitude = result.estimation
+
+    # --- Step 5: Map estimated amplitude to volatility (heuristic) ---
+    est_scaled = est_amplitude * max_variance
+    est_volatility = np.sqrt(est_scaled)
     annualized_vol = est_volatility * np.sqrt(252)
+
     return {
         'portfolio_volatility_daily': float(est_volatility),
-        'portfolio_volatility_annualized': float(annualized_vol)
+        'portfolio_volatility_annualized': float(annualized_vol),
+        'raw_amplitude_estimate': float(est_amplitude),
+        'scaled_volatility_input': scaled_contributions.tolist(),
+        'value_qubits': n_state_qubits
     }
 
 

@@ -15,7 +15,6 @@ interface AnalyticsData {
     skewness: number;
     kurtosis: number;
     standard_error: number;
-    statistical_significance: number;
     median_volatility?: number;
     iqr_volatility?: number;
     sample_size?: number;
@@ -35,7 +34,6 @@ interface AnalyticsData {
     convergence_rate: number;
     monte_carlo_efficiency: number;
     standard_error: number;
-    statistical_significance: number;
   };
   hybrid_metrics?: {
     quantum_classical_ratio: number;
@@ -273,10 +271,6 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                     <span className="text-zinc-400">Standard Error:</span>
                     <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.standard_error, 4)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Statistical Significance:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.classical_metrics.statistical_significance, 4)}</span>
-                  </div>
                 </div>
               </div>
             )}
@@ -371,7 +365,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 <div className="bg-zinc-700/50 rounded p-3">
                   <div className="text-sm text-zinc-400 mb-1">Reliability</div>
                   <div className="text-white font-medium">
-                    {analytics.statistical_metrics.statistical_significance > 0.95 ? 'Very High' : analytics.statistical_metrics.statistical_significance > 0.8 ? 'High' : 'Moderate'} confidence
+                    N/A
                   </div>
                 </div>
                 <div className="bg-zinc-700/50 rounded p-3">

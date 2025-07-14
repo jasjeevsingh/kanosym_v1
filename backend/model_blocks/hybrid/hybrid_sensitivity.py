@@ -30,51 +30,47 @@ def hybrid_sensitivity_test(
 ) -> Dict[str, Any]:
     """
     Main function for hybrid sensitivity testing.
-    
-    Args:
-        portfolio: Portfolio configuration with assets, weights, volatility, correlation_matrix
-        param: Parameter to perturb ('volatility', 'weight', 'correlation')
-        asset: Asset to perturb
-        range_vals: [min_value, max_value] for perturbation range
-        steps: Number of steps in the range
-        
-    Returns:
-        Dictionary with sensitivity analysis results
+    Now standardized to return volatility metrics (not Sharpe), matching classical/quantum.
     """
     # Initialize analytics collector
     analytics = AnalyticsCollector('hybrid')
     analytics.start_collection()
-        
     
     logger.info(f"Starting hybrid sensitivity analysis: {param} for {asset}")
     
     # 1. Perturb the portfolio
     perturbed_portfolios = perturb_portfolio(param, asset, range_vals, steps, portfolio)
     
-    # 2. Run hybrid analysis for baseline (unperturbed)
-    baseline_sharpe = run_hybrid_analysis(portfolio)
+    # 2. Run hybrid volatility analysis for baseline (unperturbed)
+    baseline_vols = run_hybrid_volatility(portfolio)
+    baseline_daily = baseline_vols['portfolio_volatility_daily']
+    baseline_annualized = baseline_vols['portfolio_volatility_annualized']
     
-    # 3. Run hybrid analysis for each perturbed portfolio
+    # 3. Run hybrid volatility analysis for each perturbed portfolio
     results = []
     for p in perturbed_portfolios:
-        sharpe = run_hybrid_analysis(p)
-        result = {"perturbed_value": p["perturbed_value"], "sharpe": sharpe}
+        vol_dict = run_hybrid_volatility(p)
+        result = {
+            "perturbed_value": p["perturbed_value"],
+            "portfolio_volatility_daily": vol_dict['portfolio_volatility_daily'],
+            "portfolio_volatility_annualized": vol_dict['portfolio_volatility_annualized'],
+            "volatility": vol_dict['portfolio_volatility_daily'],
+            "delta_vs_baseline": vol_dict['portfolio_volatility_daily'] - baseline_daily
+        }
         results.append(result)
         analytics.add_result(result)
     
-    # 4. Compute deltas
-    metrics = compute_metrics(baseline_sharpe, results)
-    
-    # 5. End analytics collection
+    # 4. End analytics collection
     analytics.end_collection()
     
-    # 6. Format output with analytics
+    # 5. Format output with analytics
     output = format_output(
         perturbation=param,
         asset=asset,
         range_tested=list(np.linspace(range_vals[0], range_vals[1], steps)),
-        baseline_sharpe=baseline_sharpe,
-        results=metrics,
+        baseline_portfolio_volatility_daily=baseline_daily,
+        baseline_portfolio_volatility_annualized=baseline_annualized,
+        results=results,
         analytics=analytics.get_analytics_summary()
     )
     
@@ -173,38 +169,26 @@ def run_hybrid_analysis(portfolio_state: Dict[str, Any]) -> float:
     return float(sharpe)
 
 
-def compute_metrics(baseline: float, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Compute sensitivity metrics from results.
-    """
-    metrics = []
-    for result in results:
-        delta = result['sharpe'] - baseline
-        sensitivity = delta / baseline if baseline != 0 else 0
-        metrics.append({
-            'perturbed_value': result['perturbed_value'],
-            'sharpe': result['sharpe'],
-            'volatility': result['sharpe'],  # Use sharpe as the main metric for hybrid
-            'delta_vs_baseline': delta,
-            'sensitivity': sensitivity
-        })
-    return metrics
+def compute_metrics(*args, **kwargs):
+    # No longer needed for volatility-based output, but kept for compatibility
+    return []
 
 
-def format_output(perturbation: str, asset: str, range_tested: List[float], 
-                  baseline_sharpe: float, results: List[Dict[str, Any]], 
-                  analytics: Dict[str, Any] = None) -> Dict[str, Any]:
+def format_output(perturbation: str, asset: str, range_tested: list, 
+                  baseline_portfolio_volatility_daily: float, baseline_portfolio_volatility_annualized: float, 
+                  results: list, analytics: dict = None) -> dict:
     """
-    Format output for API response.
+    Format output for API response (standardized for volatility-based metrics).
     """
     output = {
         "perturbation": perturbation,
         "asset": asset,
         "range_tested": range_tested,
-        "baseline_sharpe": baseline_sharpe,
+        "baseline_portfolio_volatility_daily": baseline_portfolio_volatility_daily,
+        "baseline_portfolio_volatility_annualized": baseline_portfolio_volatility_annualized,
         "results": results,
         "processing_mode": "hybrid",
-        "description": "Hybrid simulation for portfolio sensitivity analysis"
+        "description": "Hybrid simulation for portfolio sensitivity analysis (portfolio volatility only)"
     }
     if analytics:
         output["analytics"] = analytics

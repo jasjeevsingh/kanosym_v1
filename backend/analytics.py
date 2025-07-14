@@ -48,7 +48,6 @@ class ClassicalMetrics:
     convergence_rate: float
     monte_carlo_efficiency: float
     standard_error: float
-    statistical_significance: float
 
 
 @dataclass
@@ -283,7 +282,7 @@ class AnalyticsCollector:
         # Monte Carlo efficiency
         monte_carlo_efficiency = simulations_per_second / (execution_time * 1000)  # Normalized efficiency
         
-        # Standard error and statistical significance
+        # Standard error
         if self.statistical_metrics:
             standard_error = self.statistical_metrics.standard_error
         else:
