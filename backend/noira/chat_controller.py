@@ -136,12 +136,19 @@ class ChatController:
             
             enhanced_context = context.copy() if context else {}
             tool_results = []
+            all_tool_calls = []  # Track all tool calls across iterations
+            thinking_responses = []  # Track all thinking responses for usage
             
-            # Phase 1: Tool usage (if enabled)
+            # Tool usage loop (if enabled)
             if use_tools:
-                logger.info("\n🧠 TOOL PHASE: Analyzing request for potential tool usage...")
+                iteration = 0
+                max_iterations = 5  # Prevent infinite loops
                 
-                thinking_system_prompt = self._build_system_message(context) + """
+                while iteration < max_iterations:
+                    iteration += 1
+                    logger.info(f"\n🧠 TOOL PHASE (Iteration {iteration}): Analyzing request for potential tool usage...")
+                    
+                    thinking_system_prompt = self._build_system_message(enhanced_context) + """
 
 THINKING MODE: You are in thinking mode. Analyze the user's request and determine:
 1. What information they need
@@ -154,27 +161,72 @@ You have access to these tools:
 - search_test_runs: Search test runs by date or filters
 - list_projects: List all available projects
 
+IMPORTANT: Always list/search before loading:
+- Use list_projects() BEFORE load_project() to ensure the project exists
+- Use search_test_runs() BEFORE load_test_run() to verify the test run exists
+- You can make multiple tool calls in sequence
+- If search returns empty results, DO NOT attempt to load non-existent items
+
 Be strategic about tool usage - only call tools when you need actual data."""
-                
-                thinking_messages = [
-                    {"role": "system", "content": thinking_system_prompt}
-                ]
-                thinking_messages.extend(recent_history)
-                thinking_messages.append({"role": "user", "content": message})
-                
-                # Get thinking response with potential tool calls
-                thinking_response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=thinking_messages,
-                    tools=NOIRA_TOOLS,
-                    tool_choice="auto",
-                    max_tokens=500,
-                    temperature=0.3  # Lower temperature for reasoning
-                )
-                
-                # Execute tool calls
-                if thinking_response.choices[0].message.tool_calls:
+                    
+                    # Include previous tool results in context
+                    if tool_results:
+                        thinking_system_prompt += "\n\nPrevious tool results:\n"
+                        for tr in tool_results:
+                            if tr["result"]["success"]:
+                                thinking_system_prompt += f"- {tr['result']['summary']}\n"
+                    
+                    thinking_messages = [
+                        {"role": "system", "content": thinking_system_prompt}
+                    ]
+                    thinking_messages.extend(recent_history)
+                    thinking_messages.append({"role": "user", "content": message})
+                    
+                    # Add previous tool calls to conversation
+                    for tc in all_tool_calls:
+                        thinking_messages.append(tc["assistant_message"])
+                        # Add each tool response individually
+                        for tool_resp in tc["tool_responses"]:
+                            thinking_messages.append(tool_resp)
+                    
+                    # Get thinking response with potential tool calls
+                    thinking_response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=thinking_messages,
+                        tools=NOIRA_TOOLS,
+                        tool_choice="auto",
+                        max_tokens=500,
+                        temperature=0.3  # Lower temperature for reasoning
+                    )
+                    
+                    # Store thinking response for usage tracking
+                    thinking_responses.append(thinking_response)
+                    
+                    # Check if there are tool calls
+                    if not thinking_response.choices[0].message.tool_calls:
+                        logger.info("🎯 No more tool calls needed, proceeding to response phase...")
+                        break
+                    
+                    # Execute tool calls
                     logger.info(f"🔧 Executing {len(thinking_response.choices[0].message.tool_calls)} tool calls...")
+                    
+                    # Store the assistant message with tool calls
+                    assistant_msg_with_tools = {
+                        "role": "assistant",
+                        "content": thinking_response.choices[0].message.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in thinking_response.choices[0].message.tool_calls
+                        ]
+                    }
+                    
+                    tool_responses = []
                     
                     for tool_call in thinking_response.choices[0].message.tool_calls:
                         tool_name = tool_call.function.name
@@ -184,6 +236,14 @@ Be strategic about tool usage - only call tools when you need actual data."""
                         tool_results.append({
                             "tool_name": tool_name,
                             "result": result
+                        })
+                        
+                        # Create tool response message
+                        tool_response_content = json.dumps(result["data"] if result["success"] else {"error": result.get("error", "Unknown error")})
+                        tool_responses.append({
+                            "role": "tool",
+                            "content": tool_response_content,
+                            "tool_call_id": tool_call.id
                         })
                         
                         if result["success"]:
@@ -196,8 +256,17 @@ Be strategic about tool usage - only call tools when you need actual data."""
                             })
                         else:
                             logger.error(f"❌ Tool {tool_name} failed: {result['error']}")
+                    
+                    # Store this iteration's calls and responses
+                    all_tool_calls.append({
+                        "assistant_message": assistant_msg_with_tools,
+                        "tool_responses": tool_responses  # Store individual tool responses
+                    })
+                
+                if iteration >= max_iterations:
+                    logger.warning("⚠️ Reached maximum tool iterations, proceeding to response phase...")
             
-            # Phase 2: Generate final response
+            # Response Phase: Generate final response
             logger.info("\n💬 RESPONSE PHASE: Generating final response...")
             
             # Build system message with any tool results
@@ -235,10 +304,13 @@ Be strategic about tool usage - only call tools when you need actual data."""
                 "total_tokens": response.usage.total_tokens if hasattr(response, 'usage') else 0
             }
             
-            if use_tools and hasattr(thinking_response, 'usage'):
-                total_usage["prompt_tokens"] += thinking_response.usage.prompt_tokens
-                total_usage["completion_tokens"] += thinking_response.usage.completion_tokens
-                total_usage["total_tokens"] += thinking_response.usage.total_tokens
+            # Add usage from all thinking iterations
+            if use_tools:
+                for thinking_resp in thinking_responses:
+                    if hasattr(thinking_resp, 'usage'):
+                        total_usage["prompt_tokens"] += thinking_resp.usage.prompt_tokens
+                        total_usage["completion_tokens"] += thinking_resp.usage.completion_tokens
+                        total_usage["total_tokens"] += thinking_resp.usage.total_tokens
             
             # Add to chat history
             self.chat_history.append({"role": "user", "content": message})
