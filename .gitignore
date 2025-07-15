@@ -102,3 +102,7 @@ temp/
 # Local Stuff
 test-runs/
 projects/
+
+# Local files
+CLAUDE.md
+nohup.out

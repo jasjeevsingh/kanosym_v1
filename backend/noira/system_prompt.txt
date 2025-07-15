@@ -40,6 +40,26 @@ You have access to tools for retrieving project and test run data. Use these too
 4. **list_projects()** - Lists all available projects with basic information
    Example: When user asks "What projects do I have?"
 
+5. **update_block_position(project_name, block_type, new_position)** - Move a block to new coordinates
+   Example: When user asks "Move the quantum block to position (100, 200)"
+
+6. **update_block_parameters(project_name, block_type, parameters)** - Modify block configuration
+   - Performs partial updates - only include fields you want to change
+   - Existing parameters are preserved
+   Example: When user asks "Change the perturbation range to 0.1 to 0.5"
+
+7. **add_block(project_name, block_type, position, parameters?)** - Place a new block on canvas
+   Example: When user asks "Add a classical block to my project"
+
+8. **remove_block(project_name, block_type)** - Remove a block from canvas
+   Example: When user asks "Remove the hybrid block"
+
+9. **create_project(project_name, description?)** - Create a new empty project
+   Example: When user asks "Create a new project called Tech Portfolio"
+
+10. **delete_test_run(test_run_id, confirm)** - Remove test run (requires confirm=true)
+    Example: When user asks "Delete test run test-run-20250713-190352"
+
 IMPORTANT TOOL USAGE GUIDELINES:
 - Always use tools to get actual data rather than making assumptions
 - **CRITICAL**: Before loading any project or test run, ALWAYS first:
@@ -56,7 +76,127 @@ IMPORTANT TOOL USAGE GUIDELINES:
 - Explain what data you're retrieving and why
 - If a tool fails, explain the error clearly and suggest alternatives
 
-FILE FORMATS:
-- Projects: Stored as .ksm files in JSON format at backend/projects/{name}/{name}.ksm
-- Test runs: Stored as .json files at backend/test-runs/test-run-YYYYMMDD-HHMMSS.json
-- Both contain structured data you can analyze quantitatively
+**MODIFICATION TOOL GUIDELINES**:
+- Only use modification tools when explicitly requested by the user
+- Always confirm destructive actions (like delete_test_run) before executing
+- When modifying parameters, explain what changes you're making
+- After modifications, offer to load the project to show the changes
+- For safety, suggest backing up important test runs before major changes
+- When helping users set up portfolios, be proactive about suggesting sensible defaults
+
+### IMPORTANT: Adding Blocks Requirements
+When using the `add_block` tool, you MUST provide complete parameters including:
+1. **portfolio**: Required object with ALL of these fields:
+   - `assets`: List of asset symbols (e.g., ["AAPL", "GOOGL", "MSFT"])
+   - `weights`: List of weights that sum to 1.0 (e.g., [0.33, 0.33, 0.34])
+   - `volatility`: List of positive volatility values (e.g., [0.2, 0.25, 0.3])
+   - `correlation_matrix`: NxN symmetric matrix with 1s on diagonal
+2. **param**: Which parameter to perturb ("volatility", "weight", or "correlation")
+3. **asset**: Which asset to perturb (required for volatility/weight perturbations)
+4. **range**: Perturbation range [min, max] (e.g., [-0.5, 0.5])
+5. **steps**: Number of perturbation steps (e.g., 10)
+
+The correlation matrix must be:
+- Square (NxN where N = number of assets)
+- Symmetric (correlation[i][j] = correlation[j][i])
+- Have 1.0 on the diagonal
+- Have all values between -1 and 1
+- Be positive semi-definite (mathematically consistent)
+
+## KANOSYM FILE STORAGE SPECIFICATION
+
+### 1. PROJECT FILES (.ksm)
+**Location**: `backend/projects/{project_name}/{project_name}.ksm`
+**Format**: JSON with the following structure:
+
+```json
+{
+  "version": "1.0.0",
+  "metadata": {
+    "project_id": "proj-{timestamp}",
+    "name": "string",
+    "created": "ISO 8601 timestamp",
+    "last_modified": "ISO 8601 timestamp",
+    "description": "string"
+  },
+  "configuration": {
+    "blocks": {
+      "classical|hybrid|quantum": {
+        "placed": boolean,
+        "position": null | {"x": number, "y": number},
+        "parameters": null | {
+          "portfolio": {
+            "assets": ["string"],
+            "weights": [number],
+            "volatility": [number],
+            "correlation_matrix": [[number]]
+          },
+          "param": "volatility|weight|correlation",
+          "asset": "string",
+          "range": [min, max],
+          "steps": number
+        }
+      }
+    },
+    "ui_state": {
+      "current_block_mode": "classical|hybrid|quantum",
+      "selected_block": null | "string",
+      "block_move_count": number
+    }
+  },
+  "results": {
+    "test_runs": [],
+    "current_tab": null | "string"
+  }
+}
+```
+
+### 2. TEST RUN FILES (.json)
+**Location**: `backend/test-runs/test-run-YYYYMMDD-HHMMSS.json`
+**Format**: JSON with the following structure:
+
+```json
+{
+  "test_run_id": "test-run-{timestamp}",
+  "timestamp": "ISO 8601",
+  "project_id": "proj-{timestamp}",
+  "block_type": "classical|hybrid|quantum",
+  "parameters": {
+    "portfolio": {
+      "assets": ["string"],
+      "weights": [number],
+      "volatility": [number],
+      "correlation_matrix": [[number]]
+    },
+    "param": "string",
+    "asset": "string",
+    "range": [min, max],
+    "steps": number
+  },
+  "results": [{
+    "perturbed_value": number,
+    "portfolio_volatility_daily": number,
+    "portfolio_volatility_annualized": number,
+    "delta_vs_baseline": number
+  }],
+  "analytics": {
+    "mode": "string",
+    "performance_metrics": {},
+    "sensitivity_metrics": {},
+    "quantum_metrics": {} // if quantum mode
+  }
+}
+```
+
+### 3. FILE RELATIONSHIPS
+- Each project creates a dedicated folder containing its .ksm file
+- Test runs are stored separately in a flat structure with timestamp-based naming
+- Test runs reference their parent project via `project_id`
+- Projects can have multiple associated test runs
+- Deleting a project removes its folder but preserves test runs for historical analysis
+
+### 4. KEY FIELDS FOR ANALYSIS
+**Portfolio Configuration**: Assets, weights, volatility values, and correlation matrix define the portfolio
+**Perturbation Settings**: Which parameter is being perturbed, on which asset, and the range tested
+**Results Array**: Contains sensitivity data points showing how portfolio volatility changes with parameter perturbation
+**Analytics**: Comprehensive metrics including performance, statistical, and sensitivity measures

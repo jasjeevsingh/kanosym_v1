@@ -12,12 +12,18 @@ interface ChatMessage {
   timestamp?: string;
   isThinking?: boolean;
   messageId?: string;
+  toolsUsed?: string[];  // Tool names that were used
 }
 
 interface ApiResponse {
   success: boolean;
   message?: string;
   response?: string;
+  tools_used?: number;
+  tool_details?: Array<{
+    tool_name: string;
+    summary: string;
+  }>;
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -545,7 +551,20 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
 
   // Markdown rendering for Noira messages
   return (
-    <div className="prose prose-invert prose-sm max-w-none">
+    <div>
+      {/* Tool usage indicator */}
+      {message.toolsUsed && message.toolsUsed.length > 0 && (
+        <div className="text-xs text-zinc-400 mb-2 pb-2 border-b border-zinc-700">
+          <span className="text-zinc-500">📊 Used tools: </span>
+          {message.toolsUsed.map((tool, index) => (
+            <span key={index}>
+              {index > 0 && ', '}
+              <span className="text-zinc-300">{tool}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="prose prose-invert prose-sm max-w-none">
       <ReactMarkdown 
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -579,6 +598,7 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
           {formatTimestamp(message.timestamp)}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -673,13 +693,17 @@ export default function NoiraPanel() {
       const result = await apiService.current.sendMessage(userMessage);
       
       if (result.success && result.response) {
+        // Extract tool names from tool details
+        const toolsUsed = result.tool_details?.map(detail => detail.tool_name) || [];
+        
         // Replace thinking message with actual response
         setMessages(prev => prev.map(msg => 
           msg.messageId === thinkingMessageId 
             ? { 
                 sender: 'noira', 
                 text: result.response!,
-                timestamp: result.timestamp 
+                timestamp: result.timestamp,
+                toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
               }
             : msg
         ));

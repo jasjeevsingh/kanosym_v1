@@ -32,11 +32,16 @@ file_manager = FileManager()
 logger = logging.getLogger("kanosym")
 logging.basicConfig(level=logging.INFO)
 
-# Custom logger to filter out thinking-status polling noise
+# Custom logger to filter out polling noise
 class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
     def log_request(self, code='-', size='-'):
-        # Filter out thinking-status endpoint logs since they're just polling
-        if self.path and '/thinking-status' in self.path:
+        # Filter out polling endpoint logs
+        if self.path and any(endpoint in self.path for endpoint in [
+            '/thinking-status',
+            '/api/projects HTTP',  # Project list polling
+            '/api/projects/',  # Project details polling
+            '/last-modified'  # Last modified polling
+        ]):
             return
         super().log_request(code, size)
 
@@ -743,6 +748,30 @@ def get_project_state(project_name):
             "timestamp": datetime.now().isoformat()
         }), 500
 
+@app.route('/api/projects/<project_name>/last-modified', methods=['GET'])
+def get_project_last_modified(project_name):
+    """Get the last modified timestamp of a project"""
+    try:
+        project_config = file_manager.load_project(project_name)
+        if not project_config:
+            return jsonify({
+                "success": False,
+                "error": "Project not found",
+                "timestamp": datetime.now().isoformat()
+            }), 404
+        
+        return jsonify({
+            "success": True,
+            "last_modified": project_config.get("metadata", {}).get("last_modified"),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
 @app.route('/api/projects/<project_name>/state', methods=['PUT'])
 def save_project_state(project_name):
     """Save complete project state"""
@@ -906,8 +935,9 @@ def autosave_project(project_name):
             project_config['configuration']['blocks'] = project_state['blocks']
         if 'ui_state' in project_state:
             project_config['configuration']['ui_state'] = project_state['ui_state']
-        if 'results' in project_state:
-            project_config['results'] = project_state['results']
+        # For results, only update current_tab to avoid overwriting test_runs
+        if 'results' in project_state and 'current_tab' in project_state['results']:
+            project_config['results']['current_tab'] = project_state['results']['current_tab']
         
         # Debug: Log what blocks are being saved
         print(f"Autosave for {project_name} - Saving blocks:")
@@ -1003,5 +1033,27 @@ class NoPollingRequestFilter(logging.Filter):
                 return False
         return True
 
+class WerkzeugFilter(logging.Filter):
+    """Filter out polling endpoint logs from werkzeug"""
+    def filter(self, record):
+        # Check if this is a werkzeug access log
+        if record.name == 'werkzeug' and hasattr(record, 'args'):
+            # Convert args to string to check the message content
+            message = str(record.getMessage())
+            # Filter out polling endpoints
+            if any(endpoint in message for endpoint in [
+                '"GET /api/projects HTTP',
+                '"GET /api/projects/',
+                '/last-modified HTTP',
+                '/thinking-status HTTP'
+            ]):
+                return False
+        return True
+
 if __name__ == '__main__':
+    # Add filter to werkzeug logger
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.addFilter(WerkzeugFilter())
+    
+    # Run the app
     app.run(debug=True, port=5001)
