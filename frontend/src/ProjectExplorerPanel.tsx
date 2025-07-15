@@ -52,6 +52,7 @@ export default function ProjectExplorerPanel({
   const [fileTrees, setFileTrees] = useState<{ [projectId: string]: any }>({});
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; projectId: string; filePath: string } | null>(null);
+  const fileContextMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Load projects and test runs on mount and when refreshTrigger changes
   useEffect(() => {
@@ -331,6 +332,22 @@ export default function ProjectExplorerPanel({
       );
     }
   };
+
+  useEffect(() => {
+    if (!fileContextMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        fileContextMenuRef.current &&
+        !fileContextMenuRef.current.contains(e.target as Node)
+      ) {
+        setFileContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, [fileContextMenu]);
 
   return (
     <div className="h-full bg-zinc-900 text-zinc-100 flex flex-col">
@@ -677,6 +694,7 @@ export default function ProjectExplorerPanel({
       {/* Render file context menu */}
       {fileContextMenu && (
         <div
+          ref={fileContextMenuRef}
           style={{ position: 'fixed', left: fileContextMenu.x, top: fileContextMenu.y, zIndex: 1000 }}
           className="bg-white rounded shadow border border-zinc-200 min-w-[120px]"
           onClick={() => setFileContextMenu(null)}
