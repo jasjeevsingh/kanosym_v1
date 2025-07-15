@@ -23,6 +23,7 @@ from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
 from qiskit.utils import QuantumInstance
 from qiskit.providers.fake_provider import FakeToronto
 from qiskit_aer.noise import NoiseModel
+from qiskit.quantum_info import Statevector, Operator
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -74,27 +75,18 @@ def perturb_portfolio(param: str, asset: str, range_vals: List[float], steps: in
 
 def run_quantum_volatility(portfolio_state: Dict[str, Any], use_noise_model: bool = False, noise_model_type: str = 'fast') -> dict:
     """
-    Quantum volatility estimator using Qiskit's Iterative Amplitude Estimation (QAE).
-    Uses manual controlled weighted addition logic.
-    Automatically determines number of value qubits needed.
-    Supports up to 5 assets.
-    
+    Quantum volatility estimator using quantum expectation value of the true portfolio variance operator.
+    Uses Qiskit's Statevector and Operator for simulation (up to 5 assets).
     Args:
         portfolio_state: Dict describing the portfolio (weights, volatilities, correlation matrix)
-        use_noise_model: Whether to simulate with noise (default: False)
-        noise_model_type: 'fast' for basic noise, 'realistic' for full hardware noise
-    
+        use_noise_model: Ignored in this implementation (no noise simulation for statevector method)
+        noise_model_type: Ignored
     Returns:
         Dict with daily and annualized portfolio volatility
     """
-    from qiskit import QuantumCircuit, transpile
-    from qiskit.circuit.library import WeightedAdder
-    from qiskit.algorithms import EstimationProblem
-    from qiskit.algorithms.amplitude_estimators import IterativeAmplitudeEstimation
-    from qiskit.utils import QuantumInstance
-    from qiskit_aer import Aer
     import numpy as np
-
+    from qiskit.quantum_info import Statevector, Operator
+    
     weights = np.array(portfolio_state['weights'])
     volatility = np.array(portfolio_state['volatility'])
     correlation_matrix = np.array(portfolio_state['correlation_matrix'])
@@ -105,102 +97,45 @@ def run_quantum_volatility(portfolio_state: Dict[str, Any], use_noise_model: boo
     if n_assets < 2:
         raise ValueError("At least 2 assets are required.")
 
-    # Classical portfolio variance (for scaling or validation)
-    cov_matrix = np.outer(volatility, volatility) * correlation_matrix
-    portfolio_variance = float(weights @ cov_matrix @ weights)
-    max_variance = 1.0  # normalize to [0, 1]
+    # 1. Prepare uniform superposition state over all 2^n_assets basis states
+    dim = 2 ** n_assets
+    psi = np.ones(dim) / np.sqrt(dim)
+    state = Statevector(psi)
 
-    # --- Step 1: Compute scaled contributions and required value qubits ---
-    scale_factor = 100
-    scaled_contributions = np.round(weights * volatility * scale_factor).astype(int)
-    if np.all(scaled_contributions == 0):
-        raise ValueError("All scaled asset contributions are zero. Increase the scaling factor or check your portfolio weights/volatilities.")
-    total_scaled = np.sum(scaled_contributions)
+    # 2. For each basis state, compute the portfolio return
+    # Each basis state is a bitstring of length n_assets (e.g., '101')
+    # We'll interpret '1' as asset up (return = +volatility), '0' as down (return = -volatility)
+    returns = []
+    for i in range(dim):
+        bits = np.array(list(np.binary_repr(i, width=n_assets))).astype(int)
+        # Map 0 -> -1, 1 -> +1
+        directions = 2 * bits - 1
+        asset_returns = directions * volatility
+        # Portfolio return: w^T r
+        port_return = np.dot(weights, asset_returns)
+        returns.append(port_return)
+    returns = np.array(returns)
 
-    n_state_qubits = int(np.ceil(np.log2(total_scaled + 1)))
-    required_state_qubits = int(np.ceil(np.log2(total_scaled + 1)))
-    n_state_qubits = max(n_state_qubits, required_state_qubits)
-    n_weight_qubits = n_assets
-    total_qubits = n_state_qubits + n_weight_qubits
+    # 3. Compute the portfolio variance for each basis state (centered)
+    mean_return = np.mean(returns)
+    centered_returns = returns - mean_return
+    squared_returns = centered_returns ** 2
 
-    # --- Step 2: Build circuit ---
-    qc = QuantumCircuit(total_qubits, name="VolatilityEncoding")
-    for i in range(total_qubits - n_weight_qubits, total_qubits):
-        qc.h(i)
+    # 4. Build diagonal operator with squared returns
+    variance_op = np.diag(squared_returns)
+    op = Operator(variance_op)
 
-    for i, weight in enumerate(scaled_contributions.tolist()):
-        if weight > 0:
-            control_qubit = total_qubits - n_weight_qubits + i
-            for j in range(n_state_qubits):
-                if weight & (1 << j):
-                    qc.ccx(control_qubit, j, (j + 1) % n_state_qubits)
-
-    objective_qubit = n_state_qubits - 1
-
-    # --- Step 3: Choose backend ---
-    from qiskit_aer.noise import NoiseModel
-    from qiskit.providers.fake_provider import FakeToronto
-
-    backend = Aer.get_backend('aer_simulator')
-
-    if use_noise_model:
-        if noise_model_type == 'fast':
-            # Use a simpler noise model for faster execution
-            noise_model = NoiseModel()
-            
-            # Add basic depolarizing noise instead of full hardware noise
-            from qiskit_aer.noise import depolarizing_error
-            error_1q = depolarizing_error(0.001, 1)  # 0.1% error rate for 1-qubit gates
-            error_2q = depolarizing_error(0.01, 2)   # 1% error rate for 2-qubit gates
-            
-            noise_model.add_all_qubit_quantum_error(error_1q, ['sx', 'x', 'rz'])
-            noise_model.add_all_qubit_quantum_error(error_2q, ['cx'])
-
-            qi = QuantumInstance(
-                backend,
-                noise_model=noise_model,
-                shots=1000
-            )
-        else:  # realistic
-            # Use full hardware noise model (slower but more accurate)
-            fake_backend = FakeToronto()
-            noise_model = NoiseModel.from_backend(fake_backend)
-            coupling_map = fake_backend.configuration().coupling_map
-            basis_gates = fake_backend.configuration().basis_gates
-
-            qi = QuantumInstance(
-                backend,
-                noise_model=noise_model,
-                coupling_map=coupling_map,
-                basis_gates=basis_gates,
-                shots=1000
-            )
-            qc = transpile(qc, backend=fake_backend, optimization_level=1)
-    else:
-        qi = QuantumInstance(backend, shots=1000)
-
-    # --- Step 4: Amplitude Estimation ---
-    problem = EstimationProblem(
-        state_preparation=qc,
-        objective_qubits=[objective_qubit]
-    )
-
-    qae = IterativeAmplitudeEstimation(epsilon_target=0.01, alpha=0.05, quantum_instance=qi)
-    result = qae.estimate(problem)
-    est_amplitude = result.estimation
-
-    # --- Step 5: Map amplitude to volatility ---
-    est_scaled = est_amplitude * max_variance
-    est_volatility = np.sqrt(est_scaled)
-    annualized_vol = est_volatility * np.sqrt(252)
+    # 5. Compute expectation value (quantum expectation of variance operator)
+    exp_val = np.real(state.expectation_value(op))
+    daily_vol = np.sqrt(exp_val)
+    annualized_vol = daily_vol * np.sqrt(252)
 
     return {
-        'portfolio_volatility_daily': float(est_volatility),
+        'portfolio_volatility_daily': float(daily_vol),
         'portfolio_volatility_annualized': float(annualized_vol),
-        'raw_amplitude_estimate': float(est_amplitude),
-        'scaled_volatility_input': scaled_contributions.tolist(),
-        'value_qubits': n_state_qubits,
-        'noise_simulated': use_noise_model
+        'quantum_expectation_value': float(exp_val),
+        'n_assets': n_assets,
+        'noise_simulated': False
     }
 
 
