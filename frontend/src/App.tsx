@@ -556,7 +556,7 @@ function SubtleResizableBorder({ onResize, direction, children, show = true, min
   const [size, setSize] = useState(initial);
   const dragging = useRef(false);
 
-  function onMouseDown(e: React.MouseEvent) {
+  function onMouseDown(_e: React.MouseEvent) {
     dragging.current = true;
     document.body.style.cursor = direction === 'bottom' ? 'row-resize' : 'col-resize';
   }
@@ -1653,7 +1653,7 @@ function App() {
     
     function handleCorrelationChange(i: number, j: number, value: string) {
       setForm((prev: any) => {
-        const matrix = prev.portfolio.correlation_matrix.map((row: number[], idx: number) => [...row]);
+        const matrix = prev.portfolio.correlation_matrix.map((row: number[], _idx: number) => [...row]);
         matrix[i][j] = Number(value);
         matrix[j][i] = Number(value);
         return { ...prev, portfolio: { ...prev.portfolio, correlation_matrix: matrix } };
@@ -1722,7 +1722,7 @@ function App() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {form.portfolio.assets.map((asset: string, idx: number) => (
+                  {form.portfolio.assets.map((_asset: string, idx: number) => (
                     <div key={idx} className="bg-zinc-700 rounded-lg p-3 border border-zinc-600">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-zinc-400 font-medium">Asset {idx + 1}</span>
