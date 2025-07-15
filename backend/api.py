@@ -19,6 +19,7 @@ import numpy as np
 from datetime import datetime
 import math
 from price_data import get_asset_volatility
+from price_data import fetch_correlation_matrix
 
 # Load environment variables
 load_dotenv()
@@ -69,6 +70,27 @@ def validate_portfolio(portfolio):
     weights = portfolio['weights']
     volatility = portfolio['volatility']
     correlation_matrix = portfolio['correlation_matrix']
+    
+    # Convert all values in correlation_matrix to float to avoid TypeError
+    if correlation_matrix:
+        correlation_matrix = [
+            [float(val) for val in row]
+            for row in correlation_matrix
+        ]
+    
+    # Convert all values to float to avoid dtype errors
+    if weights:
+        weights = [float(w) for w in weights]
+        portfolio['weights'] = weights
+    if volatility:
+        volatility = [float(v) for v in volatility]
+        portfolio['volatility'] = volatility
+    if correlation_matrix:
+        correlation_matrix = [
+            [float(val) for val in row]
+            for row in correlation_matrix
+        ]
+        portfolio['correlation_matrix'] = correlation_matrix
     
     # Check asset count constraints
     if len(assets) < 1:
@@ -1051,6 +1073,28 @@ def fetch_volatility():
             results[symbol] = f"Error: {str(e)}"
 
     return jsonify({"success": True, "volatility": results})
+
+@app.route('/api/fetch_correlation_matrix', methods=['POST'])
+def fetch_correlation_matrix_api():
+    """
+    Fetch correlation matrix for a list of asset symbols.
+    Expects JSON: {"symbols": ["AAPL", "GOOGL"], "start": "2023-01-01", "end": "2024-01-01", "frequency": "1d"}
+    """
+    data = request.get_json()
+    symbols = data.get('symbols')
+    start = data.get('start')
+    end = data.get('end')
+    frequency = data.get('frequency', '1d')
+
+    if not symbols or not isinstance(symbols, list) or len(symbols) < 2:
+        return jsonify({"success": False, "error": "At least two symbols are required."}), 400
+    if not start or not end:
+        return jsonify({"success": False, "error": "Start and end dates are required."}), 400
+
+    matrix = fetch_correlation_matrix(symbols, start, end, frequency)
+    if matrix is None:
+        return jsonify({"success": False, "error": "Insufficient data or error."}), 200
+    return jsonify({"success": True, "correlation_matrix": matrix})
 
 class NoPollingRequestFilter(logging.Filter):
     """Filter out frequent polling requests from Flask logs"""

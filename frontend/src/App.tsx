@@ -536,7 +536,7 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
                 <input
                   type="number"
                   step="0.0001"
-                  className="w-full border border-zinc-300 rounded px-2 py-1"
+                  className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={volatility}
                   onChange={e => setVolatility(e.target.value)}
                   placeholder="e.g. 0.25"
@@ -548,7 +548,7 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
                   onClick={handleFetchVolatility}
                   disabled={!asset || fetchingVol}
                 >
-                  {fetchingVol ? 'Fetching...' : 'Auto-fetch'}
+                  {fetchingVol ? 'Fetching...' : 'Fetch'}
                 </button>
               </div>
               {fetchError && <div className="text-xs text-red-600 mt-1">{fetchError}</div>}
@@ -1707,7 +1707,19 @@ function App() {
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
       const { name, value } = e.target;
-      setForm((prev: any) => ({ ...prev, [name]: name === 'steps' ? Number(value) : value }));
+      setForm((prev: any) => {
+        if (name === 'asset') {
+          // Find the volatility for the new asset
+          const idx = prev.portfolio.assets.indexOf(value);
+          let newRange = prev.range;
+          if (idx !== -1) {
+            const v = prev.portfolio.volatility[idx];
+            newRange = [Number((v - 0.05).toFixed(4)), Number((v + 0.05).toFixed(4))];
+          }
+          return { ...prev, [name]: value, range: newRange };
+        }
+        return { ...prev, [name]: name === 'steps' ? Number(value) : value };
+      });
     }
     
     function handleRangeChange(idx: number, value: string) {
@@ -1750,7 +1762,13 @@ function App() {
       setForm((prev: any) => {
         const volatility = [...prev.portfolio.volatility];
         volatility[idx] = Number(value);
-        return { ...prev, portfolio: { ...prev.portfolio, volatility } };
+        let newRange = prev.range;
+        // If this asset is the selected one for sensitivity, auto-adjust range
+        if (prev.asset === prev.portfolio.assets[idx]) {
+          const v = Number(value);
+          newRange = [Number((v - 0.05).toFixed(4)), Number((v + 0.05).toFixed(4))];
+        }
+        return { ...prev, portfolio: { ...prev.portfolio, volatility }, range: newRange };
       });
     }
     
@@ -1804,7 +1822,8 @@ function App() {
         });
         const data = await res.json();
         if (data.success && data.volatility && typeof data.volatility[symbol] === 'number') {
-          handleVolatilityChange(idx, data.volatility[symbol].toFixed(4));
+          const rounded = Number(data.volatility[symbol]).toFixed(4);
+          handleVolatilityChange(idx, rounded);
           setFetchingVols(prev => ({ ...prev, [idx]: false }));
           return true;
         } else {
@@ -1903,6 +1922,134 @@ function App() {
       );
     }
 
+    const [fetchingCorr, setFetchingCorr] = useState(false);
+    const [fetchCorrError, setFetchCorrError] = useState('');
+    const [showCorrModal, setShowCorrModal] = useState(false);
+    const defaultCorrParams = { ...getDefaultDates(), frequency: '1d' };
+
+    async function handleFetchCorrelationMatrix(params?: any) {
+      setFetchingCorr(true);
+      setFetchCorrError('');
+      const symbols = form.portfolio.assets;
+      const { start, end, frequency } = params || { ...getDefaultDates(), frequency: '1d' };
+      try {
+        const res = await fetch('http://localhost:5001/api/fetch_correlation_matrix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols, start, end, frequency }),
+        });
+        const data = await res.json();
+        if (data.success && data.correlation_matrix) {
+          const roundedMatrix = data.correlation_matrix.map((row: any[]) => row.map((val: any) => Number(val).toFixed(4)));
+          setForm((prev: any) => ({
+            ...prev,
+            portfolio: {
+              ...prev.portfolio,
+              correlation_matrix: roundedMatrix,
+            },
+          }));
+          setFetchingCorr(false);
+          return true;
+        } else {
+          setFetchCorrError(data.error || 'Could not fetch correlation matrix.');
+          setFetchingCorr(false);
+          return false;
+        }
+      } catch (err) {
+        setFetchCorrError('Error fetching correlation matrix.');
+        setFetchingCorr(false);
+        if (err instanceof Error) {
+          console.error('handleFetchCorrelationMatrix error:', err.message, err.stack);
+        } else {
+          console.error('handleFetchCorrelationMatrix error:', err);
+        }
+        return false;
+      }
+    }
+
+    function FetchCorrelationModal({ open, onClose, onFetch, defaultParams }: { open: boolean; onClose: () => void; onFetch: (params: { start: string; end: string; frequency: string; }) => Promise<boolean>; defaultParams: any }) {
+      const [start, setStart] = useState(defaultParams.start);
+      const [end, setEnd] = useState(defaultParams.end);
+      const [frequency, setFrequency] = useState(defaultParams.frequency || '1d');
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      async function handleSubmit(e?: React.FormEvent) {
+        if (e) e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          const success = await onFetch({ start, end, frequency });
+          if (success) {
+            onClose();
+          } else {
+            setError('Could not fetch correlation matrix.');
+          }
+        } catch (err) {
+          setError('Error fetching correlation matrix.');
+          if (err instanceof Error) {
+            console.error('FetchCorrelationModal handleSubmit error:', err.message, err.stack);
+          } else {
+            console.error('FetchCorrelationModal handleSubmit error:', err);
+          }
+        }
+        setLoading(false);
+      }
+
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] relative">
+            <button
+              className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+              onClick={onClose}
+            >
+              ×
+            </button>
+            <div className="text-lg font-bold mb-4 text-zinc-800">Estimate Correlation Matrix</div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Start Date</label>
+                <input type="date" className="w-full border border-zinc-300 rounded px-2 py-1" value={start} onChange={e => setStart(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">End Date</label>
+                <input type="date" className="w-full border border-zinc-300 rounded px-2 py-1" value={end} onChange={e => setEnd(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Frequency (optional)</label>
+                <select className="w-full border border-zinc-300 rounded px-2 py-1" value={frequency} onChange={e => setFrequency(e.target.value)}>
+                  <option value="1d">Daily</option>
+                  <option value="1wk">Weekly</option>
+                  <option value="1mo">Monthly</option>
+                </select>
+              </div>
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+              <button type="button" className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-bold" disabled={loading} onClick={handleSubmit}>
+                {loading ? 'Fetching...' : 'Fetch'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const [showRangeWarning, setShowRangeWarning] = useState(false);
+
+    function handleSave(e: React.FormEvent) {
+      e.preventDefault();
+      const selectedIdx = form.portfolio.assets.findIndex((a: string) => a === form.asset);
+      const v = form.portfolio.volatility[selectedIdx];
+      const [min, max] = form.range;
+      if (v < min || v > max) {
+        setShowRangeWarning(true);
+        return;
+      }
+      setShowRangeWarning(false);
+      onSave(form);
+      onClose();
+    }
+
     return open ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
         <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-6 min-w-[800px] max-w-[1000px] max-h-[90vh] overflow-y-auto">
@@ -1922,7 +2069,7 @@ function App() {
             </button>
           </div>
 
-          <form className="space-y-6" onSubmit={e => { e.preventDefault(); onSave(form); onClose(); }}>
+          <form className="space-y-6" onSubmit={handleSave}>
             {/* Portfolio Configuration Section */}
             <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
               <h3 className="text-lg font-medium text-zinc-100 mb-4 flex items-center">
@@ -1996,7 +2143,7 @@ function App() {
                           <div className="flex items-center space-x-2">
                             <input
                               type="number"
-                              step="0.01"
+                              step="0.0001"
                               min="0"
                               className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                               value={form.portfolio.volatility[idx]}
@@ -2008,9 +2155,9 @@ function App() {
                               onClick={() => handleFetchVolatilityForAsset(idx)}
                               onContextMenu={e => { e.preventDefault(); setShowFetchModalIdx(idx); }}
                               disabled={!form.portfolio.assets[idx] || fetchingVols[idx]}
-                              title="Left click: auto-fetch. Right click: custom fetch."
+                              title="Left click: Fetch. Right click: custom fetch."
                             >
-                              {fetchingVols[idx] ? 'Fetching...' : 'Auto-fetch'}
+                              {fetchingVols[idx] ? 'Fetching...' : 'Fetch'}
                             </button>
                           </div>
                           {fetchErrors[idx] && <div className="text-xs text-red-400 mt-1">{fetchErrors[idx]}</div>}
@@ -2030,8 +2177,29 @@ function App() {
               </div>
 
               {/* Correlation Matrix */}
+              <div className="flex items-center mb-2">
+                <label className="block text-zinc-300 text-sm font-medium">Correlation Matrix</label>
+                <button
+                  type="button"
+                  className="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                  onClick={() => handleFetchCorrelationMatrix()}
+                  onContextMenu={e => { e.preventDefault(); setShowCorrModal(true); }}
+                  disabled={form.portfolio.assets.length < 2 || fetchingCorr}
+                  title="Left click: estimate. Right click: custom fetch."
+                >
+                  {fetchingCorr ? 'Estimating...' : 'Estimate'}
+                </button>
+                {fetchCorrError && <div className="text-xs text-red-400 ml-2">{fetchCorrError}</div>}
+                {showCorrModal && (
+                  <FetchCorrelationModal
+                    open={true}
+                    onClose={() => setShowCorrModal(false)}
+                    defaultParams={defaultCorrParams}
+                    onFetch={async params => await handleFetchCorrelationMatrix(params)}
+                  />
+                )}
+              </div>
               <div>
-                <label className="block text-zinc-300 text-sm font-medium mb-3">Correlation Matrix</label>
                 <div className="bg-zinc-700 rounded-lg p-3 border border-zinc-600 overflow-x-auto">
                   <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${form.portfolio.assets.length + 1}, minmax(60px, 1fr))` }}>
                     {/* Header row */}
@@ -2048,7 +2216,7 @@ function App() {
                           <input
                             key={j}
                             type="number"
-                            step="0.01"
+                            step="0.0001"
                             min="-1"
                             max="1"
                             className="w-full bg-zinc-600 border border-zinc-500 rounded px-1 py-1 text-zinc-100 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -2078,7 +2246,7 @@ function App() {
                   <label className="block text-zinc-300 text-sm font-medium mb-2">Parameter to Perturb</label>
                   <select 
                     name="param" 
-                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                     value={form.param} 
                     onChange={handleChange}
                   >
@@ -2092,7 +2260,7 @@ function App() {
                   <label className="block text-zinc-300 text-sm font-medium mb-2">Target Asset</label>
                   <select 
                     name="asset" 
-                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                     value={form.asset} 
                     onChange={handleChange}
                   >
@@ -2106,8 +2274,7 @@ function App() {
                   <label className="block text-zinc-300 text-sm font-medium mb-2">Range Min</label>
                   <input
                     type="number"
-                    step="any"
-                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={form.range[0]}
                     onChange={e => handleRangeChange(0, e.target.value)}
                     required
@@ -2118,8 +2285,7 @@ function App() {
                   <label className="block text-zinc-300 text-sm font-medium mb-2">Range Max</label>
                   <input
                     type="number"
-                    step="any"
-                    className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={form.range[1]}
                     onChange={e => handleRangeChange(1, e.target.value)}
                     required
