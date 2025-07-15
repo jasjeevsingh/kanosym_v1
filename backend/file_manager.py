@@ -106,7 +106,7 @@ class FileManager:
                 return None
             with open(filepath, 'r') as f:
                 project_config = json.load(f)
-            logger.info(f"Loaded project file: {filepath}")
+            logger.debug(f"Loaded project file: {filepath}")
             return project_config
         except Exception as e:
             logger.error(f"Failed to load project file {filepath}: {e}")
@@ -183,7 +183,7 @@ class FileManager:
                         except Exception as e:
                             logger.error(f"Failed to read project file {ksm_file}: {e}")
                             continue
-            logger.info(f"Found {len(projects)} projects")
+            logger.debug(f"Found {len(projects)} projects")
             return projects
         except Exception as e:
             logger.error(f"Failed to list projects: {e}")

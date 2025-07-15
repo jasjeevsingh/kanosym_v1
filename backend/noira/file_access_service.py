@@ -10,6 +10,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, date
 from pathlib import Path
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,24 @@ class NoiraFileAccessService:
             
             elif tool_name == "list_projects":
                 return self._handle_list_projects(arguments)
+            
+            elif tool_name == "update_block_position":
+                return self._handle_update_block_position(arguments)
+            
+            elif tool_name == "update_block_parameters":
+                return self._handle_update_block_parameters(arguments)
+            
+            elif tool_name == "add_block":
+                return self._handle_add_block(arguments)
+            
+            elif tool_name == "remove_block":
+                return self._handle_remove_block(arguments)
+            
+            elif tool_name == "create_project":
+                return self._handle_create_project(arguments)
+            
+            elif tool_name == "delete_test_run":
+                return self._handle_delete_test_run(arguments)
             
             else:
                 return {
@@ -119,20 +138,55 @@ class NoiraFileAccessService:
         }
     
     def _handle_search_test_runs(self, arguments: dict) -> dict:
-        """Handle search_test_runs tool call"""
-        date_filter = arguments.get("date_filter")
+        """Handle search_test_runs tool call - now with flexible filtering"""
+        # Default to 'recent' if no date_filter specified
+        date_filter = arguments.get("date_filter", "recent")
         limit = arguments.get("limit", 10)
         
         # Get all test runs
         all_test_runs = self.file_manager.list_test_runs()
         
-        # Apply date filtering
-        filtered_runs = self._filter_test_runs_by_date(all_test_runs, date_filter, arguments)
+        # Sort by timestamp for 'recent' mode
+        if date_filter == "recent" or not any([
+            arguments.get("project_filter"),
+            arguments.get("asset_filter"),
+            arguments.get("block_type_filter"),
+            arguments.get("test_run_id_prefix")
+        ]):
+            # Sort by timestamp descending for recent results
+            all_test_runs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Apply date filtering if not 'recent'
+        if date_filter != "recent":
+            filtered_runs = self._filter_test_runs_by_date(all_test_runs, date_filter, arguments)
+        else:
+            filtered_runs = all_test_runs
         
         # Apply additional filters
         if arguments.get("project_filter"):
-            project_filter = arguments["project_filter"].lower()
-            filtered_runs = [tr for tr in filtered_runs if project_filter in tr.get("project_id", "").lower()]
+            project_filter = arguments["project_filter"]
+            
+            # First try to find project by name to get its ID
+            project_id_to_match = None
+            projects = self.file_manager.list_projects()
+            for project in projects:
+                if project_filter.lower() == project["name"].lower():
+                    project_id_to_match = project["project_id"]
+                    break
+            
+            # If exact match not found, try partial match
+            if not project_id_to_match:
+                for project in projects:
+                    if project_filter.lower() in project["name"].lower():
+                        project_id_to_match = project["project_id"]
+                        break
+            
+            # Filter by project_id if found, otherwise filter by the original string
+            if project_id_to_match:
+                filtered_runs = [tr for tr in filtered_runs if tr.get("project_id") == project_id_to_match]
+            else:
+                # Fallback: check if filter string is in project_id (in case user provided the ID directly)
+                filtered_runs = [tr for tr in filtered_runs if project_filter.lower() in tr.get("project_id", "").lower()]
         
         if arguments.get("asset_filter"):
             asset_filter = arguments["asset_filter"].upper()
@@ -141,7 +195,25 @@ class NoiraFileAccessService:
         if arguments.get("block_type_filter"):
             filtered_runs = [tr for tr in filtered_runs if tr.get("block_type") == arguments["block_type_filter"]]
         
+        if arguments.get("test_run_id_prefix"):
+            prefix = arguments["test_run_id_prefix"]
+            filtered_runs = [tr for tr in filtered_runs if tr.get("test_run_id", "").startswith(prefix)]
+        
+        # Build summary of applied filters
+        filters_applied = []
+        if date_filter != "recent":
+            filters_applied.append(f"date={date_filter}")
+        if arguments.get("project_filter"):
+            filters_applied.append(f"project='{arguments['project_filter']}'")
+        if arguments.get("asset_filter"):
+            filters_applied.append(f"asset={arguments['asset_filter']}")
+        if arguments.get("block_type_filter"):
+            filters_applied.append(f"block_type={arguments['block_type_filter']}")
+        if arguments.get("test_run_id_prefix"):
+            filters_applied.append(f"id_prefix='{arguments['test_run_id_prefix']}'")
+        
         # Limit results
+        total_matches = len(filtered_runs)
         filtered_runs = filtered_runs[:limit]
         
         # Load full data for each test run
@@ -151,10 +223,18 @@ class NoiraFileAccessService:
             if full_data:
                 results.append(self._format_test_run_data(full_data))
         
+        # Create descriptive summary
+        if filters_applied:
+            summary = f"Found {len(results)} test runs (of {total_matches} total) matching: {', '.join(filters_applied)}"
+        else:
+            summary = f"Found {len(results)} most recent test runs (of {total_matches} total)"
+        
         return {
             "success": True,
             "data": results,
-            "summary": f"Found {len(results)} test runs matching criteria"
+            "summary": summary,
+            "total_matches": total_matches,
+            "filters_applied": filters_applied
         }
     
     def _handle_list_projects(self, arguments: dict) -> dict:
@@ -187,6 +267,10 @@ class NoiraFileAccessService:
     
     def _filter_test_runs_by_date(self, test_runs: List[Dict], date_filter: str, arguments: dict) -> List[Dict]:
         """Filter test runs by date criteria"""
+        if date_filter == "recent":
+            # Return all test runs sorted by timestamp
+            return sorted(test_runs, key=lambda x: x.get("timestamp", ""), reverse=True)
+        
         today = date.today()
         
         if date_filter == "today":
@@ -219,9 +303,6 @@ class NoiraFileAccessService:
                 end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
             else:
                 return test_runs  # No valid range provided
-        elif date_filter == "recent":
-            # Just return all, sorted by date (newest first)
-            return sorted(test_runs, key=lambda x: x["timestamp"], reverse=True)
         else:
             return test_runs
         
@@ -300,3 +381,405 @@ class NoiraFileAccessService:
             formatted["sample_results"] = test_run_data["results"][:3]  # First 3 data points
         
         return formatted
+    
+    def _handle_update_block_position(self, arguments: dict) -> dict:
+        """Handle update_block_position tool call"""
+        project_name = arguments.get("project_name")
+        block_type = arguments.get("block_type")
+        new_position = arguments.get("new_position")
+        
+        if not all([project_name, block_type, new_position]):
+            return {"success": False, "error": "project_name, block_type, and new_position are required"}
+        
+        # Load the project
+        project_config = self.file_manager.load_project(project_name)
+        if not project_config:
+            return {"success": False, "error": f"Project '{project_name}' not found"}
+        
+        # Check if block exists and is placed
+        blocks = project_config.get("configuration", {}).get("blocks", {})
+        if block_type not in blocks:
+            return {"success": False, "error": f"Block type '{block_type}' not found in project"}
+        
+        if not blocks[block_type].get("placed"):
+            return {"success": False, "error": f"Block '{block_type}' is not placed on canvas"}
+        
+        # Update position
+        blocks[block_type]["position"] = new_position
+        
+        # Save the project
+        if self.file_manager.save_project(project_name, project_config):
+            logger.info(f"✅ Modified project '{project_name}': Moved {block_type} block to ({new_position['x']}, {new_position['y']})")
+            return {
+                "success": True,
+                "data": {"block_type": block_type, "new_position": new_position},
+                "summary": f"Moved {block_type} block to position ({new_position['x']}, {new_position['y']})"
+            }
+        else:
+            return {"success": False, "error": "Failed to save project"}
+    
+    def _handle_update_block_parameters(self, arguments: dict) -> dict:
+        """Handle update_block_parameters tool call - performs partial parameter updates"""
+        project_name = arguments.get("project_name")
+        block_type = arguments.get("block_type")
+        parameters = arguments.get("parameters")
+        
+        if not all([project_name, block_type, parameters]):
+            return {"success": False, "error": "project_name, block_type, and parameters are required"}
+        
+        # Validate parameters if portfolio is being updated
+        if "portfolio" in parameters:
+            portfolio = parameters["portfolio"]
+            if "weights" in portfolio:
+                weights = portfolio["weights"]
+                if not isinstance(weights, list) or not all(isinstance(w, (int, float)) for w in weights):
+                    return {"success": False, "error": "Weights must be a list of numbers"}
+                total_weight = sum(weights)
+                if abs(total_weight - 1.0) > 0.01:
+                    return {"success": False, "error": f"Weights must sum to 1.0 (current sum: {total_weight:.3f})"}
+            
+            if "volatility" in portfolio:
+                volatility = portfolio["volatility"]
+                if not isinstance(volatility, list) or not all(isinstance(v, (int, float)) and v > 0 for v in volatility):
+                    return {"success": False, "error": "Volatility must be a list of positive numbers"}
+            
+            if "correlation_matrix" in portfolio:
+                corr_matrix = portfolio["correlation_matrix"]
+                if not isinstance(corr_matrix, list) or not all(isinstance(row, list) for row in corr_matrix):
+                    return {"success": False, "error": "Correlation matrix must be a 2D list"}
+                # Check if square matrix
+                n = len(corr_matrix)
+                if not all(len(row) == n for row in corr_matrix):
+                    return {"success": False, "error": "Correlation matrix must be square"}
+                
+                # Check if matrix dimensions match other portfolio arrays
+                if "assets" in portfolio and len(portfolio["assets"]) != n:
+                    return {"success": False, "error": f"Correlation matrix size ({n}x{n}) doesn't match number of assets ({len(portfolio['assets'])})"}
+                if "weights" in portfolio and len(portfolio["weights"]) != n:
+                    return {"success": False, "error": f"Correlation matrix size ({n}x{n}) doesn't match number of weights ({len(portfolio['weights'])})"}
+                if "volatility" in portfolio and len(portfolio["volatility"]) != n:
+                    return {"success": False, "error": f"Correlation matrix size ({n}x{n}) doesn't match number of volatilities ({len(portfolio['volatility'])})"}
+                
+                # Check diagonal elements are 1
+                for i in range(n):
+                    if abs(corr_matrix[i][i] - 1.0) > 0.01:
+                        return {"success": False, "error": f"Diagonal element [{i}][{i}] must be 1.0 (found {corr_matrix[i][i]})"}
+                
+                # Check values are in [-1, 1]
+                for i in range(n):
+                    for j in range(n):
+                        val = corr_matrix[i][j]
+                        if not isinstance(val, (int, float)):
+                            return {"success": False, "error": f"Correlation matrix element [{i}][{j}] must be a number"}
+                        if val < -1 or val > 1:
+                            return {"success": False, "error": f"Correlation [{i}][{j}] = {val} is outside valid range [-1, 1]"}
+                
+                # Check symmetry
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        if abs(corr_matrix[i][j] - corr_matrix[j][i]) > 0.0001:
+                            return {"success": False, "error": f"Correlation matrix must be symmetric: [{i}][{j}]={corr_matrix[i][j]} != [{j}][{i}]={corr_matrix[j][i]}"}
+                
+                # Check positive semi-definiteness (all eigenvalues >= 0)
+                try:
+                    eigenvalues = np.linalg.eigvals(corr_matrix)
+                    min_eigenvalue = np.min(eigenvalues.real)
+                    if min_eigenvalue < -0.01:  # Allow small numerical errors
+                        return {"success": False, "error": f"Correlation matrix is not positive semi-definite (min eigenvalue: {min_eigenvalue:.4f}). This means the correlations are mathematically inconsistent."}
+                except Exception as e:
+                    logger.warning(f"Could not check positive semi-definiteness: {str(e)}")
+        
+        # Load the project
+        project_config = self.file_manager.load_project(project_name)
+        if not project_config:
+            return {"success": False, "error": f"Project '{project_name}' not found"}
+        
+        # Check if block exists
+        blocks = project_config.get("configuration", {}).get("blocks", {})
+        if block_type not in blocks:
+            return {"success": False, "error": f"Block type '{block_type}' not found in project"}
+        
+        # Initialize parameters if not exists
+        if blocks[block_type].get("parameters") is None:
+            blocks[block_type]["parameters"] = {}
+        
+        # Deep merge for nested structures like portfolio
+        if "portfolio" in parameters and "portfolio" in blocks[block_type]["parameters"]:
+            # Merge portfolio fields individually
+            existing_portfolio = blocks[block_type]["parameters"]["portfolio"]
+            new_portfolio = parameters["portfolio"]
+            for key, value in new_portfolio.items():
+                existing_portfolio[key] = value
+        else:
+            # Update other parameters
+            blocks[block_type]["parameters"].update(parameters)
+        
+        # Update last modified
+        project_config["metadata"]["last_modified"] = datetime.now().isoformat()
+        
+        # Save the project
+        if self.file_manager.save_project(project_name, project_config):
+            logger.info(f"✅ Modified project '{project_name}': Updated {block_type} block parameters")
+            return {
+                "success": True,
+                "data": {"block_type": block_type, "parameters": parameters},
+                "summary": f"Updated {block_type} block parameters"
+            }
+        else:
+            return {"success": False, "error": "Failed to save project"}
+    
+    def _handle_add_block(self, arguments: dict) -> dict:
+        """Handle add_block tool call"""
+        project_name = arguments.get("project_name")
+        block_type = arguments.get("block_type")
+        position = arguments.get("position")
+        parameters = arguments.get("parameters", {})
+        
+        if not all([project_name, block_type, position]):
+            return {"success": False, "error": "project_name, block_type, and position are required"}
+        
+        # Validate that parameters include portfolio with correlation matrix
+        if not parameters:
+            return {"success": False, "error": "Parameters must be provided with portfolio configuration"}
+        
+        if "portfolio" not in parameters:
+            return {"success": False, "error": "Portfolio configuration is required in parameters"}
+        
+        portfolio = parameters["portfolio"]
+        
+        # Validate required portfolio fields
+        required_fields = ["assets", "weights", "volatility", "correlation_matrix"]
+        missing_fields = [field for field in required_fields if field not in portfolio]
+        if missing_fields:
+            return {"success": False, "error": f"Portfolio is missing required fields: {', '.join(missing_fields)}"}
+        
+        # Validate assets
+        assets = portfolio["assets"]
+        if not isinstance(assets, list) or len(assets) == 0:
+            return {"success": False, "error": "Assets must be a non-empty list"}
+        
+        n_assets = len(assets)
+        
+        # Validate weights
+        weights = portfolio["weights"]
+        if not isinstance(weights, list) or len(weights) != n_assets:
+            return {"success": False, "error": f"Weights must be a list of {n_assets} numbers (one for each asset)"}
+        
+        if not all(isinstance(w, (int, float)) for w in weights):
+            return {"success": False, "error": "All weights must be numbers"}
+        
+        total_weight = sum(weights)
+        if abs(total_weight - 1.0) > 0.01:
+            return {"success": False, "error": f"Weights must sum to 1.0 (current sum: {total_weight:.3f})"}
+        
+        # Validate volatility
+        volatility = portfolio["volatility"]
+        if not isinstance(volatility, list) or len(volatility) != n_assets:
+            return {"success": False, "error": f"Volatility must be a list of {n_assets} positive numbers"}
+        
+        if not all(isinstance(v, (int, float)) and v > 0 for v in volatility):
+            return {"success": False, "error": "All volatilities must be positive numbers"}
+        
+        # Validate correlation matrix
+        corr_matrix = portfolio["correlation_matrix"]
+        if not isinstance(corr_matrix, list) or len(corr_matrix) != n_assets:
+            return {"success": False, "error": f"Correlation matrix must be a {n_assets}x{n_assets} matrix"}
+        
+        for i, row in enumerate(corr_matrix):
+            if not isinstance(row, list) or len(row) != n_assets:
+                return {"success": False, "error": f"Correlation matrix row {i} must have {n_assets} elements"}
+            
+            for j, val in enumerate(row):
+                if not isinstance(val, (int, float)):
+                    return {"success": False, "error": f"Correlation matrix element [{i}][{j}] must be a number"}
+                
+                # Check diagonal elements
+                if i == j and abs(val - 1.0) > 0.01:
+                    return {"success": False, "error": f"Diagonal element [{i}][{i}] must be 1.0 (found {val})"}
+                
+                # Check range
+                if val < -1 or val > 1:
+                    return {"success": False, "error": f"Correlation [{i}][{j}] = {val} is outside valid range [-1, 1]"}
+        
+        # Check symmetry
+        for i in range(n_assets):
+            for j in range(i + 1, n_assets):
+                if abs(corr_matrix[i][j] - corr_matrix[j][i]) > 0.0001:
+                    return {"success": False, "error": f"Correlation matrix must be symmetric: [{i}][{j}]={corr_matrix[i][j]} != [{j}][{i}]={corr_matrix[j][i]}"}
+        
+        # Check positive semi-definiteness
+        try:
+            eigenvalues = np.linalg.eigvals(corr_matrix)
+            min_eigenvalue = np.min(eigenvalues.real)
+            if min_eigenvalue < -0.01:  # Allow small numerical errors
+                return {"success": False, "error": f"Correlation matrix is not positive semi-definite (min eigenvalue: {min_eigenvalue:.4f})"}
+        except Exception as e:
+            logger.warning(f"Could not check positive semi-definiteness: {str(e)}")
+        
+        # Validate other required parameters based on block type
+        if "param" not in parameters:
+            return {"success": False, "error": "Parameter 'param' is required to specify which parameter to perturb"}
+        
+        if "range" not in parameters:
+            return {"success": False, "error": "Parameter 'range' is required to specify perturbation range [min, max]"}
+        
+        if "steps" not in parameters:
+            return {"success": False, "error": "Parameter 'steps' is required to specify number of perturbation steps"}
+        
+        # If perturbing a specific asset's parameter, validate asset is specified
+        if parameters["param"] in ["volatility", "weight"] and "asset" not in parameters:
+            return {"success": False, "error": f"Parameter 'asset' is required when perturbing {parameters['param']}"}
+        
+        # Load the project
+        project_config = self.file_manager.load_project(project_name)
+        if not project_config:
+            return {"success": False, "error": f"Project '{project_name}' not found"}
+        
+        # Check if block already exists and is placed
+        blocks = project_config.get("configuration", {}).get("blocks", {})
+        if block_type in blocks and blocks[block_type].get("placed"):
+            return {"success": False, "error": f"Block '{block_type}' is already placed on canvas"}
+        
+        # Add or update block
+        if block_type not in blocks:
+            blocks[block_type] = {}
+        
+        blocks[block_type]["placed"] = True
+        blocks[block_type]["position"] = position
+        blocks[block_type]["parameters"] = parameters
+        
+        # Update UI state
+        ui_state = project_config.get("configuration", {}).get("ui_state", {})
+        ui_state["current_block_mode"] = block_type
+        ui_state["block_move_count"] = ui_state.get("block_move_count", 0) + 1
+        
+        # Update last modified
+        project_config["metadata"]["last_modified"] = datetime.now().isoformat()
+        
+        # Save the project
+        if self.file_manager.save_project(project_name, project_config):
+            logger.info(f"✅ Modified project '{project_name}': Added {block_type} block at ({position['x']}, {position['y']})")
+            return {
+                "success": True,
+                "data": {"block_type": block_type, "position": position},
+                "summary": f"Added {block_type} block at position ({position['x']}, {position['y']})"
+            }
+        else:
+            return {"success": False, "error": "Failed to save project"}
+    
+    def _handle_remove_block(self, arguments: dict) -> dict:
+        """Handle remove_block tool call"""
+        project_name = arguments.get("project_name")
+        block_type = arguments.get("block_type")
+        
+        if not all([project_name, block_type]):
+            return {"success": False, "error": "project_name and block_type are required"}
+        
+        # Load the project
+        project_config = self.file_manager.load_project(project_name)
+        if not project_config:
+            return {"success": False, "error": f"Project '{project_name}' not found"}
+        
+        # Check if block exists
+        blocks = project_config.get("configuration", {}).get("blocks", {})
+        if block_type not in blocks:
+            return {"success": False, "error": f"Block type '{block_type}' not found in project"}
+        
+        # Mark block as not placed
+        blocks[block_type]["placed"] = False
+        blocks[block_type]["position"] = None
+        
+        # Update last modified
+        project_config["metadata"]["last_modified"] = datetime.now().isoformat()
+        
+        # Save the project
+        if self.file_manager.save_project(project_name, project_config):
+            logger.info(f"✅ Modified project '{project_name}': Removed {block_type} block from canvas")
+            return {
+                "success": True,
+                "data": {"block_type": block_type},
+                "summary": f"Removed {block_type} block from canvas"
+            }
+        else:
+            return {"success": False, "error": "Failed to save project"}
+    
+    def _handle_create_project(self, arguments: dict) -> dict:
+        """Handle create_project tool call"""
+        project_name = arguments.get("project_name")
+        description = arguments.get("description", "")
+        
+        if not project_name:
+            return {"success": False, "error": "project_name is required"}
+        
+        # Check if project already exists
+        existing_projects = self.file_manager.list_projects()
+        if any(p["name"].lower() == project_name.lower() for p in existing_projects):
+            return {"success": False, "error": f"Project '{project_name}' already exists"}
+        
+        # Create new project
+        project_id = f"proj-{int(datetime.now().timestamp())}"
+        project_config = self.file_manager.create_project(project_name, project_id)
+        
+        if project_config:
+            # Add description if provided
+            if description:
+                project_config["metadata"]["description"] = description
+                self.file_manager.save_project(project_name, project_config)
+            
+            logger.info(f"✅ Created new project '{project_name}' (ID: {project_id})")
+            return {
+                "success": True,
+                "data": {
+                    "project_id": project_id,
+                    "name": project_name,
+                    "description": description
+                },
+                "summary": f"Created new project '{project_name}' (ID: {project_id})"
+            }
+        else:
+            return {"success": False, "error": "Failed to create project"}
+    
+    def _handle_delete_test_run(self, arguments: dict) -> dict:
+        """Handle delete_test_run tool call"""
+        test_run_id = arguments.get("test_run_id")
+        confirm = arguments.get("confirm", False)
+        
+        if not test_run_id:
+            return {"success": False, "error": "test_run_id is required"}
+        
+        if not confirm:
+            return {"success": False, "error": "Please set confirm=true to delete the test run"}
+        
+        # Load test run to get project info
+        test_run = self.file_manager.load_test_run(test_run_id)
+        if not test_run:
+            return {"success": False, "error": f"Test run '{test_run_id}' not found"}
+        
+        project_id = test_run.get("project_id")
+        
+        # Delete the test run file
+        test_run_path = self.file_manager.test_runs_dir / f"{test_run_id}.json"
+        try:
+            test_run_path.unlink()
+            logger.info(f"Deleted test run file: {test_run_id}")
+            
+            # Update project to remove test run reference
+            projects = self.file_manager.list_projects()
+            for project in projects:
+                if project["project_id"] == project_id:
+                    project_config = self.file_manager.load_project(project["name"])
+                    if project_config:
+                        test_runs = project_config.get("results", {}).get("test_runs", [])
+                        if test_run_id in test_runs:
+                            test_runs.remove(test_run_id)
+                            self.file_manager.save_project(project["name"], project_config)
+                    break
+            
+            logger.warning(f"⚠️ Deleted test run {test_run_id} from project {project_id}")
+            return {
+                "success": True,
+                "data": {"test_run_id": test_run_id},
+                "summary": f"Deleted test run {test_run_id}"
+            }
+        except Exception as e:
+            return {"success": False, "error": f"Failed to delete test run: {str(e)}"}

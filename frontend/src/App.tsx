@@ -27,6 +27,7 @@ function ProjectDeletionMonitor({ projectId, projectName, onDeleted }: {
   // This component doesn't render anything
   return null;
 }
+import { useProjectPolling, useProjectListPolling } from './hooks/useProjectPolling';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -788,6 +789,31 @@ function App() {
       };
     });
   }
+
+  // Poll for project list changes (for create/delete operations)
+  useProjectListPolling({
+    enabled: true,
+    onProjectsChanged: () => {
+      console.log('Project list changed, refreshing...');
+      setProjectRefreshTrigger(prev => prev + 1);
+    },
+    pollingInterval: 1000, // Check every second
+  });
+
+  // Poll for current project changes (for block operations)
+  const currentProject = openProjects.find(p => p.id === currentProjectId);
+  useProjectPolling({
+    projectName: currentProject?.name || null,
+    enabled: !!currentProject,
+    onProjectChanged: async () => {
+      console.log('Current project changed, reloading...');
+      if (currentProject) {
+        // Reload the project data
+        await handleOpenProject(currentProject.name);
+      }
+    },
+    pollingInterval: 500, // Check every 500ms for faster updates
+  });
   
 
   // File Manager handlers

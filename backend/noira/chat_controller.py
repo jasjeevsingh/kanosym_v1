@@ -166,6 +166,13 @@ IMPORTANT: Always list/search before loading:
 - You can make multiple tool calls in sequence
 - If search returns empty results, DO NOT attempt to load non-existent items
 
+FILE STORAGE CONTEXT:
+- Projects are stored as .ksm files at: backend/projects/{project_name}/{project_name}.ksm
+- Test runs are stored as .json files at: backend/test-runs/test-run-YYYYMMDD-HHMMSS.json
+- Project files contain: metadata, block configurations, UI state
+- Test run files contain: parameters, results array, analytics metrics
+- Test runs reference their parent project via project_id field
+
 Be strategic about tool usage - only call tools when you need actual data."""
                     
                     # Include previous tool results in context
@@ -201,13 +208,28 @@ Be strategic about tool usage - only call tools when you need actual data."""
                     # Store thinking response for usage tracking
                     thinking_responses.append(thinking_response)
                     
+                    # Log Noira's thinking
+                    thinking_content = thinking_response.choices[0].message.content
+                    if thinking_content:
+                        logger.info(f"\n🤔 NOIRA'S THINKING:\n{'-' * 40}")
+                        logger.info(thinking_content)
+                        logger.info('-' * 40)
+                    
                     # Check if there are tool calls
                     if not thinking_response.choices[0].message.tool_calls:
                         logger.info("🎯 No more tool calls needed, proceeding to response phase...")
                         break
                     
                     # Execute tool calls
-                    logger.info(f"🔧 Executing {len(thinking_response.choices[0].message.tool_calls)} tool calls...")
+                    logger.info(f"\n🔧 TOOL CALLS ({len(thinking_response.choices[0].message.tool_calls)} total):")
+                    logger.info("=" * 60)
+                    
+                    # Log each tool call before execution
+                    for i, tc in enumerate(thinking_response.choices[0].message.tool_calls, 1):
+                        logger.info(f"\n📌 Tool Call #{i}:")
+                        logger.info(f"   Tool: {tc.function.name}")
+                        logger.info(f"   Arguments: {tc.function.arguments}")
+                    logger.info("=" * 60)
                     
                     # Store the assistant message with tool calls
                     assistant_msg_with_tools = {
@@ -246,7 +268,14 @@ Be strategic about tool usage - only call tools when you need actual data."""
                         })
                         
                         if result["success"]:
-                            logger.info(f"✅ Tool {tool_name}: {result['summary']}")
+                            logger.info(f"\n✅ Tool {tool_name} succeeded:")
+                            logger.info(f"   Summary: {result['summary']}")
+                            if 'data' in result and isinstance(result['data'], dict):
+                                # Log key data points without overwhelming the log
+                                if 'blocks_placed' in result['data']:
+                                    logger.info(f"   Blocks placed: {result['data']['blocks_placed']}")
+                                elif 'project_id' in result['data']:
+                                    logger.info(f"   Project ID: {result['data']['project_id']}")
                             enhanced_context["tool_data"] = enhanced_context.get("tool_data", [])
                             enhanced_context["tool_data"].append({
                                 "tool": tool_name,
@@ -254,7 +283,8 @@ Be strategic about tool usage - only call tools when you need actual data."""
                                 "summary": result["summary"]
                             })
                         else:
-                            logger.error(f"❌ Tool {tool_name} failed: {result['error']}")
+                            logger.error(f"\n❌ Tool {tool_name} failed:")
+                            logger.error(f"   Error: {result['error']}")
                     
                     # Store this iteration's calls and responses
                     all_tool_calls.append({
@@ -318,10 +348,20 @@ Be strategic about tool usage - only call tools when you need actual data."""
             logger.info(f"📚 Chat History Updated: {len(self.chat_history)} total messages")
             logger.info("=" * 60)
             
+            # Extract tool details for frontend display
+            tool_details = []
+            for tr in tool_results:
+                if tr["result"]["success"]:
+                    tool_details.append({
+                        "tool_name": tr["tool_name"],
+                        "summary": tr["result"]["summary"]
+                    })
+            
             return {
                 "success": True,
                 "response": assistant_response,
                 "tools_used": len(tool_results),
+                "tool_details": tool_details,
                 "usage": total_usage,
                 "timestamp": datetime.now().isoformat()
             }
