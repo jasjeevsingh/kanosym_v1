@@ -446,11 +446,47 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
   const [rangeMin, setRangeMin] = useState('');
   const [rangeMax, setRangeMax] = useState('');
   const [steps, setSteps] = useState('');
+  const [volatility, setVolatility] = useState('');
+  const [fetchingVol, setFetchingVol] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+
+  // Helper to get default date range (last 6 months)
+  function getDefaultDates() {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(end.getMonth() - 6);
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+    };
+  }
+
+  async function handleFetchVolatility() {
+    setFetchingVol(true);
+    setFetchError('');
+    const { start, end } = getDefaultDates();
+    try {
+      const res = await fetch('http://localhost:5001/api/fetch_volatility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols: [asset], start, end, window: 60 }),
+      });
+      const data = await res.json();
+      if (data.success && data.volatility && data.volatility[asset] && typeof data.volatility[asset] === 'number') {
+        setVolatility(data.volatility[asset].toFixed(4));
+      } else {
+        setFetchError(data.volatility && data.volatility[asset] ? data.volatility[asset] : 'Could not fetch volatility.');
+      }
+    } catch (err) {
+      setFetchError('Error fetching volatility.');
+    }
+    setFetchingVol(false);
+  }
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
     // For now, just log the values
-    console.log({ asset, parameter, rangeMin, rangeMax, steps });
+    console.log({ asset, parameter, rangeMin, rangeMax, steps, volatility });
     onClose();
   }
 
@@ -493,12 +529,36 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
               <option value="weight">Weight</option>
             </select>
           </div>
+          {parameter === 'volatility' && (
+            <div>
+              <label className="block text-zinc-700 text-sm mb-1">Volatility</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  step="0.0001"
+                  className="w-full border border-zinc-300 rounded px-2 py-1"
+                  value={volatility}
+                  onChange={e => setVolatility(e.target.value)}
+                  placeholder="e.g. 0.25"
+                  required
+                />
+                <button
+                  type="button"
+                  className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                  onClick={handleFetchVolatility}
+                  disabled={!asset || fetchingVol}
+                >
+                  {fetchingVol ? 'Fetching...' : 'Auto-fetch'}
+                </button>
+              </div>
+              {fetchError && <div className="text-xs text-red-600 mt-1">{fetchError}</div>}
+            </div>
+          )}
           <div className="flex space-x-2">
             <div className="flex-1">
               <label className="block text-zinc-700 text-sm mb-1">Range Min</label>
               <input
                 type="number"
-                step="any"
                 className="w-full border border-zinc-300 rounded px-2 py-1"
                 value={rangeMin}
                 onChange={e => setRangeMin(e.target.value)}
@@ -509,7 +569,6 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
               <label className="block text-zinc-700 text-sm mb-1">Range Max</label>
               <input
                 type="number"
-                step="any"
                 className="w-full border border-zinc-300 rounded px-2 py-1"
                 value={rangeMax}
                 onChange={e => setRangeMax(e.target.value)}
@@ -527,14 +586,12 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
               required
             />
           </div>
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-            >
-              Save
-            </button>
-          </div>
+          <button
+            type="submit"
+            className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-bold"
+          >
+            Save
+          </button>
         </form>
       </div>
     </div>
@@ -1721,6 +1778,131 @@ function App() {
         ? 'Hybrid Portfolio Sensitivity Test'
         : 'Quantum Portfolio Sensitivity Test';
 
+    const [fetchingVols, setFetchingVols] = useState<{[idx: number]: boolean}>({});
+    const [fetchErrors, setFetchErrors] = useState<{[idx: number]: string}>({});
+
+    function getDefaultDates() {
+      const end = new Date();
+      const start = new Date();
+      start.setMonth(end.getMonth() - 6);
+      return {
+        start: start.toISOString().slice(0, 10),
+        end: end.toISOString().slice(0, 10),
+      };
+    }
+
+    async function handleFetchVolatilityForAsset(idx: number, params?: any): Promise<boolean> {
+      setFetchingVols(prev => ({ ...prev, [idx]: true }));
+      setFetchErrors(prev => ({ ...prev, [idx]: '' }));
+      const symbol = form.portfolio.assets[idx];
+      const { start, end, window, frequency } = params || { ...getDefaultDates(), window: 60, frequency: '1d' };
+      try {
+        const res = await fetch('http://localhost:5001/api/fetch_volatility', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols: [symbol], start, end, window, frequency }),
+        });
+        const data = await res.json();
+        if (data.success && data.volatility && typeof data.volatility[symbol] === 'number') {
+          handleVolatilityChange(idx, data.volatility[symbol].toFixed(4));
+          setFetchingVols(prev => ({ ...prev, [idx]: false }));
+          return true;
+        } else {
+          setFetchErrors(prev => ({ ...prev, [idx]: data.volatility && data.volatility[symbol] ? data.volatility[symbol] : 'Could not fetch volatility.' }));
+          setFetchingVols(prev => ({ ...prev, [idx]: false }));
+          return false;
+        }
+      } catch (err) {
+        setFetchErrors(prev => ({ ...prev, [idx]: 'Error fetching volatility.' }));
+        setFetchingVols(prev => ({ ...prev, [idx]: false }));
+        return false;
+      }
+    }
+
+    const [showFetchModalIdx, setShowFetchModalIdx] = useState<number|null>(null);
+    const defaultFetchParams = { ...getDefaultDates(), window: 60, frequency: '1d' };
+
+    // Inside BlockEditModal, before the return statement:
+    function FetchVolatilityModal({ open, onClose, onFetch, defaultParams }: { open: boolean; onClose: () => void; onFetch: (params: { start: string; end: string; window: number; frequency: string; volType: string; }) => Promise<boolean>; defaultParams: any }) {
+      const [start, setStart] = useState(defaultParams.start);
+      const [end, setEnd] = useState(defaultParams.end);
+      const [windowSize, setWindowSize] = useState(defaultParams.window);
+      const [frequency, setFrequency] = useState(defaultParams.frequency || '1d');
+      const [volType, setVolType] = useState('historical'); // Only one option for now
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      async function handleSubmit(e?: React.FormEvent) {
+        if (e) e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          const success = await onFetch({ start, end, window: windowSize, frequency, volType });
+          if (success) {
+            onClose();
+          } else {
+            setError('Could not fetch volatility.');
+          }
+        } catch (err) {
+          setError('Error fetching volatility.');
+          if (err instanceof Error) {
+            console.error('FetchVolatilityModal handleSubmit error:', err.message, err.stack);
+          } else {
+            console.error('FetchVolatilityModal handleSubmit error:', err);
+          }
+        }
+        setLoading(false);
+      }
+
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] relative">
+            <button
+              className="absolute top-2 right-2 text-zinc-500 hover:text-zinc-800 text-xl font-bold"
+              onClick={onClose}
+            >
+              ×
+            </button>
+            <div className="text-lg font-bold mb-4 text-zinc-800">Custom Volatility Fetch</div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Start Date</label>
+                <input type="date" className="w-full border border-zinc-300 rounded px-2 py-1" value={start} onChange={e => setStart(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">End Date</label>
+                <input type="date" className="w-full border border-zinc-300 rounded px-2 py-1" value={end} onChange={e => setEnd(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Window Size (days)</label>
+                <input type="number" className="w-full border border-zinc-300 rounded px-2 py-1" value={windowSize} onChange={e => setWindowSize(Number(e.target.value))} min={2} max={252} required />
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Frequency (optional)</label>
+                <select className="w-full border border-zinc-300 rounded px-2 py-1" value={frequency} onChange={e => setFrequency(e.target.value)}>
+                  <option value="1d">Daily</option>
+                  <option value="1wk">Weekly</option>
+                  <option value="1mo">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-zinc-700 text-sm mb-1">Volatility Type</label>
+                <select className="w-full border border-zinc-300 rounded px-2 py-1" value={volType} onChange={e => setVolType(e.target.value)}>
+                  <option value="historical">Historical (stddev)</option>
+                  {/* Future: <option value="ewma">EWMA</option> */}
+                </select>
+              </div>
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+              <button type="button" className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-bold" disabled={loading} onClick={handleSubmit}>
+                {loading ? 'Fetching...' : 'Fetch'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return open ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
         <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-6 min-w-[800px] max-w-[1000px] max-h-[90vh] overflow-y-auto">
@@ -1811,14 +1993,35 @@ function App() {
                         
                         <div>
                           <label className="block text-xs text-zinc-400 mb-1">Volatility</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={form.portfolio.volatility[idx]}
-                            onChange={e => handleVolatilityChange(idx, e.target.value)}
-                          />
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={form.portfolio.volatility[idx]}
+                              onChange={e => handleVolatilityChange(idx, e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                              onClick={() => handleFetchVolatilityForAsset(idx)}
+                              onContextMenu={e => { e.preventDefault(); setShowFetchModalIdx(idx); }}
+                              disabled={!form.portfolio.assets[idx] || fetchingVols[idx]}
+                              title="Left click: auto-fetch. Right click: custom fetch."
+                            >
+                              {fetchingVols[idx] ? 'Fetching...' : 'Auto-fetch'}
+                            </button>
+                          </div>
+                          {fetchErrors[idx] && <div className="text-xs text-red-400 mt-1">{fetchErrors[idx]}</div>}
+                          {showFetchModalIdx === idx && (
+                            <FetchVolatilityModal
+                              open={true}
+                              onClose={() => setShowFetchModalIdx(null)}
+                              defaultParams={defaultFetchParams}
+                              onFetch={params => handleFetchVolatilityForAsset(idx, params)}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>

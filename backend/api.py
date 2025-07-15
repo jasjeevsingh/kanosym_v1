@@ -18,6 +18,7 @@ from file_manager import FileManager
 import numpy as np
 from datetime import datetime
 import math
+from price_data import get_asset_volatility
 
 # Load environment variables
 load_dotenv()
@@ -1020,6 +1021,36 @@ def delete_project_file(project_name):
             return jsonify({"success": False, "error": "File not found"}), 404
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/fetch_volatility', methods=['POST'])
+def fetch_volatility():
+    """
+    Fetch historical volatility for a list of asset symbols.
+    Expects JSON: {"symbols": ["AAPL", "GOOGL"], "start": "2023-01-01", "end": "2024-01-01", "window": 252}
+    """
+    data = request.get_json()
+    symbols = data.get('symbols')
+    start = data.get('start')
+    end = data.get('end')
+    window = data.get('window', 252)
+
+    if not symbols or not isinstance(symbols, list):
+        return jsonify({"success": False, "error": "'symbols' must be a list of asset symbols."}), 400
+    if not start or not end:
+        return jsonify({"success": False, "error": "'start' and 'end' dates are required."}), 400
+
+    results = {}
+    for symbol in symbols:
+        try:
+            vol = get_asset_volatility(symbol, start, end, window)
+            if vol is not None:
+                results[symbol] = vol
+            else:
+                results[symbol] = "Insufficient data or error."
+        except Exception as e:
+            results[symbol] = f"Error: {str(e)}"
+
+    return jsonify({"success": True, "volatility": results})
 
 class NoPollingRequestFilter(logging.Filter):
     """Filter out frequent polling requests from Flask logs"""
