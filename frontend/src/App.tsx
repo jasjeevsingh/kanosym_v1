@@ -1864,7 +1864,7 @@ function App() {
             >
               ×
             </button>
-            <div className="text-lg font-bold mb-4 text-zinc-800">Custom Volatility Fetch</div>
+            <div className="text-lg font-bold mb-4 text-zinc-800">Fetching Historical Volatility</div>
             <div className="space-y-4">
               <div>
                 <label className="block text-zinc-700 text-sm mb-1">Start Date</label>
@@ -1895,7 +1895,7 @@ function App() {
               </div>
               {error && <div className="text-red-500 text-sm">{error}</div>}
               <button type="button" className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-bold" disabled={loading} onClick={handleSubmit}>
-                {loading ? 'Fetching...' : 'Fetch'}
+                {loading ? 'Fetching...' : 'Compute'}
               </button>
             </div>
           </div>
