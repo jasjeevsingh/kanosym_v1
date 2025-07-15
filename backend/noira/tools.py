@@ -45,14 +45,14 @@ NOIRA_TOOLS = [
         "type": "function",
         "function": {
             "name": "search_test_runs",
-            "description": "Search for test runs by date range or get the most recent test runs",
+            "description": "Search for test runs using any combination of filters. If no filters provided, returns recent test runs.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "date_filter": {
                         "type": "string",
                         "enum": ["today", "yesterday", "this_week", "last_week", "last_month", "specific_date", "date_range", "recent"],
-                        "description": "Type of date filter to apply"
+                        "description": "Optional: Type of date filter to apply. Defaults to 'recent' if not specified."
                     },
                     "specific_date": {
                         "type": "string",
@@ -75,19 +75,23 @@ NOIRA_TOOLS = [
                     },
                     "project_filter": {
                         "type": "string",
-                        "description": "Optional: filter results to a specific project name"
+                        "description": "Filter results to a specific project by name (exact or partial match) or project ID"
                     },
                     "asset_filter": {
                         "type": "string",
-                        "description": "Optional: filter results to a specific asset (e.g., 'AAPL')"
+                        "description": "Filter results to a specific asset (e.g., 'AAPL')"
                     },
                     "block_type_filter": {
                         "type": "string",
                         "enum": ["classical", "hybrid", "quantum"],
-                        "description": "Optional: filter results to a specific block type"
+                        "description": "Filter results to a specific block type"
+                    },
+                    "test_run_id_prefix": {
+                        "type": "string",
+                        "description": "Filter results by test run ID prefix (e.g., 'test-run-2025')"
                     }
                 },
-                "required": ["date_filter"]
+                "required": []
             }
         }
     },

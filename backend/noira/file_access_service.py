@@ -138,20 +138,55 @@ class NoiraFileAccessService:
         }
     
     def _handle_search_test_runs(self, arguments: dict) -> dict:
-        """Handle search_test_runs tool call"""
-        date_filter = arguments.get("date_filter")
+        """Handle search_test_runs tool call - now with flexible filtering"""
+        # Default to 'recent' if no date_filter specified
+        date_filter = arguments.get("date_filter", "recent")
         limit = arguments.get("limit", 10)
         
         # Get all test runs
         all_test_runs = self.file_manager.list_test_runs()
         
-        # Apply date filtering
-        filtered_runs = self._filter_test_runs_by_date(all_test_runs, date_filter, arguments)
+        # Sort by timestamp for 'recent' mode
+        if date_filter == "recent" or not any([
+            arguments.get("project_filter"),
+            arguments.get("asset_filter"),
+            arguments.get("block_type_filter"),
+            arguments.get("test_run_id_prefix")
+        ]):
+            # Sort by timestamp descending for recent results
+            all_test_runs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Apply date filtering if not 'recent'
+        if date_filter != "recent":
+            filtered_runs = self._filter_test_runs_by_date(all_test_runs, date_filter, arguments)
+        else:
+            filtered_runs = all_test_runs
         
         # Apply additional filters
         if arguments.get("project_filter"):
-            project_filter = arguments["project_filter"].lower()
-            filtered_runs = [tr for tr in filtered_runs if project_filter in tr.get("project_id", "").lower()]
+            project_filter = arguments["project_filter"]
+            
+            # First try to find project by name to get its ID
+            project_id_to_match = None
+            projects = self.file_manager.list_projects()
+            for project in projects:
+                if project_filter.lower() == project["name"].lower():
+                    project_id_to_match = project["project_id"]
+                    break
+            
+            # If exact match not found, try partial match
+            if not project_id_to_match:
+                for project in projects:
+                    if project_filter.lower() in project["name"].lower():
+                        project_id_to_match = project["project_id"]
+                        break
+            
+            # Filter by project_id if found, otherwise filter by the original string
+            if project_id_to_match:
+                filtered_runs = [tr for tr in filtered_runs if tr.get("project_id") == project_id_to_match]
+            else:
+                # Fallback: check if filter string is in project_id (in case user provided the ID directly)
+                filtered_runs = [tr for tr in filtered_runs if project_filter.lower() in tr.get("project_id", "").lower()]
         
         if arguments.get("asset_filter"):
             asset_filter = arguments["asset_filter"].upper()
@@ -160,7 +195,25 @@ class NoiraFileAccessService:
         if arguments.get("block_type_filter"):
             filtered_runs = [tr for tr in filtered_runs if tr.get("block_type") == arguments["block_type_filter"]]
         
+        if arguments.get("test_run_id_prefix"):
+            prefix = arguments["test_run_id_prefix"]
+            filtered_runs = [tr for tr in filtered_runs if tr.get("test_run_id", "").startswith(prefix)]
+        
+        # Build summary of applied filters
+        filters_applied = []
+        if date_filter != "recent":
+            filters_applied.append(f"date={date_filter}")
+        if arguments.get("project_filter"):
+            filters_applied.append(f"project='{arguments['project_filter']}'")
+        if arguments.get("asset_filter"):
+            filters_applied.append(f"asset={arguments['asset_filter']}")
+        if arguments.get("block_type_filter"):
+            filters_applied.append(f"block_type={arguments['block_type_filter']}")
+        if arguments.get("test_run_id_prefix"):
+            filters_applied.append(f"id_prefix='{arguments['test_run_id_prefix']}'")
+        
         # Limit results
+        total_matches = len(filtered_runs)
         filtered_runs = filtered_runs[:limit]
         
         # Load full data for each test run
@@ -170,10 +223,18 @@ class NoiraFileAccessService:
             if full_data:
                 results.append(self._format_test_run_data(full_data))
         
+        # Create descriptive summary
+        if filters_applied:
+            summary = f"Found {len(results)} test runs (of {total_matches} total) matching: {', '.join(filters_applied)}"
+        else:
+            summary = f"Found {len(results)} most recent test runs (of {total_matches} total)"
+        
         return {
             "success": True,
             "data": results,
-            "summary": f"Found {len(results)} test runs matching criteria"
+            "summary": summary,
+            "total_matches": total_matches,
+            "filters_applied": filters_applied
         }
     
     def _handle_list_projects(self, arguments: dict) -> dict:
@@ -206,6 +267,10 @@ class NoiraFileAccessService:
     
     def _filter_test_runs_by_date(self, test_runs: List[Dict], date_filter: str, arguments: dict) -> List[Dict]:
         """Filter test runs by date criteria"""
+        if date_filter == "recent":
+            # Return all test runs sorted by timestamp
+            return sorted(test_runs, key=lambda x: x.get("timestamp", ""), reverse=True)
+        
         today = date.today()
         
         if date_filter == "today":
@@ -238,9 +303,6 @@ class NoiraFileAccessService:
                 end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
             else:
                 return test_runs  # No valid range provided
-        elif date_filter == "recent":
-            # Just return all, sorted by date (newest first)
-            return sorted(test_runs, key=lambda x: x["timestamp"], reverse=True)
         else:
             return test_runs
         
