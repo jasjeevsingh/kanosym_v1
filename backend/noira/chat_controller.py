@@ -10,8 +10,15 @@ import os
 import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-import openai
 from openai import OpenAI
+import sys
+import os
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from file_manager import FileManager
+from noira.file_access_service import NoiraFileAccessService
+from noira.tools import NOIRA_TOOLS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +39,10 @@ class ChatController:
         self.model: str = "gpt-4o"
         self.max_tokens: int = 1000
         self.temperature: float = 0.7
+        
+        # Initialize file access service
+        self.file_manager = FileManager()
+        self.file_access_service = NoiraFileAccessService(self.file_manager)
         
         # Add welcome message
         self.chat_history.append({
@@ -91,13 +102,14 @@ class ChatController:
             "timestamp": datetime.now().isoformat()
         }
     
-    def send_message(self, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def send_message(self, message: str, context: Optional[Dict[str, Any]] = None, use_tools: bool = True) -> Dict[str, Any]:
         """
-        Send a message to the OpenAI API and get response.
+        Send a message to the OpenAI API and get response, optionally using function calling.
         
         Args:
             message: User message to send
             context: Optional context about current portfolio/analysis state
+            use_tools: Whether to enable function calling for data retrieval (default: True)
             
         Returns:
             Dictionary with response and metadata
@@ -110,57 +122,168 @@ class ChatController:
             }
         
         try:
-            # Log full context and message details being sent to Noira
             logger.info("=" * 60)
-            logger.info("🤖 SENDING MESSAGE TO NOIRA")
+            logger.info(f"🤖 SENDING MESSAGE TO NOIRA (tools={'enabled' if use_tools else 'disabled'})")
             logger.info("=" * 60)
             logger.info(f"Model: {self.model}")
             logger.info(f"Max Tokens: {self.max_tokens}")
             logger.info(f"Temperature: {self.temperature}")
-            logger.info(f"Timestamp: {datetime.now().isoformat()}")
+            logger.info(f"Use Tools: {use_tools}")
             
-            if context:
-                logger.info("\n📊 CONTEXT PROVIDED:")
-                logger.info("-" * 40)
-                logger.info(json.dumps(context, indent=2))
-            else:
-                logger.info("\n📊 CONTEXT: None provided")
-            
-            # Prepare system message with context
-            system_message = self._build_system_message(context)
-            
-            logger.info("\n🔧 SYSTEM MESSAGE:")
-            logger.info("-" * 40)
-            logger.info(system_message)
-            
-            # Build messages array with history
-            messages = [{"role": "system", "content": system_message}]
-            
-            # Add recent chat history (last 10 messages to stay within token limits)
+            # Get recent chat history
             recent_history = self.chat_history[-10:] if len(self.chat_history) > 10 else self.chat_history
+            
+            enhanced_context = context.copy() if context else {}
+            tool_results = []
+            all_tool_calls = []  # Track all tool calls across iterations
+            thinking_responses = []  # Track all thinking responses for usage
+            
+            # Tool usage loop (if enabled)
+            if use_tools:
+                iteration = 0
+                max_iterations = 5  # Prevent infinite loops
+                
+                while iteration < max_iterations:
+                    iteration += 1
+                    logger.info(f"\n🧠 TOOL PHASE (Iteration {iteration}): Analyzing request for potential tool usage...")
+                    
+                    thinking_system_prompt = self._build_system_message(enhanced_context) + """
+
+THINKING MODE: You are in thinking mode. Analyze the user's request and determine:
+1. What information they need
+2. Which tools (if any) you should use to get that information
+3. How you'll structure your response
+
+You have access to these tools:
+- load_project: Load project configuration and state
+- load_test_run: Load specific test run results  
+- search_test_runs: Search test runs by date or filters
+- list_projects: List all available projects
+
+IMPORTANT: Always list/search before loading:
+- Use list_projects() BEFORE load_project() to ensure the project exists
+- Use search_test_runs() BEFORE load_test_run() to verify the test run exists
+- You can make multiple tool calls in sequence
+- If search returns empty results, DO NOT attempt to load non-existent items
+
+Be strategic about tool usage - only call tools when you need actual data."""
+                    
+                    # Include previous tool results in context
+                    if tool_results:
+                        thinking_system_prompt += "\n\nPrevious tool results:\n"
+                        for tr in tool_results:
+                            if tr["result"]["success"]:
+                                thinking_system_prompt += f"- {tr['result']['summary']}\n"
+                    
+                    thinking_messages = [
+                        {"role": "system", "content": thinking_system_prompt}
+                    ]
+                    thinking_messages.extend(recent_history)
+                    thinking_messages.append({"role": "user", "content": message})
+                    
+                    # Add previous tool calls to conversation
+                    for tc in all_tool_calls:
+                        thinking_messages.append(tc["assistant_message"])
+                        # Add each tool response individually
+                        for tool_resp in tc["tool_responses"]:
+                            thinking_messages.append(tool_resp)
+                    
+                    # Get thinking response with potential tool calls
+                    thinking_response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=thinking_messages,
+                        tools=NOIRA_TOOLS,
+                        tool_choice="auto",
+                        max_tokens=500,
+                        temperature=0.3  # Lower temperature for reasoning
+                    )
+                    
+                    # Store thinking response for usage tracking
+                    thinking_responses.append(thinking_response)
+                    
+                    # Check if there are tool calls
+                    if not thinking_response.choices[0].message.tool_calls:
+                        logger.info("🎯 No more tool calls needed, proceeding to response phase...")
+                        break
+                    
+                    # Execute tool calls
+                    logger.info(f"🔧 Executing {len(thinking_response.choices[0].message.tool_calls)} tool calls...")
+                    
+                    # Store the assistant message with tool calls
+                    assistant_msg_with_tools = {
+                        "role": "assistant",
+                        "content": thinking_response.choices[0].message.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in thinking_response.choices[0].message.tool_calls
+                        ]
+                    }
+                    
+                    tool_responses = []
+                    
+                    for tool_call in thinking_response.choices[0].message.tool_calls:
+                        tool_name = tool_call.function.name
+                        tool_args = json.loads(tool_call.function.arguments)
+                        
+                        result = self.file_access_service.execute_tool_call(tool_name, tool_args)
+                        tool_results.append({
+                            "tool_name": tool_name,
+                            "result": result
+                        })
+                        
+                        # Create tool response message
+                        tool_response_content = json.dumps(result["data"] if result["success"] else {"error": result.get("error", "Unknown error")})
+                        tool_responses.append({
+                            "role": "tool",
+                            "content": tool_response_content,
+                            "tool_call_id": tool_call.id
+                        })
+                        
+                        if result["success"]:
+                            logger.info(f"✅ Tool {tool_name}: {result['summary']}")
+                            enhanced_context["tool_data"] = enhanced_context.get("tool_data", [])
+                            enhanced_context["tool_data"].append({
+                                "tool": tool_name,
+                                "data": result["data"],
+                                "summary": result["summary"]
+                            })
+                        else:
+                            logger.error(f"❌ Tool {tool_name} failed: {result['error']}")
+                    
+                    # Store this iteration's calls and responses
+                    all_tool_calls.append({
+                        "assistant_message": assistant_msg_with_tools,
+                        "tool_responses": tool_responses  # Store individual tool responses
+                    })
+                
+                if iteration >= max_iterations:
+                    logger.warning("⚠️ Reached maximum tool iterations, proceeding to response phase...")
+            
+            # Response Phase: Generate final response
+            logger.info("\n💬 RESPONSE PHASE: Generating final response...")
+            
+            # Build system message with any tool results
+            system_message = self._build_system_message(enhanced_context)
+            
+            if tool_results:
+                tool_summary = "\n\nI have retrieved the following data for you:\n"
+                for tr in tool_results:
+                    if tr["result"]["success"]:
+                        tool_summary += f"- {tr['result']['summary']}\n"
+                system_message += tool_summary
+            
+            # Build final messages
+            messages = [{"role": "system", "content": system_message}]
             messages.extend(recent_history)
-            
-            logger.info(f"\n💬 CHAT HISTORY: {len(recent_history)} messages included")
-            if recent_history:
-                logger.info("-" * 40)
-                for i, hist_msg in enumerate(recent_history):
-                    role = hist_msg.get('role', 'unknown')
-                    content = hist_msg.get('content', '')
-                    content_preview = content[:100] + "..." if len(content) > 100 else content
-                    logger.info(f"  [{i+1}] {role}: {content_preview}")
-            
-            # Add current user message
             messages.append({"role": "user", "content": message})
             
-            logger.info(f"\n📝 USER MESSAGE:")
-            logger.info("-" * 40)
-            logger.info(message)
-            logger.info(f"\nMessage Length: {len(message)} characters")
-            
-            logger.info(f"\n📤 TOTAL MESSAGES TO API: {len(messages)}")
-            
-            # Send to OpenAI
-            logger.info("\n🚀 Sending to OpenAI API...")
+            # Generate response
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -170,34 +293,36 @@ class ChatController:
             
             assistant_response = response.choices[0].message.content
             
-            logger.info("\n✅ RECEIVED RESPONSE:")
-            logger.info("-" * 40)
-            logger.info(assistant_response)
-            logger.info(f"\nResponse Length: {len(assistant_response) if assistant_response else 0} characters")
+            logger.info(f"\n✅ RESPONSE GENERATED ({len(tool_results)} tools used)")
+            logger.info(f"Response Length: {len(assistant_response) if assistant_response else 0} characters")
             
-            # Log token usage
-            if hasattr(response, 'usage'):
-                logger.info(f"\n💰 TOKEN USAGE:")
-                logger.info("-" * 40)
-                logger.info(f"  Prompt Tokens: {response.usage.prompt_tokens}")
-                logger.info(f"  Completion Tokens: {response.usage.completion_tokens}")
-                logger.info(f"  Total Tokens: {response.usage.total_tokens}")
+            # Calculate total usage
+            total_usage = {
+                "prompt_tokens": response.usage.prompt_tokens if hasattr(response, 'usage') else 0,
+                "completion_tokens": response.usage.completion_tokens if hasattr(response, 'usage') else 0,
+                "total_tokens": response.usage.total_tokens if hasattr(response, 'usage') else 0
+            }
+            
+            # Add usage from all thinking iterations
+            if use_tools:
+                for thinking_resp in thinking_responses:
+                    if hasattr(thinking_resp, 'usage'):
+                        total_usage["prompt_tokens"] += thinking_resp.usage.prompt_tokens
+                        total_usage["completion_tokens"] += thinking_resp.usage.completion_tokens
+                        total_usage["total_tokens"] += thinking_resp.usage.total_tokens
             
             # Add to chat history
             self.chat_history.append({"role": "user", "content": message})
             self.chat_history.append({"role": "assistant", "content": assistant_response})
             
-            logger.info(f"\n📚 Chat History Updated: {len(self.chat_history)} total messages")
+            logger.info(f"📚 Chat History Updated: {len(self.chat_history)} total messages")
             logger.info("=" * 60)
             
             return {
                 "success": True,
                 "response": assistant_response,
-                "usage": {
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
-                },
+                "tools_used": len(tool_results),
+                "usage": total_usage,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -223,7 +348,17 @@ class ChatController:
         Returns:
             System message string
         """
-        base_message = """You are Noira, an AI chatbot specialized in quantum portfolio analysis and the KANOSYM platform. 
+        # Get the path to the system prompt file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        prompt_file = os.path.join(current_dir, 'system_prompt.txt')
+        
+        # Read the system prompt from file
+        try:
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                base_message = f.read().strip()
+        except FileNotFoundError:
+            logger.warning(f"System prompt file not found at {prompt_file}. Using default prompt.")
+            base_message = """You are Noira, an AI chatbot specialized in quantum portfolio analysis and the KANOSYM platform. 
         
 You help users understand:
 - Portfolio optimization and risk analysis
