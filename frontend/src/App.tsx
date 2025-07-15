@@ -10,6 +10,23 @@ import ResultsChart from './ResultsChart';
 import NoiraPanel from './NoiraPanel';
 import ProjectExplorerPanel from './ProjectExplorerPanel';
 import { triggerProjectAutosave, autosaveManager } from './autosave';
+import { useProjectDeletion } from './hooks/useProjectDeletion';
+
+// Component to monitor a single project for deletion
+function ProjectDeletionMonitor({ projectId, projectName, onDeleted }: { 
+  projectId: string; 
+  projectName: string; 
+  onDeleted: () => void;
+}) {
+  useProjectDeletion({
+    projectId,
+    projectName,
+    onDeleted,
+  });
+  
+  // This component doesn't render anything
+  return null;
+}
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -731,6 +748,9 @@ function App() {
   // Real projects state loaded from backend
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [projectRefreshTrigger, setProjectRefreshTrigger] = useState(0);
+  
+  // Notification state for auto-closed projects
+  const [deletedProjectNotification, setDeletedProjectNotification] = useState<string | null>(null);
 
   // Project tab state
   const [openProjects, setOpenProjects] = useState<Array<{ id: string; name: string }>>([]);
@@ -1967,7 +1987,41 @@ function App() {
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      {/* Monitor each open project for deletion */}
+      {openProjects.map(project => (
+        <ProjectDeletionMonitor
+          key={project.id}
+          projectId={project.id}
+          projectName={project.name}
+          onDeleted={() => {
+            console.log(`Auto-closing deleted project: ${project.name}`);
+            // Show notification
+            setDeletedProjectNotification(`Project "${project.name}" was deleted from the file system and has been closed.`);
+            // Close the project
+            closeProject(project.id);
+            // Refresh project list
+            setProjectRefreshTrigger(prev => prev + 1);
+            // Clear notification after 5 seconds
+            setTimeout(() => setDeletedProjectNotification(null), 5000);
+          }}
+        />
+      ))}
       <div className="h-screen w-screen flex flex-col relative" onClick={handleCloseContextMenu}>
+        {/* Notification for deleted projects */}
+        {deletedProjectNotification && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{deletedProjectNotification}</span>
+            <button 
+              onClick={() => setDeletedProjectNotification(null)}
+              className="ml-4 text-white hover:text-gray-200"
+            >
+              ×
+            </button>
+          </div>
+        )}
         <LayoutToggles
           showNoira={showNoira}
           setShowNoira={setShowNoira}
