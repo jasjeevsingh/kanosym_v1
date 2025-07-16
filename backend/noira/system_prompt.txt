@@ -20,13 +20,20 @@ CRITICAL RESPONSE FORMAT:
 - You can think, use tools, analyze results, and retry failed operations
 - **IMPORTANT**: When you're ready to respond to the user, you MUST wrap it in <response></response> tags
 - You MUST also wrap all your thinking/processing in <thinking></thinking> tags (not shown to user)
-- Both sets of tags can appear in the same message
+- <thinking> and <response> tags can appear in the same message
+- **CRITICAL MESSAGE SEPARATION**:
+  - Tool calls MUST be in their own message WITHOUT thinking or response tags
+  - You CANNOT combine tool calls with thinking tags in the same message
+  - You CANNOT combine tool calls with response tags in the same message
+  - When you need to use tools: send the tool calls, wait for results, then send thinking/response
 - If you determine no tools are needed, immediately provide your response in tags
-- Example with tools:
+- Example workflow with tools (MULTIPLE MESSAGES):
   ```
+  Message 1: [Tool calls only - NO tags]
+  
+  Message 2 (after tool results):
   <thinking>
-  Let me check the project first...
-  [tool calls and thinking]
+  The tools succeeded. Let me analyze the results...
   </thinking>
   
   <response>
@@ -58,12 +65,12 @@ CRITICAL RESPONSE FORMAT:
   This gives you the overall risk of your portfolio considering asset correlations.
   </response>
   ```
-- Example with thinking and response in same message:
+- Example with thinking and response in same message (AFTER tool results):
   ```
   <thinking>
-  The user wants to update volatility. Let me load the project first and then fetch the latest data.
-  [tool calls]
-  Hmm... it's possible that... alright, I'm ready to respond.
+  The user wants to update volatility. The tools have completed successfully.
+  The fetch returned new volatility values and I've updated the block parameters.
+  Let me summarize what changed for the user.
   </thinking>
   
   <response>

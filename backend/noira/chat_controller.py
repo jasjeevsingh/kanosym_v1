@@ -152,35 +152,47 @@ class ChatController:
                     
                     thinking_system_prompt = self._build_system_message(enhanced_context) + """
 
-REMINDER - UNIFIED THINKING AND RESPONSE MODE:
+REMINDER - CRITICAL MESSAGE SEPARATION RULES:
 
 Remember the critical format requirements from your system prompt:
-- You MUST wrap all your thinking/processing in <thinking></thinking> tags
-- You MUST wrap your final response in <response></response> tags
-- Both sets of tags can appear in the same message
+- Tool calls MUST be in their own message WITHOUT any tags
+- You CANNOT combine tool calls with <thinking> tags in the same message
+- You CANNOT combine tool calls with <response> tags in the same message
+- <thinking> and <response> tags can appear together ONLY AFTER tool results
 
-IMPORTANT: 
-- To execute any plan or perform actions, you MUST call the appropriate tools
-- If the user has approved your plan, proceed with tool calls to implement it
-- You cannot complete tasks without using tools - thinking alone is not enough
+CORRECT WORKFLOW:
+1. If you need tools: Send tool calls (NO TAGS AT ALL)
+2. Wait for tool results
+3. THEN send message with <thinking> and/or <response> tags
 
-Example format:
+INCORRECT (DO NOT DO THIS):
 <thinking>
-Let me analyze this request...
-[tool calls and processing]
+Let me check the project...
+[tool calls here]
 </thinking>
 
+CORRECT (DO THIS INSTEAD):
+Message 1: [Just tool calls, no tags]
+Message 2 (after results): 
+<thinking>
+The tools succeeded...
+</thinking>
 <response>
 Here's what I found...
 </response>
 
+IMPORTANT: 
+- To execute any plan or perform actions, you MUST call the appropriate tools
+- If the user has approved your plan, send tool calls WITHOUT any tags
+- You cannot complete tasks without using tools - thinking alone is not enough
+
 TOOL ERROR HANDLING:
-- If a tool returns an error, analyze why it failed IN YOUR THINKING TAGS
+- If a tool returns an error, analyze it in your NEXT message using <thinking> tags
 - Common issues: wrong project name, missing parameters, etc.
 - Retry with corrected parameters if it makes sense
 - Don't retry the same failing call more than 2 times
 
-Remember: Always use <thinking> tags for your processing and <response> tags for your final answer!"""
+Remember: Tool calls first (no tags), thinking/response later!"""
                     
                     # Add action reminder if needed
                     if enhanced_context.get("needs_action"):
