@@ -16,6 +16,7 @@ qiskit-aer==0.12.2
 
 # AI/ML
 openai>=1.0.0
+scikit-learn
 
 # Optional: Development & Testing (uncomment if needed)
 # pytest>=7.0.0

@@ -42,6 +42,14 @@ interface AnalyticsData {
     efficiency_gain_vs_classical: number;
     efficiency_gain_vs_quantum: number;
     optimal_hybrid_ratio: number;
+    mean_quantum_correction: number;
+    max_quantum_correction: number;
+    fraction_significant_correction: number;
+    hybrid_baseline_vs_quantum: number;
+    gp_interpolation_mse: number;
+    gp_kernel_length_scale: number;
+    gp_kernel_variance: number;
+    curve_shape_change: number;
   };
   sensitivity_metrics?: {
     max_sensitivity_point: number;
@@ -285,28 +293,36 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Q/C Ratio:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.quantum_classical_ratio, 4)}</span>
+                    <span className="text-zinc-400">Average Quantum Correction:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.mean_quantum_correction, 6)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Hybrid Overhead:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.hybrid_overhead, 4)}</span>
+                    <span className="text-zinc-400">Max Quantum Correction:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.max_quantum_correction, 6)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Synergy Factor:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.synergy_factor, 4)}</span>
+                    <span className="text-zinc-400">Scenarios with Significant Quantum Impact:</span>
+                    <span className="text-white font-mono">{(analytics.hybrid_metrics.fraction_significant_correction * 100).toFixed(2)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Efficiency vs Classical:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.efficiency_gain_vs_classical, 4)}</span>
+                    <span className="text-zinc-400">Hybrid vs Quantum Baseline Agreement:</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.hybrid_baseline_vs_quantum, 6)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Efficiency vs Quantum:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.efficiency_gain_vs_quantum, 4)}</span>
+                  <div className="flex justify-between" title="Mean squared error between GP fit and quantum-calibrated points (lower is better)">
+                    <span className="text-zinc-400">Quantum Correction Fit Error (MSE):</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.gp_interpolation_mse, 6)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Optimal Hybrid Ratio:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.optimal_hybrid_ratio, 4)}</span>
+                  <div className="flex justify-between" title="Length scale parameter of the GP kernel (higher = smoother correction)">
+                    <span className="text-zinc-400">Quantum Correction Surface Smoothness (Length Scale):</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.gp_kernel_length_scale, 4)}</span>
+                  </div>
+                  <div className="flex justify-between" title="Variance parameter of the GP kernel (higher = more variable correction)">
+                    <span className="text-zinc-400">Quantum Correction Surface Smoothness (Variance):</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.gp_kernel_variance, 4)}</span>
+                  </div>
+                  <div className="flex justify-between" title="Change in number of extrema (peaks/valleys) in the sensitivity curve after quantum correction">
+                    <span className="text-zinc-400">Change in Sensitivity Curve Shape:</span>
+                    <span className="text-white font-mono">{analytics.hybrid_metrics.curve_shape_change}</span>
                   </div>
                 </div>
               </div>
@@ -363,39 +379,93 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                   </div>
                 </div>
                 <div className="bg-zinc-700/50 rounded p-3">
-                  <div className="text-sm text-zinc-400 mb-1">Reliability</div>
-                  <div className="text-white font-medium">
-                    N/A
-                  </div>
-                </div>
-                <div className="bg-zinc-700/50 rounded p-3">
                   <div className="text-sm text-zinc-400 mb-1">Efficiency</div>
                   <div className="text-white font-medium">
                     {analytics.performance_metrics.memory_usage_mb < 100 ? 'Low' : analytics.performance_metrics.memory_usage_mb < 500 ? 'Medium' : 'High'} memory usage
                   </div>
                 </div>
-                {analytics.quantum_metrics && (
-                  <div className="bg-zinc-700/50 rounded p-3">
-                    <div className="text-sm text-zinc-400 mb-1">Quantum Advantage</div>
-                    <div className="text-white font-medium">
-                      {analytics.quantum_metrics.enhancement_factor > 1.1 ? 'Significant' : analytics.quantum_metrics.enhancement_factor > 1.05 ? 'Moderate' : 'Minimal'} enhancement
-                    </div>
-                  </div>
-                )}
-                {analytics.hybrid_metrics && (
-                  <div className="bg-zinc-700/50 rounded p-3">
-                    <div className="text-sm text-zinc-400 mb-1">Synergy</div>
-                    <div className="text-white font-medium">
-                      {analytics.hybrid_metrics.synergy_factor > 1.1 ? 'Strong' : analytics.hybrid_metrics.synergy_factor > 1.05 ? 'Moderate' : 'Weak'} quantum-classical synergy
-                    </div>
-                  </div>
-                )}
                 <div className="bg-zinc-700/50 rounded p-3">
                   <div className="text-sm text-zinc-400 mb-1">Statistical Quality</div>
                   <div className="text-white font-medium">
                     {analytics.statistical_metrics.coefficient_of_variation < 0.1 ? 'Excellent' : analytics.statistical_metrics.coefficient_of_variation < 0.2 ? 'Good' : 'Fair'} precision
                   </div>
                 </div>
+                
+                {/* Classical-specific insights */}
+                {analytics.mode === 'classical' && analytics.classical_metrics && (
+                  <>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Monte Carlo Convergence</div>
+                      <div className="text-white font-medium">
+                        {analytics.classical_metrics.convergence_rate > 0.95 ? 'Excellent' : analytics.classical_metrics.convergence_rate > 0.9 ? 'Good' : 'Fair'} convergence
+                      </div>
+                    </div>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Simulation Efficiency</div>
+                      <div className="text-white font-medium">
+                        {analytics.classical_metrics.monte_carlo_efficiency > 0.8 ? 'High' : analytics.classical_metrics.monte_carlo_efficiency > 0.5 ? 'Medium' : 'Low'} efficiency
+                      </div>
+                    </div>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Error Estimation</div>
+                      <div className="text-white font-medium">
+                        {analytics.classical_metrics.standard_error < 0.01 ? 'Excellent' : analytics.classical_metrics.standard_error < 0.05 ? 'Good' : 'Fair'} error bounds
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Quantum-specific insights */}
+                {analytics.mode === 'quantum' && analytics.quantum_metrics && (
+                  <>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Quantum Advantage</div>
+                      <div className="text-white font-medium">
+                        {analytics.quantum_metrics.enhancement_factor > 1.1 ? 'Significant' : analytics.quantum_metrics.enhancement_factor > 1.05 ? 'Moderate' : 'Minimal'} enhancement
+                      </div>
+                    </div>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Circuit Complexity</div>
+                      <div className="text-white font-medium">
+                        {analytics.quantum_metrics.circuit_depth > 10 ? 'High' : analytics.quantum_metrics.circuit_depth > 5 ? 'Medium' : 'Low'} complexity
+                      </div>
+                    </div>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Quantum Operations</div>
+                      <div className="text-white font-medium">
+                        {analytics.quantum_metrics.quantum_operations > 1000 ? 'High' : analytics.quantum_metrics.quantum_operations > 100 ? 'Medium' : 'Low'} operations
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Hybrid-specific insights */}
+                {analytics.mode === 'hybrid' && analytics.hybrid_metrics && (
+                  <>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Quantum Correction Quality</div>
+                      <div className="text-white font-medium">
+                        {analytics.hybrid_metrics.gp_interpolation_mse !== undefined ? 
+                         (analytics.hybrid_metrics.gp_interpolation_mse < 0.001 ? 'Excellent' : 
+                          analytics.hybrid_metrics.gp_interpolation_mse < 0.01 ? 'Good' : 'Fair') : 'N/A'} fit
+                      </div>
+                    </div>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Quantum Impact</div>
+                      <div className="text-white font-medium">
+                        {analytics.hybrid_metrics.mean_quantum_correction > 0.01 ? 'High' :
+                         analytics.hybrid_metrics.mean_quantum_correction > 0.001 ? 'Moderate' : 'Low'} correction magnitude
+                      </div>
+                    </div>
+                    <div className="bg-zinc-700/50 rounded p-3">
+                      <div className="text-sm text-zinc-400 mb-1">Correction Consistency</div>
+                      <div className="text-white font-medium">
+                        {analytics.hybrid_metrics.fraction_significant_correction > 0.5 ? 'High' :
+                         analytics.hybrid_metrics.fraction_significant_correction > 0.2 ? 'Moderate' : 'Low'} consistency
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
