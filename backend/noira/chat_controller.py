@@ -8,6 +8,7 @@ and debugging features for the Noira AI assistant.
 import json
 import os
 import logging
+import re
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from openai import OpenAI
@@ -138,42 +139,67 @@ class ChatController:
             all_tool_calls = []  # Track all tool calls across iterations
             thinking_responses = []  # Track all thinking responses for usage
             
-            # Tool usage loop (if enabled)
+            # Unified thinking and response loop
+            final_response = None
+            
             if use_tools:
                 iteration = 0
-                max_iterations = 5  # Prevent infinite loops
+                max_iterations = 30  # Increased to allow retries and multiple thinking steps
                 
-                while iteration < max_iterations:
+                while iteration < max_iterations and final_response is None:
                     iteration += 1
-                    logger.info(f"\n🧠 TOOL PHASE (Iteration {iteration}): Analyzing request for potential tool usage...")
+                    logger.info(f"\n🧠 THINKING ITERATION {iteration}: Processing...")
                     
                     thinking_system_prompt = self._build_system_message(enhanced_context) + """
 
-THINKING MODE: You are in thinking mode. Analyze the user's request and determine:
-1. What information they need
-2. Which tools (if any) you should use to get that information
-3. How you'll structure your response
+REMINDER - CRITICAL MESSAGE SEPARATION RULES:
 
-You have access to these tools:
-- load_project: Load project configuration and state
-- load_test_run: Load specific test run results  
-- search_test_runs: Search test runs by date or filters
-- list_projects: List all available projects
+Remember the critical format requirements from your system prompt:
+- Tool calls MUST be in their own message WITHOUT any tags
+- You CANNOT combine tool calls with <thinking> tags in the same message
+- You CANNOT combine tool calls with <response> tags in the same message
+- <thinking> and <response> tags can appear together ONLY AFTER tool results
 
-IMPORTANT: Always list/search before loading:
-- Use list_projects() BEFORE load_project() to ensure the project exists
-- Use search_test_runs() BEFORE load_test_run() to verify the test run exists
-- You can make multiple tool calls in sequence
-- If search returns empty results, DO NOT attempt to load non-existent items
+CORRECT WORKFLOW:
+1. If you need tools: Send tool calls (NO TAGS AT ALL)
+2. Wait for tool results
+3. THEN send message with <thinking> and/or <response> tags
 
-FILE STORAGE CONTEXT:
-- Projects are stored as .ksm files at: backend/projects/{project_name}/{project_name}.ksm
-- Test runs are stored as .json files at: backend/test-runs/test-run-YYYYMMDD-HHMMSS.json
-- Project files contain: metadata, block configurations, UI state
-- Test run files contain: parameters, results array, analytics metrics
-- Test runs reference their parent project via project_id field
+INCORRECT (DO NOT DO THIS):
+<thinking>
+Let me check the project...
+[tool calls here]
+</thinking>
 
-Be strategic about tool usage - only call tools when you need actual data."""
+CORRECT (DO THIS INSTEAD):
+Message 1: [Just tool calls, no tags]
+Message 2 (after results): 
+<thinking>
+The tools succeeded...
+</thinking>
+<response>
+Here's what I found...
+</response>
+
+IMPORTANT: 
+- To execute any plan or perform actions, you MUST call the appropriate tools
+- If the user has approved your plan, send tool calls WITHOUT any tags
+- You cannot complete tasks without using tools - thinking alone is not enough
+
+TOOL ERROR HANDLING:
+- If a tool returns an error, analyze it in your NEXT message using <thinking> tags
+- Common issues: wrong project name, missing parameters, etc.
+- Retry with corrected parameters if it makes sense
+- Don't retry the same failing call more than 2 times
+
+Remember: Tool calls first (no tags), thinking/response later!"""
+                    
+                    # Add action reminder if needed
+                    if enhanced_context.get("needs_action"):
+                        thinking_system_prompt += f"\n\n⚠️ IMPORTANT: {enhanced_context.get('reminder', '')}\n"
+                        # Clear the reminder after adding it
+                        enhanced_context.pop("needs_action", None)
+                        enhanced_context.pop("reminder", None)
                     
                     # Include previous tool results in context
                     if tool_results:
@@ -208,17 +234,37 @@ Be strategic about tool usage - only call tools when you need actual data."""
                     # Store thinking response for usage tracking
                     thinking_responses.append(thinking_response)
                     
-                    # Log Noira's thinking
+                    # Log Noira's full reply with tags
                     thinking_content = thinking_response.choices[0].message.content
                     if thinking_content:
-                        logger.info(f"\n🤔 NOIRA'S THINKING:\n{'-' * 40}")
+                        logger.info(f"\n🤔 NOIRA'S REPLY:\n{'-' * 40}")
                         logger.info(thinking_content)
                         logger.info('-' * 40)
+                        
+                        # Check for response tags
+                        response_match = re.search(r'<response>(.*?)</response>', thinking_content, re.DOTALL)
+                        if response_match:
+                            final_response = response_match.group(1).strip()
+                            logger.info("✅ Found final response in tags, exiting thinking loop...")
+                            break
                     
                     # Check if there are tool calls
                     if not thinking_response.choices[0].message.tool_calls:
-                        logger.info("🎯 No more tool calls needed, proceeding to response phase...")
-                        break
+                        # No tools called - check if there's a response
+                        if not response_match:
+                            # No tools AND no response tags - this shouldn't happen
+                            logger.warning("⚠️ No tool calls and no response tags found. Prompting for action...")
+                            
+                            # Add a reminder to the context for next iteration
+                            enhanced_context["needs_action"] = True
+                            enhanced_context["reminder"] = "You must either call a tool to proceed with your plan OR provide a final response to the user in <response></response> tags. Remember: plans cannot be executed without tool calls - thinking alone is not enough! You also cannot respond to the user without using <response> tags: they will not see your response."
+                            
+                            # Continue to next iteration which will remind Noira to take action
+                            continue
+                        else:
+                            # Has response tags but no tools - this is fine, we already have final_response
+                            logger.info("✅ No tools needed, response provided.")
+                            break
                     
                     # Execute tool calls
                     logger.info(f"\n🔧 TOOL CALLS ({len(thinking_response.choices[0].message.tool_calls)} total):")
@@ -294,52 +340,159 @@ Be strategic about tool usage - only call tools when you need actual data."""
                 
                 if iteration >= max_iterations:
                     logger.warning("⚠️ Reached maximum tool iterations, proceeding to response phase...")
+            else:
+                # Direct response mode (no tools)
+                logger.info("\n💬 DIRECT RESPONSE MODE (no tools)...")
+                
+                # Simple prompt for direct responses
+                direct_prompt = self._build_system_message(enhanced_context) + """
+
+Please provide a direct response to the user's question.
+Remember the critical format requirements:
+- You MUST wrap any thinking/analysis in <thinking></thinking> tags
+- You MUST wrap your response in <response></response> tags
+- Both tags can appear in the same message
+
+Example:
+<thinking>
+This is a straightforward question about X. Let me provide a clear answer.
+</thinking>
+
+<response>
+Your answer here...
+</response>
+"""
+                
+                messages = [
+                    {"role": "system", "content": direct_prompt}
+                ]
+                messages.extend(recent_history)
+                messages.append({"role": "user", "content": message})
+                
+                # Generate direct response
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature
+                )
+                
+                response_content = response.choices[0].message.content
+                if response_content:
+                    # Log full content with tags
+                    logger.info(f"\n💬 NOIRA'S REPLY:\n{'-' * 40}")
+                    logger.info(response_content)
+                    logger.info('-' * 40)
+                    
+                    # Extract response from tags if present
+                    response_match = re.search(r'<response>(.*?)</response>', response_content, re.DOTALL)
+                    if response_match:
+                        final_response = response_match.group(1).strip()
+                    else:
+                        # Use the whole response if no tags found
+                        final_response = response_content
+                
+                # Store response for usage tracking
+                thinking_responses.append(response)
             
-            # Response Phase: Generate final response
-            logger.info("\n💬 RESPONSE PHASE: Generating final response...")
-            
-            # Build system message with any tool results
-            system_message = self._build_system_message(enhanced_context)
-            
-            if tool_results:
-                tool_summary = "\n\nI have retrieved the following data for you:\n"
-                for tr in tool_results:
-                    if tr["result"]["success"]:
-                        tool_summary += f"- {tr['result']['summary']}\n"
-                system_message += tool_summary
-            
-            # Build final messages
-            messages = [{"role": "system", "content": system_message}]
-            messages.extend(recent_history)
-            messages.append({"role": "user", "content": message})
-            
-            # Generate response
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
-            )
-            
-            assistant_response = response.choices[0].message.content
+            # Response Phase: Handle final response
+            if final_response:
+                # We already have the response from the thinking loop
+                logger.info("\n💬 Using response from thinking phase...")
+                assistant_response = final_response
+            else:
+                # Fallback: Generate response if no response tags were found
+                logger.info("\n💬 FALLBACK: Generating response without tags...")
+                
+                # Build system message with any tool results
+                system_message = self._build_system_message(enhanced_context)
+                
+                if tool_results:
+                    # Create a more detailed summary of what was done
+                    tool_summary = "\n\nHere's a summary of what I did:\n"
+                    actions_taken = []
+                    
+                    for tr in tool_results:
+                        if tr["result"]["success"]:
+                            tool_name = tr["tool_name"]
+                            summary = tr["result"]["summary"]
+                            
+                            # Group similar actions for better readability
+                            if tool_name == "create_project":
+                                actions_taken.append(f"✅ Created project: {summary}")
+                            elif tool_name == "add_block":
+                                actions_taken.append(f"✅ Added block: {summary}")
+                            elif tool_name == "fetch_asset_volatility":
+                                actions_taken.append(f"✅ Fetched volatility data: {summary}")
+                            elif tool_name == "estimate_correlation_matrix":
+                                actions_taken.append(f"✅ Estimated correlations: {summary}")
+                            elif tool_name == "update_block_parameters":
+                                actions_taken.append(f"✅ Updated parameters: {summary}")
+                            elif tool_name == "load_project":
+                                actions_taken.append(f"📋 Loaded: {summary}")
+                            elif tool_name == "run_sensitivity_test":
+                                actions_taken.append(f"🚀 Ran test: {summary}")
+                            else:
+                                actions_taken.append(f"- {summary}")
+                    
+                    tool_summary += "\n".join(actions_taken)
+                    tool_summary += "\n\nBased on these actions, here's my response:"
+                    system_message += tool_summary
+                
+                # Build final messages
+                messages = [{"role": "system", "content": system_message}]
+                messages.extend(recent_history)
+                messages.append({"role": "user", "content": message})
+                
+                # Generate response
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature
+                )
+                
+                fallback_content = response.choices[0].message.content
+                if fallback_content:
+                    # Log full content with tags
+                    logger.info(f"\n💬 NOIRA'S FALLBACK REPLY:\n{'-' * 40}")
+                    logger.info(fallback_content)
+                    logger.info('-' * 40)
+                    
+                    # Extract response from tags if present
+                    response_match = re.search(r'<response>(.*?)</response>', fallback_content, re.DOTALL)
+                    if response_match:
+                        assistant_response = response_match.group(1).strip()
+                    else:
+                        # Use the whole content if no tags found
+                        logger.warning("⚠️ No response tags found in fallback response, using full content")
+                        assistant_response = fallback_content
+                else:
+                    assistant_response = ""
             
             logger.info(f"\n✅ RESPONSE GENERATED ({len(tool_results)} tools used)")
             logger.info(f"Response Length: {len(assistant_response) if assistant_response else 0} characters")
             
             # Calculate total usage
             total_usage = {
-                "prompt_tokens": response.usage.prompt_tokens if hasattr(response, 'usage') else 0,
-                "completion_tokens": response.usage.completion_tokens if hasattr(response, 'usage') else 0,
-                "total_tokens": response.usage.total_tokens if hasattr(response, 'usage') else 0
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
             }
             
-            # Add usage from all thinking iterations
-            if use_tools:
-                for thinking_resp in thinking_responses:
-                    if hasattr(thinking_resp, 'usage'):
-                        total_usage["prompt_tokens"] += thinking_resp.usage.prompt_tokens
-                        total_usage["completion_tokens"] += thinking_resp.usage.completion_tokens
-                        total_usage["total_tokens"] += thinking_resp.usage.total_tokens
+            # Add usage from all responses (thinking and final)
+            # In the new architecture, thinking_responses contains all API calls
+            for thinking_resp in thinking_responses:
+                if hasattr(thinking_resp, 'usage'):
+                    total_usage["prompt_tokens"] += thinking_resp.usage.prompt_tokens
+                    total_usage["completion_tokens"] += thinking_resp.usage.completion_tokens
+                    total_usage["total_tokens"] += thinking_resp.usage.total_tokens
+            
+            # Add usage from fallback response if it exists
+            if 'response' in locals() and hasattr(response, 'usage'):
+                total_usage["prompt_tokens"] += response.usage.prompt_tokens
+                total_usage["completion_tokens"] += response.usage.completion_tokens
+                total_usage["total_tokens"] += response.usage.total_tokens
             
             # Add to chat history
             self.chat_history.append({"role": "user", "content": message})

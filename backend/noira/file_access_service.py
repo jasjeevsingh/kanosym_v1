@@ -71,6 +71,18 @@ class NoiraFileAccessService:
             elif tool_name == "delete_test_run":
                 return self._handle_delete_test_run(arguments)
             
+            elif tool_name == "delete_project":
+                return self._handle_delete_project(arguments)
+            
+            elif tool_name == "fetch_asset_volatility":
+                return self._handle_fetch_asset_volatility(arguments)
+            
+            elif tool_name == "estimate_correlation_matrix":
+                return self._handle_estimate_correlation_matrix(arguments)
+            
+            elif tool_name == "run_sensitivity_test":
+                return self._handle_run_sensitivity_test(arguments)
+            
             else:
                 return {
                     "success": False,
@@ -568,6 +580,11 @@ class NoiraFileAccessService:
         if not all(isinstance(w, (int, float)) for w in weights):
             return {"success": False, "error": "All weights must be numbers"}
         
+        # Check for negative weights
+        for i, w in enumerate(weights):
+            if w < 0:
+                return {"success": False, "error": f"Weight for asset {assets[i]} must be non-negative (got {w})"}
+        
         total_weight = sum(weights)
         if abs(total_weight - 1.0) > 0.01:
             return {"success": False, "error": f"Weights must sum to 1.0 (current sum: {total_weight:.3f})"}
@@ -629,6 +646,19 @@ class NoiraFileAccessService:
         # If perturbing a specific asset's parameter, validate asset is specified
         if parameters["param"] in ["volatility", "weight"] and "asset" not in parameters:
             return {"success": False, "error": f"Parameter 'asset' is required when perturbing {parameters['param']}"}
+        
+        # Validate test range values
+        param_type = parameters["param"]
+        test_range = parameters["range"]
+        if param_type == "weight":
+            if test_range[0] < 0 or test_range[1] > 1:
+                return {"success": False, "error": f"Weight test range must be between 0 and 1. Got [{test_range[0]:.3f}, {test_range[1]:.3f}]"}
+        elif param_type == "volatility":
+            if test_range[0] <= 0 or test_range[1] <= 0:
+                return {"success": False, "error": f"Volatility test range must contain only positive values. Got [{test_range[0]:.3f}, {test_range[1]:.3f}]"}
+        elif param_type == "correlation":
+            if test_range[0] < -1 or test_range[1] > 1:
+                return {"success": False, "error": f"Correlation test range must be between -1 and 1. Got [{test_range[0]:.3f}, {test_range[1]:.3f}]"}
         
         # Load the project
         project_config = self.file_manager.load_project(project_name)
@@ -783,3 +813,238 @@ class NoiraFileAccessService:
             }
         except Exception as e:
             return {"success": False, "error": f"Failed to delete test run: {str(e)}"}
+    
+    def _handle_delete_project(self, arguments: dict) -> dict:
+        """Handle delete_project tool call"""
+        project_name = arguments.get("project_name")
+        confirm = arguments.get("confirm", False)
+        
+        return self.delete_project(project_name, confirm)
+    
+    def delete_project(self, project_name: str, confirm: bool = False) -> Dict[str, Any]:
+        """Delete a project and all its associated data."""
+        if not confirm:
+            return {"success": False, "error": "Please set confirm=true to delete the project"}
+        
+        # Check if project exists
+        project_config = self.file_manager.load_project(project_name)
+        if not project_config:
+            return {"success": False, "error": f"Project '{project_name}' not found"}
+        
+        # Delete associated test runs
+        test_runs = project_config.get("results", {}).get("test_runs", [])
+        for test_run_id in test_runs:
+            test_run_path = self.file_manager.test_runs_dir / f"{test_run_id}.json"
+            if test_run_path.exists():
+                test_run_path.unlink()
+                logger.info(f"Deleted test run: {test_run_id}")
+        
+        # Delete project file
+        project_path = self.file_manager.projects_dir / project_name / f"{project_name}.ksm"
+        project_dir = self.file_manager.projects_dir / project_name
+        
+        try:
+            if project_path.exists():
+                project_path.unlink()
+            if project_dir.exists():
+                project_dir.rmdir()
+            
+            logger.warning(f"⚠️ Deleted project '{project_name}' and {len(test_runs)} test runs")
+            return {
+                "success": True,
+                "data": {"project_name": project_name, "test_runs_deleted": len(test_runs)},
+                "summary": f"Deleted project '{project_name}' and {len(test_runs)} test runs"
+            }
+        except Exception as e:
+            return {"success": False, "error": f"Failed to delete project: {str(e)}"}
+    
+    def _handle_fetch_asset_volatility(self, arguments: dict) -> dict:
+        """Handle fetch_asset_volatility tool call"""
+        symbols = arguments.get("symbols", [])
+        start_date = arguments.get("start_date")
+        end_date = arguments.get("end_date")
+        window = arguments.get("window", 60)
+        frequency = arguments.get("frequency", "1d")
+        
+        return self.fetch_asset_volatility(symbols, start_date, end_date, window, frequency)
+    
+    def fetch_asset_volatility(self, symbols: List[str], start_date: str = None, end_date: str = None, 
+                               window: int = 60, frequency: str = "1d") -> Dict[str, Any]:
+        """Fetch historical volatility for assets using the existing API endpoint."""
+        try:
+            # Use existing API endpoint
+            import requests
+            response = requests.post(
+                "http://localhost:5001/api/fetch_volatility",
+                json={
+                    "symbols": symbols,
+                    "start": start_date,
+                    "end": end_date,
+                    "window": window,
+                    "frequency": frequency
+                }
+            )
+            
+            data = response.json()
+            if data.get("success") and data.get("volatility"):
+                volatilities = data["volatility"]
+                summary_parts = []
+                for symbol, vol in volatilities.items():
+                    if isinstance(vol, (int, float)):
+                        summary_parts.append(f"{symbol}: {vol:.4f}")
+                    else:
+                        summary_parts.append(f"{symbol}: {vol}")
+                
+                return {
+                    "success": True,
+                    "data": volatilities,
+                    "summary": "Volatility - " + ", ".join(summary_parts)
+                }
+            else:
+                return {"success": False, "error": data.get("error", "Failed to fetch volatility")}
+        
+        except Exception as e:
+            return {"success": False, "error": f"Failed to fetch volatility: {str(e)}"}
+    
+    def _handle_estimate_correlation_matrix(self, arguments: dict) -> dict:
+        """Handle estimate_correlation_matrix tool call"""
+        symbols = arguments.get("symbols", [])
+        start_date = arguments.get("start_date")
+        end_date = arguments.get("end_date")
+        frequency = arguments.get("frequency", "1d")
+        
+        return self.estimate_correlation_matrix(symbols, start_date, end_date, frequency)
+    
+    def estimate_correlation_matrix(self, symbols: List[str], start_date: str = None, 
+                                   end_date: str = None, frequency: str = "1d") -> Dict[str, Any]:
+        """Estimate correlation matrix for assets using the existing API endpoint."""
+        try:
+            # Use existing API endpoint
+            import requests
+            response = requests.post(
+                "http://localhost:5001/api/fetch_correlation_matrix",
+                json={
+                    "symbols": symbols,
+                    "start": start_date,
+                    "end": end_date,
+                    "frequency": frequency
+                }
+            )
+            
+            data = response.json()
+            if data.get("success") and data.get("correlation_matrix"):
+                matrix = data["correlation_matrix"]
+                # Format as readable table
+                summary_lines = ["Correlation Matrix:"]
+                header = "     " + "  ".join(f"{s:>6}" for s in symbols)
+                summary_lines.append(header)
+                
+                for i, row in enumerate(matrix):
+                    row_str = f"{symbols[i]:>4} " + "  ".join(f"{val:>6.3f}" for val in row)
+                    summary_lines.append(row_str)
+                
+                return {
+                    "success": True,
+                    "data": {"matrix": matrix, "symbols": symbols},
+                    "summary": "\n".join(summary_lines)
+                }
+            else:
+                return {"success": False, "error": data.get("error", "Failed to fetch correlation matrix")}
+        
+        except Exception as e:
+            return {"success": False, "error": f"Failed to estimate correlation matrix: {str(e)}"}
+    
+    def _handle_run_sensitivity_test(self, arguments: dict) -> dict:
+        """Handle run_sensitivity_test tool call"""
+        project_name = arguments.get("project_name")
+        block_type = arguments.get("block_type")
+        use_noise_model = arguments.get("use_noise_model", False)
+        noise_model_type = arguments.get("noise_model_type", "fast")
+        
+        return self.run_sensitivity_test(project_name, block_type, use_noise_model, noise_model_type)
+    
+    def run_sensitivity_test(self, project_name: str, block_type: str, 
+                           use_noise_model: bool = False, noise_model_type: str = "fast") -> Dict[str, Any]:
+        """Run a sensitivity test for a specific block"""
+        try:
+            # Load project to get block parameters
+            project_config = self.file_manager.load_project(project_name)
+            if not project_config:
+                return {"success": False, "error": f"Project '{project_name}' not found"}
+            
+            # Check if block exists
+            blocks = project_config.get("configuration", {}).get("blocks", {})
+            if block_type not in blocks or not blocks[block_type].get("placed"):
+                return {"success": False, "error": f"{block_type.capitalize()} block not found in project"}
+            
+            # Get block parameters
+            params = blocks[block_type].get("parameters", {})
+            if not params:
+                return {"success": False, "error": f"{block_type.capitalize()} block has no parameters configured"}
+            
+            # Prepare API request
+            api_endpoint = f"http://localhost:5001/api/{block_type}_sensitivity_test"
+            
+            # Build request data
+            request_data = {
+                "portfolio": params.get("portfolio"),
+                "param": params.get("param"),
+                "asset": params.get("asset"),
+                "range": params.get("range"),
+                "steps": params.get("steps"),
+                "project_id": project_config.get("metadata", {}).get("project_id")
+            }
+            
+            # Add quantum-specific parameters
+            if block_type == "quantum":
+                request_data["use_noise_model"] = use_noise_model
+                request_data["noise_model_type"] = noise_model_type
+            
+            # Log the request data for debugging
+            logger.info(f"Sending sensitivity test request to {api_endpoint}")
+            logger.info(f"Request data: {request_data}")
+            
+            # Call the API
+            import requests
+            response = requests.post(api_endpoint, json=request_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("success"):
+                    # Extract key metrics
+                    analytics = result.get("analytics", {})
+                    perf_metrics = analytics.get("performance_metrics", {})
+                    
+                    summary = f"Completed {block_type} sensitivity test for {params.get('param')} "
+                    if params.get('asset'):
+                        summary += f"on {params.get('asset')} "
+                    summary += f"with {params.get('steps')} steps. "
+                    summary += f"Execution time: {perf_metrics.get('total_execution_time', 0):.2f}s"
+                    
+                    return {
+                        "success": True,
+                        "data": {
+                            "test_run_id": result.get("test_run_id"),
+                            "execution_time": perf_metrics.get('total_execution_time', 0),
+                            "results_count": len(result.get("results", []))
+                        },
+                        "summary": summary
+                    }
+                else:
+                    error_msg = result.get("error", "Test failed")
+                    logger.error(f"Sensitivity test failed for {block_type} block: {error_msg}")
+                    logger.error(f"Full error response: {result}")
+                    return {"success": False, "error": error_msg}
+            else:
+                logger.error(f"API request failed with status {response.status_code}")
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("error", f"API error: {response.status_code}")
+                    logger.error(f"Error response: {error_data}")
+                except:
+                    error_msg = f"API error: {response.status_code} - {response.text}"
+                    logger.error(f"Raw error response: {response.text}")
+                return {"success": False, "error": error_msg}
+        
+        except Exception as e:
+            return {"success": False, "error": f"Failed to run sensitivity test: {str(e)}"}
