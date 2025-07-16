@@ -389,5 +389,125 @@ NOIRA_TOOLS = [
                 "required": ["test_run_id", "confirm"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_project",
+            "description": "Delete a project and all its associated data (WARNING: This action cannot be undone)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_name": {
+                        "type": "string",
+                        "description": "The name of the project to delete"
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "description": "Must be true to confirm deletion"
+                    }
+                },
+                "required": ["project_name", "confirm"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_asset_volatility",
+            "description": "Fetch historical volatility for one or more assets using market data",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbols": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of asset symbols to fetch volatility for (e.g., ['AAPL', 'GOOGL'])"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date for historical data in YYYY-MM-DD format"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date for historical data in YYYY-MM-DD format"
+                    },
+                    "window": {
+                        "type": "integer",
+                        "description": "Rolling window size in days for volatility calculation (default: 60)",
+                        "minimum": 2,
+                        "maximum": 252
+                    },
+                    "frequency": {
+                        "type": "string",
+                        "enum": ["1d", "1wk", "1mo"],
+                        "description": "Data frequency (default: '1d' for daily)"
+                    }
+                },
+                "required": ["symbols", "start_date", "end_date"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "estimate_correlation_matrix",
+            "description": "Estimate the correlation matrix for a set of assets using historical price data",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbols": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of asset symbols to estimate correlations for (e.g., ['AAPL', 'GOOGL', 'MSFT'])"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date for historical data in YYYY-MM-DD format"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date for historical data in YYYY-MM-DD format"
+                    },
+                    "frequency": {
+                        "type": "string",
+                        "enum": ["1d", "1wk", "1mo"],
+                        "description": "Data frequency (default: '1d' for daily)"
+                    }
+                },
+                "required": ["symbols", "start_date", "end_date"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_sensitivity_test",
+            "description": "Run a sensitivity test for a specific block in a project",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_name": {
+                        "type": "string",
+                        "description": "The name of the project containing the block"
+                    },
+                    "block_type": {
+                        "type": "string",
+                        "enum": ["classical", "hybrid", "quantum"],
+                        "description": "The type of block to run the test on"
+                    },
+                    "use_noise_model": {
+                        "type": "boolean",
+                        "description": "For quantum blocks: whether to use noise modeling (default: false)"
+                    },
+                    "noise_model_type": {
+                        "type": "string",
+                        "enum": ["fast", "realistic"],
+                        "description": "For quantum blocks: type of noise model (default: 'fast')"
+                    }
+                },
+                "required": ["project_name", "block_type"]
+            }
+        }
     }
 ]

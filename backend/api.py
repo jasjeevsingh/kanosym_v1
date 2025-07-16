@@ -42,7 +42,8 @@ class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
             '/thinking-status',
             '/api/projects HTTP',  # Project list polling
             '/api/projects/',  # Project details polling
-            '/last-modified'  # Last modified polling
+            '/last-modified',  # Last modified polling
+            '/api/test-runs HTTP'  # Test run list polling
         ]):
             return
         super().log_request(code, size)
@@ -174,13 +175,13 @@ def validate_sensitivity_params(param, asset, range_vals, steps, portfolio):
     
     if param == 'weight':
         if min_val < 0 or max_val > 1:
-            return False, "Weight values must be between 0 and 1"
+            return False, "Weight test range must be between 0 and 1 (weights cannot be negative)"
     elif param == 'volatility':
         if min_val <= 0 or max_val <= 0:
-            return False, "Volatility values must be positive"
+            return False, "Volatility test range must contain only positive values (volatility cannot be zero or negative)"
     elif param == 'correlation':
         if min_val < -1 or max_val > 1:
-            return False, "Correlation values must be between -1 and 1"
+            return False, "Correlation perturbation range must be between -1 and 1"
     
     # Validate steps
     if steps < 2 or steps > 20:
@@ -391,6 +392,8 @@ def quantum_sensitivity_test_api():
         
         # Sanitize for JSON
         result = sanitize_for_json(result)
+        # Add success field to indicate the test completed successfully
+        result["success"] = True
         return jsonify(result)
     except Exception as e:
         logger.error(f"[QUANTUM] Exception: {e}")
@@ -496,6 +499,8 @@ def classical_sensitivity_test_api():
         
         # Sanitize for JSON
         result = sanitize_for_json(result)
+        # Add success field to indicate the test completed successfully
+        result["success"] = True
         return jsonify(result)
     except Exception as e:
         logger.error(f"[CLASSICAL] Exception: {e}")
@@ -601,6 +606,8 @@ def hybrid_sensitivity_test_api():
         
         # Sanitize for JSON
         result = sanitize_for_json(result)
+        # Add success field to indicate the test completed successfully
+        result["success"] = True
         return jsonify(result)
     except Exception as e:
         logger.error(f"[HYBRID] Exception: {e}")
@@ -835,7 +842,9 @@ def list_test_runs():
     project_id = request.args.get('project_id')
     
     try:
-        test_runs = file_manager.list_test_runs(project_id)
+        # Suppress logs for polling requests (they don't have project_id)
+        suppress_logs = project_id is None
+        test_runs = file_manager.list_test_runs(project_id, suppress_logs=suppress_logs)
         return jsonify({
             "success": True,
             "test_runs": test_runs,
@@ -1120,7 +1129,8 @@ class WerkzeugFilter(logging.Filter):
                 '"GET /api/projects HTTP',
                 '"GET /api/projects/',
                 '/last-modified HTTP',
-                '/thinking-status HTTP'
+                '/thinking-status HTTP',
+                '"GET /api/test-runs HTTP'
             ]):
                 return False
         return True

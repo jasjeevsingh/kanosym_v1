@@ -58,7 +58,10 @@ export default function ProjectExplorerPanel({
   useEffect(() => {
     console.log('ProjectExplorerPanel: refreshTrigger changed to', refreshTrigger);
     loadProjects();
-    loadTestRuns();
+    // Add a small delay before loading test runs to ensure they're fully saved
+    setTimeout(() => {
+      loadTestRuns();
+    }, 200);
   }, [refreshTrigger]);
 
   const loadProjects = async () => {
@@ -83,12 +86,15 @@ export default function ProjectExplorerPanel({
   };
 
   const loadTestRuns = async () => {
+    console.log('Loading test runs...');
     setLoading(true);
     setError(null);
     try {
       const response = await fetch('http://localhost:5001/api/test-runs');
       const data = await response.json();
+      console.log('Test runs API response:', data);
       if (data.success) {
+        console.log(`Setting ${data.test_runs.length} test runs`);
         setTestRuns(data.test_runs);
       } else {
         setError('Failed to load test runs');

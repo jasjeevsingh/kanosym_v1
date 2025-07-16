@@ -145,3 +145,72 @@ export function useProjectListPolling({
     };
   }, [enabled, pollingInterval, checkForChanges]);
 }
+
+// Hook for polling test runs for changes
+export function useTestRunPolling({
+  enabled,
+  onTestRunsChanged,
+  pollingInterval = 2000, // Default 2 seconds for test run polling
+}: {
+  enabled: boolean;
+  onTestRunsChanged: () => void;
+  pollingInterval?: number;
+}) {
+  const testRunCountRef = useRef<number | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const checkForChanges = useCallback(async () => {
+    if (!enabled) return;
+
+    try {
+      const response = await fetch('http://localhost:5001/api/test-runs');
+      
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (data.success && data.test_runs) {
+        const currentCount = data.test_runs.length;
+        
+        // First time checking
+        if (testRunCountRef.current === null) {
+          testRunCountRef.current = currentCount;
+          return;
+        }
+        
+        // Check if test run count has changed
+        if (currentCount !== testRunCountRef.current) {
+          console.log(`Test run count changed: ${testRunCountRef.current} -> ${currentCount}`);
+          testRunCountRef.current = currentCount;
+          onTestRunsChanged();
+        }
+      }
+    } catch (error) {
+      console.error('Error checking test run changes:', error);
+    }
+  }, [enabled, onTestRunsChanged]);
+
+  useEffect(() => {
+    if (!enabled) {
+      // Clear interval if disabled
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    // Initial check
+    checkForChanges();
+
+    // Set up polling interval
+    intervalRef.current = setInterval(checkForChanges, pollingInterval);
+
+    // Cleanup
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [enabled, pollingInterval, checkForChanges]);
+}

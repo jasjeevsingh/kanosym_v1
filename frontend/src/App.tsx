@@ -27,7 +27,7 @@ function ProjectDeletionMonitor({ projectId, projectName, onDeleted }: {
   // This component doesn't render anything
   return null;
 }
-import { useProjectPolling, useProjectListPolling } from './hooks/useProjectPolling';
+import { useProjectPolling, useProjectListPolling, useTestRunPolling } from './hooks/useProjectPolling';
 
 // Block color scheme by mode (move to top-level scope)
 const blockModeStyles = {
@@ -857,6 +857,16 @@ function App() {
     pollingInterval: 1000, // Check every second
   });
 
+  // Poll for test run changes
+  useTestRunPolling({
+    enabled: true,
+    onTestRunsChanged: () => {
+      console.log('Test runs changed, refreshing...');
+      setProjectRefreshTrigger(prev => prev + 1);
+    },
+    pollingInterval: 2000, // Check every 2 seconds
+  });
+
   // Poll for current project changes (for block operations)
   const currentProject = openProjects.find(p => p.id === currentProjectId);
   useProjectPolling({
@@ -867,6 +877,8 @@ function App() {
       if (currentProject) {
         // Reload the project data
         await handleOpenProject(currentProject.name);
+        // Trigger refresh of ProjectExplorerPanel to show updated test run count
+        setProjectRefreshTrigger(prev => prev + 1);
       }
     },
     pollingInterval: 500, // Check every 500ms for faster updates
@@ -952,8 +964,31 @@ function App() {
         console.log('Available projects:', projects.map(p => ({ id: p.id, name: p.name })));
         
         if (projectId) {
-          // Find the project by ID
-          const project = projects.find(p => p.id === projectId);
+          // Find the project by ID - first check cached projects
+          let project = projects.find(p => p.id === projectId);
+          
+          // If not found in cache, fetch fresh project list
+          if (!project) {
+            console.log('Project not in cache, fetching fresh project list...');
+            const projectsResponse = await fetch('http://localhost:5001/api/projects');
+            const projectsData = await projectsResponse.json();
+            if (projectsData.success) {
+              const freshProject = projectsData.projects.find((p: any) => p.project_id === projectId);
+              if (freshProject) {
+                project = {
+                  id: freshProject.project_id,
+                  name: freshProject.name
+                };
+                // Update the projects state with fresh data
+                const projectsList = projectsData.projects.map((p: any) => ({
+                  id: p.project_id,
+                  name: p.name
+                }));
+                setProjects(projectsList);
+              }
+            }
+          }
+          
           if (project) {
             // Open the project if not already open
             if (!openProjects.find(p => p.id === projectId)) {
@@ -964,11 +999,16 @@ function App() {
             setCurrentProjectId(projectId);
             
             // Create a results tab for this test run
-            // Test run data is now saved in the same format as returned from API
+            // The test run already has all the data that ResultsChart expects
             const tabData = {
-              ...testRun,
-              testType: testRun.block_type,
-              test_run_id: testRunId
+              perturbation: testRun.perturbation,
+              asset: testRun.asset,
+              range_tested: testRun.range_tested,
+              baseline_portfolio_volatility_daily: testRun.baseline_portfolio_volatility_daily,
+              baseline_portfolio_volatility_annualized: testRun.baseline_portfolio_volatility_annualized,
+              results: testRun.results,
+              analytics: testRun.analytics,
+              testType: testRun.block_type
             };
             
             setResultsTabs(prev => {

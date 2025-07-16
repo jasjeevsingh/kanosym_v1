@@ -278,12 +278,13 @@ class FileManager:
             logger.error(f"Failed to delete test run file {filepath}: {e}")
             return False
     
-    def list_test_runs(self, project_id: str = None) -> List[Dict[str, Any]]:
+    def list_test_runs(self, project_id: str = None, suppress_logs: bool = False) -> List[Dict[str, Any]]:
         """
         List all test run files, optionally filtered by project.
         
         Args:
             project_id: Optional project ID to filter by
+            suppress_logs: If True, suppress info logging (for polling)
             
         Returns:
             List of test run metadata dictionaries
@@ -315,7 +316,8 @@ class FileManager:
             # Sort by timestamp (newest first)
             test_runs.sort(key=lambda x: x["timestamp"], reverse=True)
             
-            logger.info(f"Found {len(test_runs)} test runs")
+            if not suppress_logs:
+                logger.info(f"Found {len(test_runs)} test runs")
             return test_runs
             
         except Exception as e:
