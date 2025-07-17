@@ -38,4 +38,15 @@
     scrollbar-width: thin;
     scrollbar-color: #71717a #27272a;
   }
+/* Prevent scrolling on the main app */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
 }

@@ -659,9 +659,12 @@ export default function NoiraPanel() {
     }
   }, [status?.api_key_set]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom within the chat container only
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const chatContainer = chatEndRef.current?.parentElement;
+    if (chatContainer) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
   }, [messages]);
 
   // Chat now works with direct message sending and receiving
