@@ -2728,6 +2728,52 @@ function App() {
                 <p className="text-xs text-zinc-400 mt-1">Number of points to test in the range (2-20)</p>
               </div>
               
+              {/* Quantum-specific noise model toggle */}
+              {(editingBlockType || projectBlockModes[currentProjectId] || mode) === 'quantum' && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <label className="block text-zinc-300 text-sm font-medium mb-1">Simulate Hardware Noise</label>
+                      <p className="text-xs text-zinc-400">Use realistic quantum hardware noise model for more accurate results</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleNoiseToggle}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+                        form.use_noise_model ? 'bg-blue-600' : 'bg-zinc-600'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          form.use_noise_model ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  
+                  {/* Noise model type selector */}
+                  {form.use_noise_model && (
+                    <div className="mt-3">
+                      <label className="block text-zinc-300 text-sm font-medium mb-2">Noise Model Type</label>
+                      <select
+                        value={form.noise_model_type}
+                        onChange={handleNoiseTypeChange}
+                        className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="fast">Fast (Basic Noise)</option>
+                        <option value="realistic">Realistic (Full Hardware)</option>
+                      </select>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        {form.noise_model_type === 'fast' 
+                          ? 'Basic depolarizing noise for faster execution'
+                          : 'Full IBM Toronto hardware noise model (slower but more accurate)'
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {/* Additional correlation context */}
               {form.param === 'correlation' && (
                 <></>
