@@ -215,23 +215,26 @@ function ResizableSidebar({ children, min = 160, max = 400, initial = 224 }: { c
   );
 }
 
-function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical' }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
+function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical', isSelected = false }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum'; isSelected?: boolean }) {
   return (
     <div
       style={{ resize: 'none', width: 'fit-content', minWidth: '203px', maxWidth: '203px' }}
       className={`px-4 py-2 rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
+    style={{ resize: 'none', width: 'fit-content', minWidth: '203px', maxWidth: '203px' }}
+    className={`px-4 py-2 rounded shadow mr-2 cursor-pointer transition select-none border-2 ${isSelected ? 'border-blue-500 shadow-lg' : blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
+    onContextMenu={onContextMenu}
     >
       Portfolio Sensitivity Test
     </div>
   );
 }
 
-function DraggableBlock({ id, onContextMenu, mode = 'classical' }: { id: string; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
+function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = false }: { id: string; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum'; isSelected?: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
-      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} mode={mode} />
+      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} mode={mode} isSelected={isSelected} />
     </div>
   );
 }
@@ -299,6 +302,58 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
       setDragging(false);
       onBlockDragEnd();
     }
+      
+      // Apply the final position from tempDragPosition
+      const finalPosition = tempDragPosition[selectedBlockType];
+      if (finalPosition) {
+        setProjectBlockPositions(prev => ({
+          ...prev,
+          [currentProjectId]: {
+            ...prev[currentProjectId],
+            [selectedBlockType]: finalPosition
+          }
+        }));
+      }
+      
+      // Clear temporary position
+      setTempDragPosition(null);
+      
+      // Trigger autosave with the updated positions
+      const currentProject = openProjects.find(p => p.id === currentProjectId);
+      if (currentProject) {
+        console.log('Triggering autosave after drag');
+        const updatedPositions = {
+          ...projectBlockPositions,
+          [currentProjectId]: {
+            ...projectBlockPositions[currentProjectId],
+            [selectedBlockType]: finalPosition
+          }
+        };
+        triggerProjectAutosave(
+          currentProjectId,
+          currentProject.name,
+          projectBlocks[currentProjectId] || new Set(),
+          updatedPositions,
+          projectBlockModes,
+          projectBlockParams,
+          blockMoveCount,
+          resultsTabs,
+          currentResultsTab
+        );
+      }
+      
+      
+      // Also increment move count
+      setBlockMoveCount(prev => {
+        const currentCount = prev[currentProjectId] || 0;
+        const newCount = currentCount + 1;
+        console.log('Incrementing move count for project:', currentProjectId, 'from', currentCount, 'to', newCount);
+        return { ...prev, [currentProjectId]: newCount };
+      });
+    }
+    dragStart.current = null;
+    setDragOffset({ x: 0, y: 0 });
+    setTempDragPosition(null);
   }
   useEffect(() => {
     if (dragging) {
@@ -362,6 +417,72 @@ function MainPage({ hasBlock, blockPosition, onEditRequest, showRunButton, onRun
           )}
         </div>
       </div>
+
+<div 
+id="kanosym-mbe-dropzone" 
+className={`flex-1 relative ${hasAnyBlocks ? 'overflow-auto' : 'overflow-hidden'} scrollbar-hide`} 
+style={{ 
+  scrollbarWidth: 'none', 
+  msOverflowStyle: 'none' 
+}}
+>
+<div 
+  className="relative"
+  style={{
+    width: '100%',
+    height: '100%',
+    backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
+    backgroundSize: '20px 20px',
+  }}
+>
+  {hasAnyBlocks ? (
+    Object.entries(placedBlocks)
+      .filter(([blockType]) => projectBlocks[currentProjectId]?.has(blockType as 'classical' | 'hybrid' | 'quantum'))
+      .map(([blockType, position]) => {
+        // Use temporary position during drag, otherwise use actual position
+        const displayPosition = (dragging && tempDragPosition && tempDragPosition[blockType]) ? tempDragPosition[blockType] : position;
+        
+        return (
+          <div
+            key={blockType}
+            style={{ 
+              position: 'absolute', 
+              left: displayPosition.x, 
+              top: displayPosition.y, 
+              cursor: isSelected && selectedBlockType === blockType ? 'grab' : 'pointer', 
+              zIndex: 10,
+              transition: dragging && selectedBlockType === blockType ? 'none' : 'all 0.1s ease'
+            }}
+            onClick={e => { 
+              e.stopPropagation(); 
+              setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+              onSelect(); 
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setSelectedBlockType(blockType as 'classical' | 'hybrid' | 'quantum');
+            onSelect();
+            handleMouseDown(e, blockType);
+          }}
+          >
+            <DraggableBlock 
+              id={`main-${blockType}`} 
+              onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
+              mode={blockType as 'classical' | 'hybrid' | 'quantum'} 
+              isSelected={isSelected && selectedBlockType === blockType}
+            />
+          </div>
+        );
+      })
+  ) : (
+    <div className="flex flex-col items-center justify-center h-full">
+      <div className="text-3xl font-bold mb-4">Model Building Environment</div>
+      <div className="text-zinc-400">(Drag the blocks here)</div>
+    </div>
+  )}
+</div>
+</div>
+
       {showRunButton && onRunModel && (
         <RunModelButton onClick={onRunModel} />
       )}
@@ -761,19 +882,18 @@ function App() {
     function handleResize() {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
-        const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
+        const dropzoneElem = document.getElementById('kanosym-mbe');
         if (!dropzoneElem) return;
         
         const dropzoneRect = dropzoneElem.getBoundingClientRect();
         const blockWidth = 203;
-        const blockHeight = 50;
+        const blockHeight = 44;
         
         setProjectBlockPositions(prev => {
           const newPositions = { ...prev };
           Object.keys(newPositions).forEach(projectId => {
             const position = newPositions[projectId];
             const moveCount = blockMoveCount[projectId] || 0;
-            
             // Only recenter blocks that haven't been moved by the user (moveCount === 0)
             if (position && moveCount === 0) {
               console.log('Recentering block for project:', projectId, 'moveCount:', moveCount);
@@ -781,6 +901,19 @@ function App() {
                 x: dropzoneRect.width / 2 - blockWidth / 2,
                 y: dropzoneRect.height / 2 - blockHeight / 2
               };
+              // position is an object with block types, not a single position
+              const blockTypes = Object.keys(position);
+              if (blockTypes.length > 0) {
+                blockTypes.forEach(blockType => {
+                  newPositions[projectId] = {
+                    ...position,
+                    [blockType]: {
+                      x: dropzoneRect.width / 2 - blockWidth / 2,
+                      y: dropzoneRect.height / 2 - blockHeight / 2
+                    }
+                  };
+                });
+              }
             } else if (position) {
               console.log('Not recentering block for project:', projectId, 'moveCount:', moveCount);
             }
@@ -884,7 +1017,8 @@ function App() {
   function handleDragEnd(event: DragEndEvent) {
     if (event.over) {
       if (event.over.id === 'center-dropzone') {
-        const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
+        // Get the dropzone element and ensure it's properly sized
+        const dropzoneElem = document.getElementById('kanosym-mbe');
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
         let dropX = 200, dropY = 120; // fallback default
         if (activeId === 'blockbar-block' && dropzoneRect) {
@@ -929,9 +1063,193 @@ function App() {
             return { ...prev, [currentProjectId]: newCount };
           });
         }
+        
+        // Block dimensions
+        const blockWidth = 203; // Width of the portfolio sensitivity test block
+        const blockHeight = 44;  // Approximate height of the block
+        
+        // Default centered position
+        let dropX = 0, dropY = 0;
+        
+        if (dropzoneRect) {
+          // Always center the block when dropping for the first time
+          dropX = dropzoneRect.width / 2 - blockWidth / 2;
+          dropY = dropzoneRect.height / 2 - blockHeight / 2 - 36;
+          
+          // Add a small vertical offset to account for any UI elements
+        }
+
+        // Handle new blocks being dropped from the blockbar
+        if (
+          (activeId === 'blockbar-classical' ||
+           activeId === 'blockbar-hybrid' ||
+           activeId === 'blockbar-quantum') &&
+          dropzoneRect
+        ) {
+          // For new blocks, always use centered position
+          // The centering is already calculated above
+        } else if (
+          activeId?.startsWith('main-') &&
+          dropzoneRect &&
+          projectBlockPositions[currentProjectId]
+        ) {
+          // Handle existing blocks being moved
+          const blockType = activeId.replace('main-', '') as 'classical' | 'hybrid' | 'quantum';
+          const prev = projectBlockPositions[currentProjectId][blockType];
+
+          if (prev) {
+            dropX = prev.x + (event.delta?.x ?? 0);
+            dropY = prev.y + (event.delta?.y ?? 0);
+
+            setProjectBlockPositions(prev => ({
+              ...prev,
+              [currentProjectId]: {
+                ...(prev[currentProjectId] || {}),
+                [blockType]: { x: dropX, y: dropY }
+              }
+            }));
+            return;
+          }
+        }
+
+        // Clamp to dropzone bounds to prevent blocks from going outside
+        if (dropzoneRect) {
+          dropX = Math.max(0, Math.min(dropX, dropzoneRect.width - blockWidth));
+          dropY = Math.max(0, Math.min(dropY, dropzoneRect.height - blockHeight));
+        }
+
+        if (
+          activeId === 'blockbar-classical' ||
+          activeId === 'blockbar-hybrid' ||
+          activeId === 'blockbar-quantum'
+        ) {
+          // Determine block mode
+          let blockMode: 'classical' | 'hybrid' | 'quantum';
+          if (activeId === 'blockbar-classical') blockMode = 'classical';
+          else if (activeId === 'blockbar-hybrid') blockMode = 'hybrid';
+          else blockMode = 'quantum';
+
+          // Offset to prevent stacking
+          const existingBlocks = projectBlockPositions[currentProjectId] || {};
+          const offset = Object.keys(existingBlocks).length * 20;
+          const finalDropX = dropX;
+          const finalDropY = dropY + offset;
+
+          addBlockTypeToProject(currentProjectId, blockMode);
+          setProjectBlockPositions(prev => {
+            const newPositions = {
+              ...prev,
+              [currentProjectId]: {
+                ...(prev[currentProjectId] || {}),
+                [blockMode]: { x: finalDropX, y: finalDropY }
+              }
+            };
+            
+            // Trigger autosave with the UPDATED state
+            const currentProject = openProjects.find(p => p.id === currentProjectId);
+            if (currentProject) {
+              // Create updated projectBlocks Set
+              const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
+              updatedProjectBlocks.add(blockMode);
+              
+              // Create updated projectBlockModes
+              const updatedProjectBlockModes = { ...projectBlockModes, [currentProjectId]: blockMode };
+              
+              triggerProjectAutosave(
+                currentProjectId,
+                currentProject.name,
+                updatedProjectBlocks,
+                newPositions,
+                updatedProjectBlockModes,
+                projectBlockParams,
+                blockMoveCount,
+                resultsTabs,
+                currentResultsTab
+              );
+            }
+            
+            return newPositions;
+          });
+          setProjectBlockModes(prev => ({ ...prev, [currentProjectId]: blockMode }));
+        }
+
       } else if (event.over.id === 'blockbar-dropzone') {
         setBlockLocationForCurrent('blockbar');
         setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+        // Remove the correct block type from the project (the one being dragged)
+        let blockTypeToRemove: 'classical' | 'hybrid' | 'quantum' | undefined;
+        if (activeId?.startsWith('main-')) {
+          blockTypeToRemove = activeId.replace('main-', '') as 'classical' | 'hybrid' | 'quantum';
+        } else if (activeId?.startsWith('blockbar-')) {
+          blockTypeToRemove = activeId.replace('blockbar-', '') as 'classical' | 'hybrid' | 'quantum';
+        } else {
+          blockTypeToRemove = projectBlockModes[currentProjectId];
+        }
+        if (blockTypeToRemove) {
+          // Reset move count and log
+          console.log('Drag-to-delete: resetting move count for', currentProjectId, 'before:', blockMoveCount[currentProjectId]);
+          setBlockMoveCount(prev => {
+            const updated = { ...prev, [currentProjectId]: -1 };
+            console.log('Drag-to-delete: after reset:', updated[currentProjectId]);
+            return updated;
+          });
+
+          removeBlockTypeFromProject(currentProjectId, blockTypeToRemove);
+          setProjectBlockPositions(prev => {
+            const newPositions = { ...prev };
+            if (newPositions[currentProjectId]) {
+              delete newPositions[currentProjectId][blockTypeToRemove!];
+              // Remove the project entry if no blocks remain
+              if (Object.keys(newPositions[currentProjectId]).length === 0) {
+                delete newPositions[currentProjectId];
+              }
+            }
+            // Clean up block parameters
+            setProjectBlockParams(prev => {
+              const newParams = { ...prev };
+              if (newParams[currentProjectId]) {
+                delete newParams[currentProjectId][blockTypeToRemove!];
+                // Remove the project entry if no block params remain
+                if (Object.keys(newParams[currentProjectId]).length === 0) {
+                  delete newParams[currentProjectId];
+                }
+              }
+              return newParams;
+            });
+            // Trigger autosave with the UPDATED state
+            const currentProject = openProjects.find(p => p.id === currentProjectId);
+            if (currentProject) {
+              // Create updated projectBlocks Set
+              const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
+              updatedProjectBlocks.delete(blockTypeToRemove!);
+              // Create updated projectBlockModes
+              const updatedProjectBlockModes = { ...projectBlockModes };
+              if (updatedProjectBlockModes[currentProjectId] === blockTypeToRemove) {
+                delete updatedProjectBlockModes[currentProjectId];
+              }
+              // Create updated params
+              const updatedParams = { ...projectBlockParams };
+              if (updatedParams[currentProjectId]) {
+                delete updatedParams[currentProjectId][blockTypeToRemove!];
+                if (Object.keys(updatedParams[currentProjectId]).length === 0) {
+                  delete updatedParams[currentProjectId];
+                }
+              }
+              triggerProjectAutosave(
+                currentProjectId,
+                currentProject.name,
+                updatedProjectBlocks,
+                newPositions,
+                updatedProjectBlockModes,
+                updatedParams,
+                blockMoveCount,
+                resultsTabs,
+                currentResultsTab
+              );
+            }
+            return newPositions;
+          });
+        }
         setProjectBlockModes(prev => {
           const copy = { ...prev };
           delete copy[currentProjectId];
@@ -1004,13 +1322,103 @@ function App() {
   function handleBlockDelete() {
     setBlockLocationForCurrent('blockbar');
     setProjectBlockPositions(prev => ({ ...prev, [currentProjectId]: null }));
+    // Remove the specific block type that was right-clicked
+    const blockTypeToDelete = contextMenu?.blockType;
+    if (blockTypeToDelete) {
+      console.log('handleBlockDelete: resetting move count for', currentProjectId, 'before:', blockMoveCount[currentProjectId]);
+      setBlockMoveCount(prev => {
+        const updated = { ...prev, [currentProjectId]: 0 };
+        console.log('handleBlockDelete: after reset:', updated[currentProjectId]);
+        return updated;
+      });
+      
+      removeBlockTypeFromProject(currentProjectId, blockTypeToDelete);
+      setProjectBlockPositions(prev => {
+        const newPositions = { ...prev };
+        if (newPositions[currentProjectId]) {
+          delete newPositions[currentProjectId][blockTypeToDelete];
+          // Remove the project entry if no blocks remain
+          if (Object.keys(newPositions[currentProjectId]).length === 0) {
+            delete newPositions[currentProjectId];
+          }
+        }
+        return newPositions;
+      });
+      
+      // Clean up block parameters
+      setProjectBlockParams(prev => {
+        const newParams = { ...prev };
+        if (newParams[currentProjectId]) {
+          delete newParams[currentProjectId][blockTypeToDelete];
+          // Remove the project entry if no block params remain
+          if (Object.keys(newParams[currentProjectId]).length === 0) {
+            delete newParams[currentProjectId];
+          }
+        }
+        return newParams;
+      });
+      
+      // Also remove from projectBlockModes if it was the current mode
+      if (projectBlockModes[currentProjectId] === blockTypeToDelete) {
     setProjectBlockModes(prev => {
       const copy = { ...prev };
       delete copy[currentProjectId];
       return copy;
     });
+      }
+      
+      // Debug: log before and after resetting move count
+      console.log('Before resetting move count:', blockMoveCount[currentProjectId]);
+      setBlockMoveCount(prev => {
+        const updated = { ...prev, [currentProjectId]: 0 };
+        console.log('After resetting move count:', updated[currentProjectId]);
+        return updated;
+      });
+      
+      // Trigger autosave after deletion
+      const currentProject = openProjects.find(p => p.id === currentProjectId);
+      if (currentProject) {
+        // Get updated state values
+        const updatedProjectBlocks = new Set(projectBlocks[currentProjectId] || []);
+        updatedProjectBlocks.delete(blockTypeToDelete);
+        
+        const updatedPositions = { ...projectBlockPositions };
+        if (updatedPositions[currentProjectId]) {
+          delete updatedPositions[currentProjectId][blockTypeToDelete];
+          if (Object.keys(updatedPositions[currentProjectId]).length === 0) {
+            delete updatedPositions[currentProjectId];
+          }
+        }
+        
+        const updatedParams = { ...projectBlockParams };
+        if (updatedParams[currentProjectId]) {
+          delete updatedParams[currentProjectId][blockTypeToDelete];
+          if (Object.keys(updatedParams[currentProjectId]).length === 0) {
+            delete updatedParams[currentProjectId];
+          }
+        }
+        
+        const updatedModes = { ...projectBlockModes };
+        if (updatedModes[currentProjectId] === blockTypeToDelete) {
+          delete updatedModes[currentProjectId];
+        }
+        
+        triggerProjectAutosave(
+          currentProjectId,
+          currentProject.name,
+          updatedProjectBlocks,
+          updatedPositions,
+          updatedModes,
+          updatedParams,
+          blockMoveCount,
+          resultsTabs,
+          currentResultsTab
+        );
+      }
+    }
     setSelectedBlockProject(null);
     setContextMenu(null);
+    console.log('handleBlockDelete called', { contextMenu });
   }
 
   // Add handler to create a new project
@@ -1142,6 +1550,18 @@ function App() {
         </SubtleResizableBorder>
         <DragOverlay>
           {activeId ? <SensitivityTestBlock isDragging /> : null}
+          {activeId ? (
+            <SensitivityTestBlock 
+              isDragging 
+              mode={
+                activeId === 'blockbar-classical' || activeId === 'main-classical' ? 'classical' :
+                activeId === 'blockbar-hybrid' || activeId === 'main-hybrid' ? 'hybrid' :
+                activeId === 'blockbar-quantum' || activeId === 'main-quantum' ? 'quantum' :
+                'classical'
+              }
+              isSelected={false}
+            />
+          ) : null}
         </DragOverlay>
         {contextMenu && (
           <ContextMenu x={contextMenu.x} y={contextMenu.y} onEdit={handleEdit} onDelete={handleBlockDelete} onClose={handleCloseContextMenu} />
