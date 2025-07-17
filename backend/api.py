@@ -337,40 +337,7 @@ def quantum_sensitivity_test_api():
                         "range": range_vals,
                         "steps": steps
                     },
-                    "analytics": {
-                        "mode": "quantum",
-                        "performance_metrics": {
-                            "total_execution_time": result.get("execution_time", 0),
-                            "throughput": result.get("throughput", 0),
-                            "steps_processed": steps,
-                            "memory_usage_mb": result.get("memory_usage", 0),
-                            "cpu_usage_percent": result.get("cpu_usage", 0)
-                        },
-                        "statistical_metrics": {
-                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
-                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
-                            "skewness": result.get("skewness", 0),
-                            "kurtosis": result.get("kurtosis", 0),
-                            "standard_error": result.get("standard_error", 0),
-                            "statistical_significance": result.get("statistical_significance", 0)
-                        },
-                        "quantum_metrics": {
-                            "qubits_used": result.get("qubits_used", 0),
-                            "quantum_volume": result.get("quantum_volume", 0),
-                            "circuit_depth": result.get("circuit_depth", 0),
-                            "quantum_efficiency": result.get("quantum_efficiency", 0),
-                            "coherence_time": result.get("coherence_time", 0),
-                            "gate_fidelity": result.get("gate_fidelity", 0)
-                        },
-                        "sensitivity_metrics": {
-                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
-                            "curve_steepness": result.get("curve_steepness", 0),
-                            "risk_return_ratio": result.get("risk_return_ratio", 0),
-                            "portfolio_beta": result.get("portfolio_beta", 0),
-                            "var_95": result.get("var_95", 0),
-                            "expected_shortfall": result.get("expected_shortfall", 0)
-                        }
-                    },
+                    "analytics": result.get("analytics", {}),
                     "noira_analysis": {
                         "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                         "messages": []
@@ -446,38 +413,7 @@ def classical_sensitivity_test_api():
                         "range": range_vals,
                         "steps": steps
                     },
-                    "analytics": {
-                        "mode": "classical",
-                        "performance_metrics": {
-                            "total_execution_time": result.get("execution_time", 0),
-                            "throughput": result.get("throughput", 0),
-                            "steps_processed": steps,
-                            "memory_usage_mb": result.get("memory_usage", 0),
-                            "cpu_usage_percent": result.get("cpu_usage", 0)
-                        },
-                        "statistical_metrics": {
-                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
-                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
-                            "skewness": result.get("skewness", 0),
-                            "kurtosis": result.get("kurtosis", 0),
-                            "standard_error": result.get("standard_error", 0),
-                            "statistical_significance": result.get("statistical_significance", 0)
-                        },
-                        "classical_metrics": {
-                            "simulations_per_second": result.get("simulations_per_second", 0),
-                            "iterations_per_second": result.get("iterations_per_second", 0),
-                            "convergence_rate": result.get("convergence_rate", 0),
-                            "monte_carlo_efficiency": result.get("monte_carlo_efficiency", 0)
-                        },
-                        "sensitivity_metrics": {
-                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
-                            "curve_steepness": result.get("curve_steepness", 0),
-                            "risk_return_ratio": result.get("risk_return_ratio", 0),
-                            "portfolio_beta": result.get("portfolio_beta", 0),
-                            "var_95": result.get("var_95", 0),
-                            "expected_shortfall": result.get("expected_shortfall", 0)
-                        }
-                    },
+                    "analytics": result.get("analytics", {}),
                     "noira_analysis": {
                         "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                         "messages": []
@@ -553,38 +489,7 @@ def hybrid_sensitivity_test_api():
                         "range": range_vals,
                         "steps": steps
                     },
-                    "analytics": {
-                        "mode": "hybrid",
-                        "performance_metrics": {
-                            "total_execution_time": result.get("execution_time", 0),
-                            "throughput": result.get("throughput", 0),
-                            "steps_processed": steps,
-                            "memory_usage_mb": result.get("memory_usage", 0),
-                            "cpu_usage_percent": result.get("cpu_usage", 0)
-                        },
-                        "statistical_metrics": {
-                            "confidence_interval_95": result.get("confidence_interval", [0, 0]),
-                            "coefficient_of_variation": result.get("coefficient_of_variation", 0),
-                            "skewness": result.get("skewness", 0),
-                            "kurtosis": result.get("kurtosis", 0),
-                            "standard_error": result.get("standard_error", 0),
-                            "statistical_significance": result.get("statistical_significance", 0)
-                        },
-                        "hybrid_metrics": {
-                            "quantum_classical_ratio": result.get("quantum_classical_ratio", 0),
-                            "hybrid_efficiency": result.get("hybrid_efficiency", 0),
-                            "optimization_iterations": result.get("optimization_iterations", 0),
-                            "convergence_threshold": result.get("convergence_threshold", 0)
-                        },
-                        "sensitivity_metrics": {
-                            "max_sensitivity_point": result.get("max_sensitivity_point", 0),
-                            "curve_steepness": result.get("curve_steepness", 0),
-                            "risk_return_ratio": result.get("risk_return_ratio", 0),
-                            "portfolio_beta": result.get("portfolio_beta", 0),
-                            "var_95": result.get("var_95", 0),
-                            "expected_shortfall": result.get("expected_shortfall", 0)
-                        }
-                    },
+                    "analytics": result.get("analytics", {}),
                     "noira_analysis": {
                         "analysis_id": f"analysis-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                         "messages": []
