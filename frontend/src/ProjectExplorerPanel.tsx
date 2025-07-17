@@ -38,7 +38,7 @@ export default function ProjectExplorerPanel({
 }: ProjectExplorerPanelProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [testRuns, setTestRuns] = useState<TestRun[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Removed loading animations
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'projects' | 'test-runs'>('projects');
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -46,6 +46,7 @@ export default function ProjectExplorerPanel({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editProjectName, setEditProjectName] = useState('');
+  
 
   // Add at the top of the component
   const [expandedFileTreeProjectId, setExpandedFileTreeProjectId] = useState<string | null>(null);
@@ -66,7 +67,6 @@ export default function ProjectExplorerPanel({
 
   const loadProjects = async () => {
     console.log('Loading projects...');
-    setLoading(true);
     setError(null);
     try {
       const response = await fetch('http://localhost:5001/api/projects');
@@ -80,14 +80,11 @@ export default function ProjectExplorerPanel({
     } catch (err) {
       setError('Error loading projects');
       console.error('Error loading projects:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   const loadTestRuns = async () => {
     console.log('Loading test runs...');
-    setLoading(true);
     setError(null);
     try {
       const response = await fetch('http://localhost:5001/api/test-runs');
@@ -102,15 +99,12 @@ export default function ProjectExplorerPanel({
     } catch (err) {
       setError('Error loading test runs');
       console.error('Error loading test runs:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return;
     
-    setLoading(true);
     setError(null);
     try {
       const response = await fetch('http://localhost:5001/api/projects', {
@@ -143,13 +137,10 @@ export default function ProjectExplorerPanel({
     } catch (err) {
       setError('Error creating project');
       console.error('Error creating project:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDeleteProject = async (projectName: string) => {
-    setLoading(true);
     setError(null);
     try {
       const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`, {
@@ -164,13 +155,10 @@ export default function ProjectExplorerPanel({
     } catch (err) {
       setError('Error deleting project');
       console.error('Error deleting project:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDeleteTestRun = async (testRunId: string) => {
-    setLoading(true);
     setError(null);
     try {
       const response = await fetch(`http://localhost:5001/api/test-runs/${testRunId}`, {
@@ -185,8 +173,6 @@ export default function ProjectExplorerPanel({
     } catch (err) {
       setError('Error deleting test run');
       console.error('Error deleting test run:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -397,13 +383,6 @@ export default function ProjectExplorerPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {loading && (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mx-auto"></div>
-            <p className="text-zinc-400 mt-2">Loading...</p>
-          </div>
-        )}
-
         {error && (
           <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-2 rounded mb-4">
             {error}
@@ -412,7 +391,7 @@ export default function ProjectExplorerPanel({
 
         {activeTab === 'projects' && (
           <div className="space-y-2">
-            <FlipMove className="space-y-2">
+            <FlipMove className="space-y-2" disableAllAnimations>
               {sortedProjects.filter((project): project is Project => !!project && !!project.project_id).map(project => {
                 const isOpen = openProjects.some(p => p.id === project.project_id);
                 const showFileTree = expandedFileTreeProjectId === project.project_id;
@@ -506,7 +485,7 @@ export default function ProjectExplorerPanel({
                 );
               })}
             </FlipMove>
-            {projects.length === 0 && !loading && (
+            {projects.length === 0 && (
               <div className="text-center py-8 text-zinc-400">
                 <p>No projects found</p>
                 <p className="text-sm mt-2">Create a new project to get started</p>
@@ -553,7 +532,7 @@ export default function ProjectExplorerPanel({
                 </div>
               </div>
             ))}
-            {testRuns.length === 0 && !loading && (
+            {testRuns.length === 0 && (
               <div className="text-center py-8 text-zinc-400">
                 <p>No test runs found</p>
                 <p className="text-sm mt-2">Run tests to see results here</p>
@@ -595,9 +574,9 @@ export default function ProjectExplorerPanel({
                 <button
                   type="submit"
                   className="px-4 py-2 rounded bg-green-600 text-white font-bold hover:bg-green-700"
-                  disabled={!newProjectName.trim() || loading}
+                  disabled={!newProjectName.trim()}
                 >
-                  {loading ? 'Creating...' : 'Create'}
+                  Create
                 </button>
               </div>
             </form>
