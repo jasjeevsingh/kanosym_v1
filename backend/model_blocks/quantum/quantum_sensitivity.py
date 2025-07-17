@@ -64,9 +64,28 @@ def perturb_portfolio(param: str, asset: str, range_vals: List[float], steps: in
             idx = portfolio['assets'].index(asset)
             p['correlation_matrix'] = [row[:] for row in portfolio['correlation_matrix']]
             for j in range(len(p['correlation_matrix'])):
-                p['correlation_matrix'][idx][j] = val
-                p['correlation_matrix'][j][idx] = val
-                
+                if idx != j:  # Dont change diagonal (always 1)
+                    # Shift existing correlation by the perturbation value (delta)
+                    original_corr = portfolio['correlation_matrix'][idx][j]
+                    new_corr = original_corr + val  # val is now a "shift" amount
+                    new_corr = max(-1, min(1, new_corr))  # Clamp to [-1, 1]
+                    p['correlation_matrix'][idx][j] = new_corr
+                    p['correlation_matrix'][j][idx] = new_corr
+            
+            # Validate that the perturbed correlation matrix is still positive semi-definite
+            try:
+                corr_matrix = np.array(p['correlation_matrix'])
+                eigenvalues = np.linalg.eigvals(corr_matrix)
+                min_eigenvalue = np.min(eigenvalues.real)
+                if min_eigenvalue < -0.01:  # Allow small numerical errors
+                    logger.warning(f"Correlation matrix becomes invalid with delta {val:.4f} (min eigenvalue: {min_eigenvalue:.4f})")
+                    # Skip this perturbation value
+                    continue
+            except Exception as e:
+                logger.warning(f"Could not validate correlation matrix with delta {val:.4f}: {str(e)}")
+                # Skip this perturbation value
+                continue
+        
         p['perturbed_value'] = val
         perturbed.append(p)
         
@@ -77,6 +96,7 @@ def run_quantum_volatility(portfolio_state: Dict[str, Any], use_noise_model: boo
     """
     Quantum volatility estimator using quantum expectation value of the true portfolio variance operator.
     Uses Qiskit's Statevector and Operator for simulation (up to 5 assets).
+    Now properly accounts for correlations using the covariance matrix.
     Args:
         portfolio_state: Dict describing the portfolio (weights, volatilities, correlation matrix)
         use_noise_model: Ignored in this implementation (no noise simulation for statevector method)
@@ -97,22 +117,43 @@ def run_quantum_volatility(portfolio_state: Dict[str, Any], use_noise_model: boo
     if n_assets < 2:
         raise ValueError("At least 2 assets are required.")
 
+    # Build covariance matrix from correlation matrix and volatilities
+    covariance_matrix = np.outer(volatility, volatility) * correlation_matrix
+
     # 1. Prepare uniform superposition state over all 2^n_assets basis states
     dim = 2 ** n_assets
     psi = np.ones(dim) / np.sqrt(dim)
     state = Statevector(psi)
 
-    # 2. For each basis state, compute the portfolio return
+    # 2. For each basis state, compute the portfolio return using correlated returns
     # Each basis state is a bitstring of length n_assets (e.g., '101')
     # We'll interpret '1' as asset up (return = +volatility), '0' as down (return = -volatility)
+    # We'll use multivariate normal sampling to account for correlations
     returns = []
+    np.random.seed(42)  # For reproducibility
+    
     for i in range(dim):
         bits = np.array(list(np.binary_repr(i, width=n_assets))).astype(int)
-        # Map 0 -> -1, 1 -> +1
-        directions = 2 * bits - 1
-        asset_returns = directions * volatility
+        # Map 0 -> -1 to get directions
+        directions = 2 * bits - 1        
+        # Generate correlated returns using the covariance matrix
+        # We'll use the Cholesky decomposition to generate correlated samples
+        try:
+            L = np.linalg.cholesky(covariance_matrix)
+            # Generate uncorrelated random numbers based on the bit pattern
+            # Use the bit pattern to determine the sign of the random numbers
+            uncorrelated = np.random.normal(0, 1, n_assets) * directions
+            # Apply correlation structure
+            correlated_returns = np.dot(L, uncorrelated)
+        except np.linalg.LinAlgError:
+            # Fallback if covariance matrix is not positive definite
+            # Use simple volatility-based returns with correlation adjustment
+            asset_returns = directions * volatility
+            # Apply correlation adjustment
+            correlated_returns = np.dot(correlation_matrix, asset_returns)
+        
         # Portfolio return: w^T r
-        port_return = np.dot(weights, asset_returns)
+        port_return = np.dot(weights, correlated_returns)
         returns.append(port_return)
     returns = np.array(returns)
 

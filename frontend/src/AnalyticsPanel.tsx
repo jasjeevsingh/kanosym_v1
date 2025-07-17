@@ -199,11 +199,11 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Median Volatility:</span>
-                  <span className="text-white font-mono">{analytics.statistical_metrics?.median_volatility ?? 'N/A'}</span>
+                  <span className="text-white font-mono">{analytics.statistical_metrics?.median_volatility !== undefined ? formatNumber(analytics.statistical_metrics.median_volatility, 4) : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Interquartile Range (IQR):</span>
-                  <span className="text-white font-mono">{analytics.statistical_metrics?.iqr_volatility ?? 'N/A'}</span>
+                  <span className="text-white font-mono">{analytics.statistical_metrics?.iqr_volatility !== undefined ? formatNumber(analytics.statistical_metrics.iqr_volatility, 4) : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Sample Size:</span>

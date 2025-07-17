@@ -105,8 +105,27 @@ def perturb_portfolio(
             idx = portfolio['assets'].index(asset)
             p['correlation_matrix'] = [row[:] for row in portfolio['correlation_matrix']]
             for j in range(len(p['correlation_matrix'])):
-                p['correlation_matrix'][idx][j] = val
-                p['correlation_matrix'][j][idx] = val
+                if idx != j:  # Dont change diagonal (always 1)
+                    # Shift existing correlation by the perturbation value (delta)
+                    original_corr = portfolio['correlation_matrix'][idx][j]
+                    new_corr = original_corr + val  # val is now a "shift" amount
+                    new_corr = max(-1, min(1, new_corr))  # Clamp to [-1, 1]
+                    p['correlation_matrix'][idx][j] = new_corr
+                    p['correlation_matrix'][j][idx] = new_corr
+            
+            # Validate that the perturbed correlation matrix is still positive semi-definite
+            try:
+                corr_matrix = np.array(p['correlation_matrix'])
+                eigenvalues = np.linalg.eigvals(corr_matrix)
+                min_eigenvalue = np.min(eigenvalues.real)
+                if min_eigenvalue < -0.01:  # Allow small numerical errors
+                    logger.warning(f"Correlation matrix becomes invalid with delta {val:.4f} (min eigenvalue: {min_eigenvalue:.4f})")
+                    # Skip this perturbation value
+                    continue
+            except Exception as e:
+                logger.warning(f"Could not validate correlation matrix with delta {val:.4f}: {str(e)}")
+                # Skip this perturbation value
+                continue
         p['perturbed_value'] = val
         perturbed.append(p)
     return perturbed

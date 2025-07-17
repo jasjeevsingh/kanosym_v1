@@ -180,8 +180,8 @@ def validate_sensitivity_params(param, asset, range_vals, steps, portfolio):
         if min_val <= 0 or max_val <= 0:
             return False, "Volatility test range must contain only positive values (volatility cannot be zero or negative)"
     elif param == 'correlation':
-        if min_val < -1 or max_val > 1:
-            return False, "Correlation perturbation range must be between -1 and 1"
+        if min_val < -0.5 or max_val > 0.5:
+            return False, "Correlation delta perturbation range must be between -0.5 and 0.5 (large deltas can create invalid correlation matrices)"
     
     # Validate steps
     if steps < 2 or steps > 20:

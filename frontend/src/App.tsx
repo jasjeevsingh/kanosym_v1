@@ -529,6 +529,19 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
               <option value="weight">Weight</option>
             </select>
           </div>
+          
+          {/* Correlation-specific explanation */}
+          {parameter === 'correlation' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <div className="text-sm text-blue-800 font-medium mb-2">⚠️ Correlation Delta Perturbation</div>
+              <div className="text-xs text-blue-700 leading-relaxed">
+                When you perturb correlation for <strong>{asset || 'this asset'}</strong>, you're shifting 
+                <strong> ALL correlations</strong> between this asset and every other asset by the specified delta. 
+                This preserves relative relationships while simulating how market stress affects correlation levels.
+              </div>
+            </div>
+          )}
+          
           {parameter === 'volatility' && (
             <div>
               <label className="block text-zinc-700 text-sm mb-1">Volatility</label>
@@ -554,28 +567,46 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
               {fetchError && <div className="text-xs text-red-600 mt-1">{fetchError}</div>}
             </div>
           )}
+          
           <div className="flex space-x-2">
-            <div className="flex-1">
-              <label className="block text-zinc-700 text-sm mb-1">Range Min</label>
-              <input
-                type="number"
-                className="w-full border border-zinc-300 rounded px-2 py-1"
-                value={rangeMin}
-                onChange={e => setRangeMin(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-zinc-700 text-sm mb-1">Range Max</label>
-              <input
-                type="number"
-                className="w-full border border-zinc-300 rounded px-2 py-1"
-                value={rangeMax}
-                onChange={e => setRangeMax(e.target.value)}
-                required
-              />
-            </div>
+                          <div className="flex-1">
+                <label className="block text-zinc-700 text-sm mb-1">
+                  {parameter === 'correlation' ? 'Correlation Delta Min' : 'Range Min'}
+                </label>
+                <input
+                  type="number"
+                  className="w-full border border-zinc-300 rounded px-2 py-1"
+                  value={rangeMin}
+                  onChange={e => setRangeMin(e.target.value)}
+                  min={parameter === 'correlation' ? -0.5 : undefined}
+                  max={parameter === 'correlation' ? 0.5 : undefined}
+                  step={parameter === 'correlation' ? 0.0001 : undefined}
+                  required
+                />
+                {parameter === 'correlation' && (
+                  <div className="text-xs text-zinc-500 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
+                )}
+              </div>
+                          <div className="flex-1">
+                <label className="block text-zinc-700 text-sm mb-1">
+                  {parameter === 'correlation' ? 'Correlation Delta Max' : 'Range Max'}
+                </label>
+                <input
+                  type="number"
+                  className="w-full border border-zinc-300 rounded px-2 py-1"
+                  value={rangeMax}
+                  onChange={e => setRangeMax(e.target.value)}
+                  min={parameter === 'correlation' ? -0.5 : undefined}
+                  max={parameter === 'correlation' ? 0.5 : undefined}
+                  step={parameter === 'correlation' ? 0.0001 : undefined}
+                  required
+                />
+                {parameter === 'correlation' ? (
+                  <div className="text-xs text-zinc-500 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
+                ) : null}
+              </div>
           </div>
+          
           <div>
             <label className="block text-zinc-700 text-sm mb-1">Steps</label>
             <input
@@ -583,9 +614,18 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
               className="w-full border border-zinc-300 rounded px-2 py-1"
               value={steps}
               onChange={e => setSteps(e.target.value)}
+              min="2"
+              max="20"
               required
             />
+            <div className="text-xs text-zinc-500 mt-1">Number of points to test in the range (2-20)</div>
           </div>
+          
+          {/* Additional correlation context */}
+          {parameter === 'correlation' && (
+            <></>
+          )}
+          
           <button
             type="submit"
             className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-bold"
@@ -2281,6 +2321,23 @@ function App() {
                 Sensitivity Analysis Parameters
               </h3>
               
+              {/* Correlation-specific explanation */}
+              {form.param === 'correlation' && (
+                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-4">
+                  <div className="text-sm text-blue-300 font-medium mb-2 flex items-center">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Correlation Delta Perturbation
+                  </div>
+                  <div className="text-xs text-blue-200 leading-relaxed">
+                    When you perturb correlation for <strong>{form.asset}</strong>, you're shifting 
+                    <strong> ALL correlations</strong> between this asset and every other asset by the specified delta. 
+                    This preserves relative relationships while simulating how market stress affects correlation levels.
+                  </div>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-zinc-300 text-sm font-medium mb-2">Parameter to Perturb</label>
@@ -2311,25 +2368,41 @@ function App() {
                 </div>
                 
                 <div>
-                  <label className="block text-zinc-300 text-sm font-medium mb-2">Range Min</label>
+                  <label className="block text-zinc-300 text-sm font-medium mb-2">
+                    {form.param === 'correlation' ? 'Correlation Delta Min' : 'Range Min'}
+                  </label>
                   <input
                     type="number"
                     className="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={form.range[0]}
                     onChange={e => handleRangeChange(0, e.target.value)}
+                    min={form.param === 'correlation' ? -0.5 : undefined}
+                    max={form.param === 'correlation' ? 0.5 : undefined}
+                    step={form.param === 'correlation' ? 0.0001 : undefined}
                     required
                   />
+                  {form.param === 'correlation' && (
+                    <div className="text-xs text-zinc-400 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
+                  )}
                 </div>
                 
                 <div>
-                  <label className="block text-zinc-300 text-sm font-medium mb-2">Range Max</label>
+                  <label className="block text-zinc-300 text-sm font-medium mb-2">
+                    {form.param === 'correlation' ? 'Correlation Delta Max' : 'Range Max'}
+                  </label>
                   <input
                     type="number"
                     className="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={form.range[1]}
                     onChange={e => handleRangeChange(1, e.target.value)}
+                    min={form.param === 'correlation' ? -0.5 : undefined}
+                    max={form.param === 'correlation' ? 0.5 : undefined}
+                    step={form.param === 'correlation' ? 0.0001 : undefined}
                     required
                   />
+                  {form.param === 'correlation' ? (
+                    <div className="text-xs text-zinc-400 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
+                  ) : null}
                 </div>
               </div>
               
@@ -2348,51 +2421,12 @@ function App() {
                 <p className="text-xs text-zinc-400 mt-1">Number of points to test in the range (2-20)</p>
               </div>
               
-              {/* Quantum-specific noise model toggle */}
-              {projectBlockModes[currentProjectId] === 'quantum' && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <label className="block text-zinc-300 text-sm font-medium mb-1">Simulate Hardware Noise</label>
-                      <p className="text-xs text-zinc-400">Use realistic quantum hardware noise model for more accurate results</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleNoiseToggle}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
-                        form.use_noise_model ? 'bg-blue-600' : 'bg-zinc-600'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          form.use_noise_model ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  
-                  {/* Noise model type selector */}
-                  {form.use_noise_model && (
-                    <div className="mt-3">
-                      <label className="block text-zinc-300 text-sm font-medium mb-2">Noise Model Type</label>
-                      <select
-                        value={form.noise_model_type}
-                        onChange={handleNoiseTypeChange}
-                        className="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="fast">Fast (Basic Noise)</option>
-                        <option value="realistic">Realistic (Full Hardware)</option>
-                      </select>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        {form.noise_model_type === 'fast' 
-                          ? 'Basic depolarizing noise for faster execution'
-                          : 'Full IBM Toronto hardware noise model (slower but more accurate)'
-                        }
-                      </p>
-                    </div>
-                  )}
-                </div>
+              {/* Additional correlation context */}
+              {form.param === 'correlation' && (
+                <></>
               )}
+              
+              
             </div>
 
             {/* Action Buttons */}
