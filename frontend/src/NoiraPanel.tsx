@@ -473,7 +473,7 @@ function DebugPanel({
         {/* Status */}
         <div className="mb-4 p-3 bg-gray-100 rounded">
           <h3 className="font-semibold text-gray-700 mb-2">Status</h3>
-          <div className="text-sm space-y-1 text-gray-600">
+          <div className="text-sm space-y-1 text-gray-600 font-mono">
             <div>API Key: {debugInfo.api_key_set ? '✅ Set' : '❌ Not set'}</div>
             <div>Client: {debugInfo.client_initialized ? '✅ Connected' : '❌ Not connected'}</div>
             <div>Debug Mode: {debugInfo.debug_mode ? '✅ On' : '❌ Off'}</div>
@@ -614,7 +614,7 @@ function MessageContent({ message }: { message: ChatMessage }) {
       <div className="flex items-start gap-2 text-xs text-zinc-500 py-1">
         <span className="text-zinc-600 mt-0.5">🔧</span>
         <div>
-          <div className="font-mono">{message.toolName}</div>
+          <div>{message.toolName}</div>
           {message.toolSummary && (
             <div className="text-zinc-400">{message.toolSummary}</div>
           )}
@@ -976,7 +976,7 @@ export default function NoiraPanel() {
   };
 
   return (
-    <div className="h-full w-full bg-zinc-900 text-zinc-200 p-0 flex flex-col custom-scrollbar" style={{ fontFamily: 'Menlo, Monaco, Courier New, monospace', fontSize: 13 }}>
+    <div className="h-full w-full bg-zinc-900 text-zinc-200 p-0 flex flex-col custom-scrollbar">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
