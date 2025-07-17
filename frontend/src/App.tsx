@@ -2185,8 +2185,8 @@ function App() {
         });
         const data = await res.json();
         if (data.success && data.volatility && typeof data.volatility[symbol] === 'number') {
-          const rounded = Number(data.volatility[symbol]).toFixed(4);
-          handleVolatilityChange(idx, rounded);
+          const rounded = Number(Number(data.volatility[symbol]).toFixed(4));
+          handleVolatilityChange(idx, String(rounded));
           setFetchingVols(prev => ({ ...prev, [idx]: false }));
           return true;
         } else {
@@ -2303,7 +2303,7 @@ function App() {
         });
         const data = await res.json();
         if (data.success && data.correlation_matrix) {
-          const roundedMatrix = data.correlation_matrix.map((row: any[]) => row.map((val: any) => Number(val).toFixed(4)));
+          const roundedMatrix = data.correlation_matrix.map((row: any[]) => row.map((val: any) => Number(Number(val).toFixed(4))));
           setForm((prev: any) => ({
             ...prev,
             portfolio: {

@@ -1065,7 +1065,7 @@ def fetch_volatility():
         try:
             vol = get_asset_volatility(symbol, start, end, window)
             if vol is not None:
-                results[symbol] = vol
+                results[symbol] = round(vol, 4)
             else:
                 results[symbol] = "Insufficient data or error."
         except Exception as e:
@@ -1093,7 +1093,11 @@ def fetch_correlation_matrix_api():
     matrix = fetch_correlation_matrix(symbols, start, end, frequency)
     if matrix is None:
         return jsonify({"success": False, "error": "Insufficient data or error."}), 200
-    return jsonify({"success": True, "correlation_matrix": matrix})
+    
+    # Round each value in the correlation matrix to 4 decimal places
+    rounded_matrix = [[round(val, 4) for val in row] for row in matrix]
+    
+    return jsonify({"success": True, "correlation_matrix": rounded_matrix})
 
 @app.route('/api/check_correlation_validity', methods=['POST'])
 def check_correlation_validity_api():
