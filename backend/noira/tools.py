@@ -224,6 +224,15 @@ NOIRA_TOOLS = [
                             "steps": {
                                 "type": "integer",
                                 "description": "Number of perturbation steps"
+                            },
+                            "use_noise_model": {
+                                "type": "boolean",
+                                "description": "For quantum blocks: whether to enable hardware noise simulation (default: false)"
+                            },
+                            "noise_model_type": {
+                                "type": "string",
+                                "enum": ["fast", "realistic"],
+                                "description": "For quantum blocks: type of noise model - 'fast' (simplified) or 'realistic' (accurate hardware noise) (default: 'fast')"
                             }
                         }
                     }
@@ -317,6 +326,15 @@ NOIRA_TOOLS = [
                             "steps": {
                                 "type": "integer",
                                 "description": "REQUIRED: Number of perturbation steps"
+                            },
+                            "use_noise_model": {
+                                "type": "boolean",
+                                "description": "For quantum blocks: whether to enable hardware noise simulation (default: false)"
+                            },
+                            "noise_model_type": {
+                                "type": "string",
+                                "enum": ["fast", "realistic"],
+                                "description": "For quantum blocks: type of noise model - 'fast' (simplified) or 'realistic' (accurate hardware noise) (default: 'fast')"
                             }
                         },
                         "required": ["portfolio", "param", "range", "steps"]
@@ -483,7 +501,7 @@ NOIRA_TOOLS = [
         "type": "function",
         "function": {
             "name": "run_sensitivity_test",
-            "description": "Run a sensitivity test for a specific block in a project",
+            "description": "Run a sensitivity test for a specific block in a project. For quantum blocks, noise settings are configured in the block parameters.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -495,15 +513,6 @@ NOIRA_TOOLS = [
                         "type": "string",
                         "enum": ["classical", "hybrid", "quantum"],
                         "description": "The type of block to run the test on"
-                    },
-                    "use_noise_model": {
-                        "type": "boolean",
-                        "description": "For quantum blocks: whether to use noise modeling (default: false)"
-                    },
-                    "noise_model_type": {
-                        "type": "string",
-                        "enum": ["fast", "realistic"],
-                        "description": "For quantum blocks: type of noise model (default: 'fast')"
                     }
                 },
                 "required": ["project_name", "block_type"]
