@@ -410,7 +410,7 @@ export default function ProjectExplorerPanel({
                 const showFileTree = expandedFileTreeProjectId === project.project_id;
                 const fileTree = fileTrees[project.project_id];
                 return (
-                  <div key={project.project_id} className={`bg-zinc-800 rounded p-3 border border-zinc-700 mb-2 transition-shadow ${isOpen ? 'border-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]' : ''}`}>
+                  <div key={project.project_id} className={`bg-zinc-800 rounded p-3 border border-zinc-700 mb-2 transition-shadow ${isOpen ? 'border-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.6)]' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-zinc-100 truncate">{project.name}</h3>
