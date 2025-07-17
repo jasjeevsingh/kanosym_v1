@@ -7,12 +7,15 @@ import 'katex/dist/katex.min.css';
 
 // Types for API responses
 interface ChatMessage {
-  sender: 'user' | 'noira';
+  sender: 'user' | 'noira' | 'system';
   text: string;
   timestamp?: string;
   isThinking?: boolean;
   messageId?: string;
   toolsUsed?: string[];  // Tool names that were used
+  messageType?: 'text' | 'tool_call';  // Type of message
+  toolName?: string;  // For tool_call messages
+  toolSummary?: string;  // Summary of tool execution
 }
 
 interface ApiResponse {
@@ -126,6 +129,76 @@ class ChatApiService {
         message: `Connection error: ${error}`,
         timestamp: new Date().toISOString(),
       };
+    }
+  }
+
+  async sendMessageStream(
+    message: string, 
+    context?: any,
+    onToolCall?: (toolName: string, summary: string) => void,
+    onResponse?: (content: string, timestamp: string) => void,
+    onError?: (error: string) => void,
+    onDone?: () => void
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/send/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, context }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Read the stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('No response body');
+      }
+      
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete SSE messages
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              switch (data.type) {
+                case 'tool_call':
+                  onToolCall?.(data.tool_name, data.summary);
+                  break;
+                case 'response':
+                  onResponse?.(data.content, data.timestamp);
+                  break;
+                case 'error':
+                  onError?.(data.message);
+                  break;
+                case 'done':
+                  onDone?.();
+                  return;
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e, line);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Stream error:', error);
+      onError?.(`Connection error: ${error}`);
     }
   }
 
@@ -520,7 +593,7 @@ function DebugPanel({
 }
 
 // Add MessageContent component before the main component
-function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boolean }) {
+function MessageContent({ message }: { message: ChatMessage }) {
   // Format timestamp consistently
   const formatTimestamp = (timestamp?: string) => {
     if (!timestamp) return '';
@@ -535,6 +608,23 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
     }
   };
 
+  // Handle tool call messages
+  if (message.messageType === 'tool_call' && message.sender === 'system') {
+    return (
+      <div className="flex items-start gap-2 text-xs text-zinc-500 py-1">
+        <span className="text-zinc-600 mt-0.5">🔧</span>
+        <div>
+          <div className="font-mono">{message.toolName}</div>
+          {message.toolSummary && (
+            <div className="text-zinc-400">{message.toolSummary}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const isUser = message.sender === 'user';
+  
   if (isUser) {
     // Plain text for user messages with light gray styling
     return (
@@ -556,18 +646,6 @@ function MessageContent({ message, isUser }: { message: ChatMessage; isUser: boo
   return (
     <div>
       <div className="font-semibold text-zinc-100 mb-1">Noira</div>
-      {/* Tool usage indicator */}
-      {message.toolsUsed && message.toolsUsed.length > 0 && (
-        <div className="text-xs text-zinc-400 mb-2 pb-2 border-b border-zinc-700">
-          <span className="text-zinc-500">📊 Used tools: </span>
-          {message.toolsUsed.map((tool, index) => (
-            <span key={index}>
-              {index > 0 && ', '}
-              <span className="text-zinc-300">{tool}</span>
-            </span>
-          ))}
-        </div>
-      )}
       <div className="prose prose-invert prose-sm max-w-none">
       <ReactMarkdown 
         remarkPlugins={[remarkGfm, remarkMath]}
@@ -628,6 +706,7 @@ export default function NoiraPanel() {
   const [showDebug, setShowDebug] = useState(false);
   const [status, setStatus] = useState<ChatStatus | null>(null);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [useStreaming, setUseStreaming] = useState(true); // Enable streaming by default
   const chatEndRef = useRef<HTMLDivElement>(null);
   const apiService = useRef(new ChatApiService());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -701,7 +780,95 @@ export default function NoiraPanel() {
     console.log('Status refreshed:', { statusData, debugData });
   };
 
+  const sendMessageWithStreaming = () => {
+    if (!input.trim() || loading) return;
+
+    const userMessage = input.trim();
+    setInput('');
+    
+    // Immediately add user message for instant feedback
+    const userTimestamp = new Date().toISOString();
+    const thinkingMessageId = `thinking-${Date.now()}`;
+    
+    setMessages(prev => [
+      ...prev, 
+      { 
+        sender: 'user', 
+        text: userMessage,
+        timestamp: userTimestamp
+      },
+      {
+        sender: 'noira',
+        text: 'Thinking...',
+        isThinking: true,
+        messageId: thinkingMessageId,
+        timestamp: new Date().toISOString()
+      }
+    ]);
+    
+    setLoading(true);
+
+    // Use streaming API
+    apiService.current.sendMessageStream(
+      userMessage,
+      {}, // context
+      // onToolCall
+      (toolName, summary) => {
+        setMessages(prev => {
+          const toolMsg = {
+            sender: 'system' as const,
+            messageType: 'tool_call' as const,
+            toolName,
+            toolSummary: summary,
+            text: '',
+            timestamp: new Date().toISOString(),
+            messageId: `tool-${Date.now()}-${Math.random()}`
+          };
+
+          const thinkingIndex = prev.findIndex(m => m.messageId === thinkingMessageId);
+          if (thinkingIndex === -1) {
+            // Fallback: just append
+            return [...prev, toolMsg];
+          }
+          const newMessages = [...prev];
+          newMessages.splice(thinkingIndex, 0, toolMsg);
+          return newMessages;
+        });
+      },
+      // onResponse
+      (content, timestamp) => {
+        setMessages(prev => prev.filter(msg => msg.messageId !== thinkingMessageId).concat({
+          sender: 'noira',
+          text: content,
+          timestamp,
+          messageId: `response-${Date.now()}`
+        }));
+        setLoading(false);
+      },
+      // onError
+      (error) => {
+        setMessages(prev => prev.filter(msg => msg.messageId !== thinkingMessageId).concat({
+          sender: 'noira',
+          text: `Error: ${error}`,
+          timestamp: new Date().toISOString(),
+          messageId: `error-${Date.now()}`
+        }));
+        setLoading(false);
+      },
+      // onDone
+      () => {
+        // Ensure the thinking placeholder is gone if still present
+        setMessages(prev => prev.filter(msg => msg.messageId !== thinkingMessageId));
+        refreshStatus();
+      }
+    );
+  };
+
   const sendMessage = async () => {
+    if (useStreaming) {
+      return sendMessageWithStreaming();
+    }
+
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
@@ -733,20 +900,31 @@ export default function NoiraPanel() {
       const result = await apiService.current.sendMessage(userMessage);
       
       if (result.success && result.response) {
-        // Extract tool names from tool details
-        const toolsUsed = result.tool_details?.map(detail => detail.tool_name) || [];
+        // Create tool call messages from tool_details
+        const toolMessages: ChatMessage[] = result.tool_details?.map((detail: any) => ({
+          sender: 'system' as const,
+          messageType: 'tool_call' as const,
+          toolName: detail.tool_name,
+          toolSummary: detail.summary,
+          text: '',
+          timestamp: result.timestamp,
+          messageId: `tool-${Date.now()}-${Math.random()}`
+        })) || [];
         
-        // Replace thinking message with actual response
-        setMessages(prev => prev.map(msg => 
-          msg.messageId === thinkingMessageId 
-            ? { 
-                sender: 'noira', 
-                text: result.response!,
-                timestamp: result.timestamp,
-                toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
-              }
-            : msg
-        ));
+        // Replace thinking message with tool messages + actual response
+        setMessages(prev => {
+          const newMessages = prev.filter(msg => msg.messageId !== thinkingMessageId);
+          // Add tool messages
+          newMessages.push(...toolMessages);
+          // Add the actual response
+          newMessages.push({
+            sender: 'noira',
+            text: result.response!,
+            timestamp: result.timestamp,
+            messageId: `response-${Date.now()}`
+          });
+          return newMessages;
+        });
       } else {
         // Replace thinking message with error
         setMessages(prev => prev.map(msg => 
@@ -813,9 +991,13 @@ export default function NoiraPanel() {
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {messages.map((msg, i) => (
           <div key={msg.messageId || i}>
-            <div className={`px-6 py-4 ${
+            <div className={`px-6 ${
+              msg.sender === 'system' ? 'py-1' : 'py-4'
+            } ${
               msg.sender === 'user' 
                 ? 'text-zinc-400' 
+                : msg.sender === 'system'
+                ? 'text-zinc-500'
                 : 'text-zinc-100'
             }`}>
               {msg.isThinking ? (
@@ -824,11 +1006,11 @@ export default function NoiraPanel() {
                   <span className="text-zinc-300 italic">{msg.text}</span>
                 </div>
               ) : (
-                <MessageContent message={msg} isUser={msg.sender === 'user'} />
+                <MessageContent message={msg} />
               )}
             </div>
-            {/* Add separator between messages */}
-            {i < messages.length - 1 && (
+            {/* Add separator between messages (but not after system messages) */}
+            {i < messages.length - 1 && msg.sender !== 'system' && (
               <div className="border-b border-zinc-800" />
             )}
           </div>

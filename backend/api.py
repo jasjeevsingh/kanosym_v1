@@ -4,7 +4,7 @@ api.py
 Backend API entry point for KANOSYM. Exposes endpoints for portfolio input, perturbation, QAE, and results formatting.
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from noira.chat_controller import chat_controller
 import os
@@ -234,6 +234,90 @@ def send_message():
     result = chat_controller.send_message(message, context, use_tools)
     
     return jsonify(result), 200 if result['success'] else 400
+
+@app.route('/api/chat/send/stream', methods=['POST', 'OPTIONS'])
+def send_message_stream():
+    """Send a message to Noira and stream the response."""
+    from flask import Response, stream_with_context
+    import json
+    from queue import Queue, Empty
+    from threading import Thread
+
+    # Handle OPTIONS request for CORS
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+    
+    data = request.get_json()
+    message = data.get('message')
+    context = data.get('context', {})
+    use_tools = data.get('use_tools', True)
+    
+    if not message:
+        return jsonify({"success": False, "message": "Message is required"}), 400
+    
+    def generate():
+        # Queue for inter-thread communication
+        event_queue: "Queue[dict]" = Queue()
+
+        # Callback that the chat controller will invoke after each tool finishes
+        def tool_cb(name: str, summary: str):
+            event_queue.put({'type': 'tool_call', 'tool_name': name, 'summary': summary})
+
+        # Container to capture the final result from the background thread
+        result_container: dict = {}
+
+        def run_chat():
+            result_container['result'] = chat_controller.send_message(
+                message,
+                context,
+                use_tools,
+                tool_callback=tool_cb
+            )
+
+        # Start background processing
+        thread = Thread(target=run_chat, daemon=True)
+        thread.start()
+
+        # Immediately send a start event
+        yield f"data: {json.dumps({'type': 'start', 'timestamp': datetime.now().isoformat()})}\n\n"
+
+        # Continuously yield events from the queue while the thread is alive or queue has items
+        while True:
+            try:
+                event = event_queue.get(timeout=0.25)
+                yield f"data: {json.dumps(event)}\n\n"
+            except Empty:
+                # If the worker thread is done and queue is empty, exit loop
+                if not thread.is_alive():
+                    break
+
+        # Ensure the background thread has completed
+        thread.join()
+
+        result = result_container.get('result', {})
+
+        # Send the final response or error
+        if result.get('success'):
+            yield f"data: {json.dumps({'type': 'response', 'content': result.get('response', ''), 'timestamp': result.get('timestamp')})}\n\n"
+        else:
+            yield f"data: {json.dumps({'type': 'error', 'message': result.get('message', 'Unknown error')})}\n\n"
+
+        # Completion signal
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Access-Control-Allow-Origin': '*'
+        }
+    )
 
 @app.route('/api/chat/reset', methods=['POST'])
 def reset_chat():
