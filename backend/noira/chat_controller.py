@@ -48,7 +48,7 @@ class ChatController:
         # Add welcome message
         self.chat_history.append({
             "role": "assistant",
-            "content": """Hi! I am **Noira**, your quantum portfolio modeling assistant. How can I help you today?""",
+            "content": """Hi! I'm **Noira**, your quantum portfolio modeling assistant. How can I help you today?""",
             "timestamp": datetime.now().isoformat()
         })
     

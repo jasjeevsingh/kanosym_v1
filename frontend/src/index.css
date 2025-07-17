@@ -38,6 +38,7 @@
     scrollbar-width: thin;
     scrollbar-color: #71717a #27272a;
   }
+}
 /* Prevent scrolling on the main app */
 html, body {
   height: 100%;
