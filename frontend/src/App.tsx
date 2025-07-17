@@ -119,16 +119,14 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
     <div
       style={{
         resize: 'none',
-        width: 'fit-content',
         minWidth: '190px',
         maxWidth: '190px',
         padding: '6px 12px',
         fontSize: '14px',
-        whiteSpace: 'nowrap',
         boxShadow: getGlowStyle(),
         transition: 'box-shadow 0.15s ease',
       }}
-      className={`rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
+      className={`rounded shadow mr-2 cursor-pointer transition select-none border-2 flex items-center justify-center text-center ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
     >
       Portfolio Sensitivity Test
