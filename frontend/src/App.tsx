@@ -1,4 +1,12 @@
+// Main application component for Kanosym portfolio sensitivity analysis platform
+// This file implements the core UI including:
+// - Multi-project tabbed interface with drag-and-drop block placement
+// - Portfolio configuration and sensitivity analysis parameters
+// - Integration with backend analysis engines (classical, hybrid, quantum)
+// - Real-time collaboration features via polling and autosave
+
 import React, { useState, useRef, useEffect } from 'react';
+// @dnd-kit provides drag-and-drop functionality for placing analysis blocks
 import {
   DndContext,
   useDraggable,
@@ -6,13 +14,17 @@ import {
   DragOverlay,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import ResultsChart from './ResultsChart';
-import NoiraPanel from './NoiraPanel';
-import ProjectExplorerPanel from './ProjectExplorerPanel';
-import { triggerProjectAutosave, autosaveManager } from './autosave';
-import { useProjectDeletion } from './hooks/useProjectDeletion';
+// Component imports for major UI sections
+import ResultsChart from './ResultsChart'; // Displays sensitivity analysis results
+import NoiraPanel from './NoiraPanel'; // AI assistant chat interface
+import ProjectExplorerPanel from './ProjectExplorerPanel'; // File manager sidebar
+import { triggerProjectAutosave, autosaveManager } from './autosave'; // Auto-save functionality
+import { useProjectDeletion } from './hooks/useProjectDeletion'; // Monitors for project deletion
 
-// Component to monitor a single project for deletion
+// Component to monitor a single project for deletion from the file system
+// This component uses a custom hook to poll the backend and detect when
+// a project has been deleted externally (e.g., via file explorer)
+// When deletion is detected, it triggers the onDeleted callback to clean up UI state
 function ProjectDeletionMonitor({ projectId, projectName, onDeleted }: { 
   projectId: string; 
   projectName: string; 
@@ -24,19 +36,32 @@ function ProjectDeletionMonitor({ projectId, projectName, onDeleted }: {
     onDeleted,
   });
   
-  // This component doesn't render anything
+  // This component doesn't render anything - it's purely for side effects
   return null;
 }
 import { useProjectPolling, useProjectListPolling, useTestRunPolling } from './hooks/useProjectPolling';
 
-// Block color scheme by mode (move to top-level scope)
+// Block color scheme mapping for the three analysis modes
+// Classical: Traditional Monte Carlo simulation (gray theme)
+// Hybrid: Combines classical and quantum approaches (purple theme)  
+// Quantum: Pure quantum computation using Qiskit (blue theme)
 const blockModeStyles = {
   classical: 'bg-zinc-800 text-white border-zinc-600',
   hybrid: 'bg-purple-700 text-white border-purple-400',
   quantum: 'bg-blue-700 text-white border-blue-400',
 };
 
-function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, closeProject }: { openProjects: { id: string; name: string }[]; currentProjectId: string; setCurrentProjectId: (id: string) => void; closeProject: (id: string) => void }) {
+// ProjectTabs component renders the tabbed interface for switching between open projects
+// Similar to browser tabs, users can:
+// - Click tabs to switch between projects
+// - Close tabs with the × button
+// - See active tab highlighted with blue underline
+function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, closeProject }: { 
+  openProjects: { id: string; name: string }[]; // List of currently open projects
+  currentProjectId: string; // ID of the active project
+  setCurrentProjectId: (id: string) => void; // Handler to switch active project
+  closeProject: (id: string) => void; // Handler to close a project tab
+}) {
   return (
     <div className="flex items-end border-b border-zinc-800 bg-zinc-900 px-2" style={{ minHeight: 36 }}>
       {openProjects.map(p => (
@@ -60,8 +85,22 @@ function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, clos
   );
 }
 
-function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical', isSelected = false }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum'; isSelected?: boolean }) {
-  // Determine glow color based on mode and selection
+// SensitivityTestBlock is the visual representation of a portfolio analysis block
+// These blocks can be dragged from the BlockBar and placed in the main canvas
+// Each block represents a different analysis engine (classical, hybrid, or quantum)
+// Props:
+// - isDragging: Whether block is currently being dragged (shows opacity change)
+// - onContextMenu: Handler for right-click menu (edit/delete options)
+// - mode: Analysis type determines color scheme (classical=gray, hybrid=purple, quantum=blue)
+// - isSelected: Shows glow effect when block is selected for editing/moving
+function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical', isSelected = false }: { 
+  isDragging?: boolean; 
+  onContextMenu?: (e: React.MouseEvent) => void; 
+  mode?: 'classical' | 'hybrid' | 'quantum'; 
+  isSelected?: boolean 
+}) {
+  // Determine glow color based on mode and selection state
+  // Each mode has a unique glow color to match its theme
   const getGlowStyle = () => {
     if (!isSelected) return 'none';
     switch (mode) {
@@ -97,7 +136,17 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
   );
 }
 
-function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = false }: { id: string; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum'; isSelected?: boolean }) {
+// DraggableBlock wraps SensitivityTestBlock with drag-and-drop functionality
+// Uses @dnd-kit's useDraggable hook to enable:
+// - Dragging blocks from the BlockBar to the main canvas
+// - Moving blocks already placed on the canvas
+// The id prop helps identify whether the block is from the BlockBar or already placed
+function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = false }: { 
+  id: string; // Unique identifier (e.g., 'blockbar-classical' or 'main-classical')
+  onContextMenu?: (e: React.MouseEvent) => void; 
+  mode?: 'classical' | 'hybrid' | 'quantum'; 
+  isSelected?: boolean 
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
@@ -106,6 +155,13 @@ function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = fa
   );
 }
 
+// MainPage is the central canvas where users place and configure analysis blocks
+// Key features:
+// - Drop zone for dragging blocks from BlockBar
+// - Grid background for visual alignment
+// - Block positioning and movement after initial placement
+// - Run button appears when blocks are configured
+// - Handles both initial drag-drop placement and subsequent repositioning
 function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onDeselect, currentProjectId, projectBlockPositions, projectBlockModes, openProjects, projectBlocks, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, setProjectBlockPositions, setBlockMoveCount, triggerProjectAutosave }: {
   onEditRequest: (e: React.MouseEvent, blockType?: 'classical' | 'hybrid' | 'quantum') => void;
   showRunButton?: boolean;
@@ -136,7 +192,9 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
     currentResultsTab: { [projectId: string]: string | null }
   ) => void;
 }) {
-  // Add CSS for hiding scrollbars
+  // Add CSS for hiding scrollbars while maintaining scroll functionality
+  // This creates a cleaner UI by removing visual scrollbar clutter
+  // Applied to the main canvas area when blocks are placed
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -155,36 +213,44 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
       }
     };
   }, []);
+  // Set up the main canvas as a drop zone for blocks
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
+  
+  // Handle right-click context menu for block operations (edit/delete)
   const handleContextMenu = (e: React.MouseEvent, blockType: 'classical' | 'hybrid' | 'quantum') => {
     e.preventDefault();
     e.stopPropagation();
     onEditRequest(e, blockType);
   };
   
-  // Track which block is selected
+  // Track which block type is currently selected for operations
   const [selectedBlockType, setSelectedBlockType] = useState<'classical' | 'hybrid' | 'quantum' | null>(null);
 
-  // Get all placed blocks for this project
+  // Get all placed blocks for this project from global state
   const placedBlocks = projectBlockPositions[currentProjectId] || {};
   const hasAnyBlocks = Object.keys(placedBlocks).length > 0;
-  // Drag logic for block
-  const [dragging, setDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const dragStart = useRef<{ mouseX: number; mouseY: number; blockX: number; blockY: number } | null>(null);
-  const [tempDragPosition, setTempDragPosition] = useState<{ [blockType: string]: { x: number; y: number } } | null>(null);
   
+  // Manual drag implementation for repositioning blocks after initial placement
+  // This is separate from @dnd-kit and allows fine-grained control
+  const [dragging, setDragging] = useState(false); // Is user currently dragging?
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 }); // Click offset within block
+  const dragStart = useRef<{ mouseX: number; mouseY: number; blockX: number; blockY: number } | null>(null); // Initial drag state
+  const [tempDragPosition, setTempDragPosition] = useState<{ [blockType: string]: { x: number; y: number } } | null>(null); // Preview position during drag
+  
+  // Handle mouse down for manual block dragging (after initial placement)
+  // This captures the initial click position and calculates offsets to ensure
+  // smooth dragging without the block jumping to cursor position
   function handleMouseDown(e: React.MouseEvent, blockType: string) {
     console.log('handleMouseDown called for block:', blockType);
     const blockPos = placedBlocks[blockType];
     if (blockPos) {
-      // Get the block element to calculate click offset
+      // Get the block element to calculate click offset within the block
       const blockElement = e.currentTarget.parentElement;
       const rect = blockElement?.getBoundingClientRect();
       const parentRect = blockElement?.parentElement?.getBoundingClientRect();
       
       if (rect && parentRect) {
-        // Calculate where in the block the user clicked
+        // Calculate where in the block the user clicked (prevents jump on drag start)
         const clickOffsetX = e.clientX - rect.left;
         const clickOffsetY = e.clientY - rect.top;
         
@@ -203,33 +269,38 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
     }
   }
 
+  // Handle mouse movement during manual drag operation
+  // Updates temporary position for smooth visual feedback without
+  // committing to state until drag ends (better performance)
   function handleMouseMove(e: MouseEvent) {
     if (dragging && dragStart.current && selectedBlockType) {
-      // Calculate the total mouse movement from start
+      // Calculate the total mouse movement from start position
       const dx = e.clientX - dragStart.current.mouseX;
       const dy = e.clientY - dragStart.current.mouseY;
       
-      // Apply movement to the original block position, accounting for click offset
+      // Apply movement to the original block position
       const newX = dragStart.current.blockX + dx;
       const newY = dragStart.current.blockY + dy;
       
-      // Ensure block stays within reasonable bounds
+      // Ensure block stays within reasonable bounds (prevents losing blocks off-screen)
       const boundedX = Math.max(0, Math.min(1900, newX));
       const boundedY = Math.max(0, Math.min(1900, newY));
       
-      // Update temporary position for smooth dragging
+      // Update temporary position for smooth dragging animation
       setTempDragPosition({
         [selectedBlockType]: { x: boundedX, y: boundedY }
       });
     }
   }
+  // Handle mouse up to complete manual drag operation
+  // Commits the final position to state and triggers autosave
   function handleMouseUp() {
     console.log('handleMouseUp called, dragging:', dragging);
     if (dragging && selectedBlockType && tempDragPosition) {
       console.log('Ending drag for block:', selectedBlockType);
       setDragging(false);
       
-      // Apply the final position from tempDragPosition
+      // Apply the final position from tempDragPosition to permanent state
       const finalPosition = tempDragPosition[selectedBlockType];
       if (finalPosition) {
         setProjectBlockPositions(prev => ({
@@ -244,7 +315,7 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
       // Clear temporary position
       setTempDragPosition(null);
       
-      // Trigger autosave with the updated positions
+      // Trigger autosave with the updated positions to persist changes
       const currentProject = openProjects.find(p => p.id === currentProjectId);
       if (currentProject) {
         console.log('Triggering autosave after drag');
@@ -268,16 +339,21 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
         );
       }
       
-      // Also increment move count
+      // Increment move count to track if block has been manually positioned
+      // (used to prevent auto-centering on window resize)
       setBlockMoveCount(prev => ({
         ...prev,
         [currentProjectId]: (prev[currentProjectId] || 0) + 1
       }));
     }
+    // Reset all drag state
     dragStart.current = null;
     setDragOffset({ x: 0, y: 0 });
     setTempDragPosition(null);
   }
+  // Set up global mouse event listeners for manual drag operations
+  // We use window-level listeners to ensure drag continues even if
+  // cursor temporarily leaves the block element
   useEffect(() => {
     if (dragging) {
       window.addEventListener('mousemove', handleMouseMove);
@@ -378,6 +454,12 @@ style={{
   );
 }
 
+// BlockBar component at the bottom of the screen
+// Contains draggable blocks that haven't been placed yet
+// Features:
+// - Shows only unplaced block types
+// - Mode toggle to switch between classical/hybrid/quantum
+// - Acts as both source for new blocks and drop zone to remove blocks
 function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: { 
   mode: 'classical' | 'hybrid' | 'quantum'; 
   setMode: (m: 'classical' | 'hybrid' | 'quantum') => void;
@@ -388,6 +470,7 @@ function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: {
   return (
     <div ref={setNodeRef} className={`w-full h-full bg-zinc-950 border-t border-zinc-800 flex items-center px-4 ${isOver ? 'bg-zinc-900' : ''}`}>      
       <div className="flex gap-2">
+        {/* Only show block if it hasn't been placed in the current project */}
         {!isBlockTypePlaced(currentProjectId, mode) && (
           <DraggableBlock id={`blockbar-${mode}`} mode={mode} />
         )}
@@ -400,6 +483,12 @@ function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: {
   );
 }
 
+// ModeToggle allows switching between the three analysis engine types
+// Visual feedback shows active mode with colored background
+// Each mode represents:
+// - Classical: Traditional Monte Carlo simulation
+// - Hybrid: Combination of classical and quantum approaches
+// - Quantum: Pure quantum computation using Qiskit
 function ModeToggle({ mode, setMode }: { mode: 'classical' | 'hybrid' | 'quantum'; setMode: (m: 'classical' | 'hybrid' | 'quantum') => void }) {
   return (
     <div className="flex rounded overflow-hidden border border-zinc-700">
@@ -425,8 +514,17 @@ function ModeToggle({ mode, setMode }: { mode: 'classical' | 'hybrid' | 'quantum
   );
 }
 
-function ContextMenu({ x, y, onEdit, onDelete, onClose }: { x: number; y: number; onEdit: () => void; onDelete: () => void; onClose: () => void }) {
-  // Position the menu, but keep it within the viewport
+// ContextMenu appears on right-click of placed blocks
+// Provides options to edit block parameters or delete the block
+// Positioned at cursor location with proper viewport bounds checking
+function ContextMenu({ x, y, onEdit, onDelete, onClose }: { 
+  x: number; // X coordinate for menu position
+  y: number; // Y coordinate for menu position
+  onEdit: () => void; // Handler to open edit modal
+  onDelete: () => void; // Handler to remove block
+  onClose: () => void; // Handler to close menu
+}) {
+  // Position the menu at cursor, but keep it within the viewport
   const style: React.CSSProperties = {
     position: 'fixed',
     left: x,
@@ -456,6 +554,13 @@ function ContextMenu({ x, y, onEdit, onDelete, onClose }: { x: number; y: number
   );
 }
 
+// FloatingModal is a simplified parameter configuration dialog
+// (Note: This appears to be legacy code - the main configuration is now in BlockEditModal)
+// Allows quick configuration of:
+// - Asset to analyze
+// - Parameter type (volatility, correlation, weight)
+// - Sensitivity range and steps
+// - Volatility fetching from market data
 function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode: 'classical' | 'hybrid' | 'quantum' }) {
   const [asset, setAsset] = useState('');
   const [parameter, setParameter] = useState('volatility');
@@ -655,7 +760,20 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
 }
 
 
-function LayoutToggles({ showNoira, setShowNoira, showBlockBar, setShowBlockBar, showFileManager, setShowFileManager }: { showNoira: boolean; setShowNoira: (v: boolean) => void; showBlockBar: boolean; setShowBlockBar: (v: boolean) => void; showFileManager: boolean; setShowFileManager: (v: boolean) => void; }) {
+// LayoutToggles provides UI controls to show/hide major panels
+// Located in top-right corner for easy access
+// Three toggles control:
+// - File Manager (left sidebar with project explorer)
+// - Noira Panel (right sidebar with AI assistant)
+// - Block Bar (bottom panel with draggable blocks)
+function LayoutToggles({ showNoira, setShowNoira, showBlockBar, setShowBlockBar, showFileManager, setShowFileManager }: { 
+  showNoira: boolean; 
+  setShowNoira: (v: boolean) => void; 
+  showBlockBar: boolean; 
+  setShowBlockBar: (v: boolean) => void; 
+  showFileManager: boolean; 
+  setShowFileManager: (v: boolean) => void; 
+}) {
   return (
     <div className="absolute top-2 right-4 z-30 flex gap-2">
       <button
@@ -683,7 +801,22 @@ function LayoutToggles({ showNoira, setShowNoira, showBlockBar, setShowBlockBar,
   );
 }
 
-function SubtleResizableBorder({ onResize, direction, children, show = true, min = 200, max = 480, initial = 224 }: { onResize?: (w: number) => void; direction: 'left' | 'right' | 'bottom'; children: React.ReactNode; show?: boolean; min?: number; max?: number; initial?: number }) {
+// SubtleResizableBorder creates resizable panels with drag handles
+// Used for File Manager, Noira Panel, and Block Bar
+// Features:
+// - Draggable border for resizing
+// - Min/max size constraints
+// - Visual feedback on hover
+// - Smooth resize animation
+function SubtleResizableBorder({ onResize, direction, children, show = true, min = 200, max = 480, initial = 224 }: { 
+  onResize?: (w: number) => void; // Callback when size changes
+  direction: 'left' | 'right' | 'bottom'; // Which edge has the resize handle
+  children: React.ReactNode; // Panel content
+  show?: boolean; // Whether panel is visible
+  min?: number; // Minimum size in pixels
+  max?: number; // Maximum size in pixels
+  initial?: number; // Initial size
+}) {
   const [size, setSize] = useState(initial);
   const dragging = useRef(false);
 
@@ -729,6 +862,9 @@ function SubtleResizableBorder({ onResize, direction, children, show = true, min
   );
 }
 
+// RunModelButton appears when blocks are configured and ready to run
+// Triggers the sensitivity analysis using the selected engine
+// Positioned in bottom-right corner for easy access
 function RunModelButton({ onClick }: { onClick?: () => void }) {
   return (
     <button
@@ -741,18 +877,29 @@ function RunModelButton({ onClick }: { onClick?: () => void }) {
   );
 }
 
+// App is the root component that manages all application state and orchestrates the UI
+// Key responsibilities:
+// - Project management (create, open, close, delete)
+// - Block placement and configuration via drag-and-drop
+// - Integration with backend for analysis and data persistence
+// - Real-time updates via polling hooks
+// - Layout management with resizable panels
 function App() {
-  // blockLocation: 'blockbar' | 'main' | 'dragging'
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  // Drag and drop state
+  const [activeId, setActiveId] = useState<string | null>(null); // Currently dragging block ID
+  const [showModal, setShowModal] = useState(false); // Legacy modal visibility
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; blockType?: 'classical' | 'hybrid' | 'quantum' } | null>(null);
   const [editingBlockType, setEditingBlockType] = useState<'classical' | 'hybrid' | 'quantum' | null>(null);
-  const [showNoira, setShowNoira] = useState(true);
-  const [showBlockBar, setShowBlockBar] = useState(true);
-  const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null);
-  const [blockMoveCount, setBlockMoveCount] = useState<{ [projectId: string]: number }>({});
+  
+  // Layout state
+  const [showNoira, setShowNoira] = useState(true); // AI assistant panel visibility
+  const [showBlockBar, setShowBlockBar] = useState(true); // Bottom block bar visibility
+  const [selectedBlockProject, setSelectedBlockProject] = useState<string | null>(null); // Which project has selected block
+  const [blockMoveCount, setBlockMoveCount] = useState<{ [projectId: string]: number }>({}); // Track manual moves per project
 
   // Effect to recenter unmoved blocks when window resizes
+  // This improves UX by keeping newly placed blocks centered
+  // Only affects blocks that haven't been manually positioned (moveCount === 0)
   useEffect(() => {
     let resizeTimeout: NodeJS.Timeout;
     
@@ -803,14 +950,17 @@ function App() {
     };
   }, [blockMoveCount]);
 
-  // Effect to cancel autosaves on unmount
+  // Effect to cancel all pending autosaves when component unmounts
+  // Prevents memory leaks and ensures clean shutdown
   useEffect(() => {
     return () => {
       autosaveManager.cancelAllAutosaves();
     };
   }, []);
 
-  // Effect to load projects from backend on mount
+  // Effect to load projects from backend on initial mount
+  // Fetches the list of available projects but doesn't auto-open any
+  // Users must explicitly choose which project to work on
   useEffect(() => {
     async function loadProjects() {
       try {
@@ -836,54 +986,58 @@ function App() {
     loadProjects();
   }, []);
 
-  // Add mode state to App
+  // Block mode state - tracks which analysis type is active
   const [mode, setMode] = useState<'classical' | 'hybrid' | 'quantum'>('classical');
-  // Store block mode per project
+  // Store block mode per project (each project can have different modes)
   const [projectBlockModes, setProjectBlockModes] = useState<{ [projectId: string]: 'classical' | 'hybrid' | 'quantum' }>({});
 
-  // Add state for new project modal
+  // Modal state for creating new projects
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
 
-  // Add state for project delete dialog
+  // State for project deletion confirmation dialog
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  // Add resultsTabs state per project
+  // Results state - each project can have multiple test run results
   const [resultsTabs, setResultsTabs] = useState<{ [projectId: string]: Array<{ id: string; label: string; data: any }> }>({});
   const [currentResultsTab, setCurrentResultsTab] = useState<{ [projectId: string]: string | null }>({});
 
-  // Add isRunningModel and projectBlockParams state (mock for now)
-  const [isRunningModel, setIsRunningModel] = useState(false);
-  const [projectBlockParams, setProjectBlockParams] = useState<{ [projectId: string]: { [blockType: string]: any } }>({});
+  // Analysis state
+  const [isRunningModel, setIsRunningModel] = useState(false); // Shows loading indicator during analysis
+  const [projectBlockParams, setProjectBlockParams] = useState<{ [projectId: string]: { [blockType: string]: any } }>({}); // Portfolio configurations per block type
 
-  // File Manager state
+  // File Manager visibility state
   const [showFileManager, setShowFileManager] = useState(true);
 
-  // Real projects state loaded from backend
+  // Projects state - list of all available projects from backend
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
-  const [projectRefreshTrigger, setProjectRefreshTrigger] = useState(0);
+  const [projectRefreshTrigger, setProjectRefreshTrigger] = useState(0); // Force refresh of project explorer
   
-  // Notification state for auto-closed projects
+  // Notification state for projects deleted externally
   const [deletedProjectNotification, setDeletedProjectNotification] = useState<string | null>(null);
 
-  // Project tab state
+  // Project tab state - tracks which projects are open and active
   const [openProjects, setOpenProjects] = useState<Array<{ id: string; name: string }>>([]);
-  const [currentProjectId, setCurrentProjectId] = useState<string>('');
-  // Per-project block state - change from single block to multiple block types
+  const [currentProjectId, setCurrentProjectId] = useState<string>(''); // Active project ID
+  
+  // Per-project block state - supports multiple block types per project
   const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> }>({});
   const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>({});
   
-  // Legacy function for backward compatibility - check if any block is placed
+  // Helper function to check if any block is placed in a project
+  // Used to determine when to show the Run button
   function hasAnyBlock(projectId: string): boolean {
     return (projectBlocks[projectId]?.size || 0) > 0;
   }
   
-  // Helper function to check if a specific block type is placed
+  // Helper function to check if a specific block type is already placed
+  // Prevents duplicate blocks of the same type in a project
   function isBlockTypePlaced(projectId: string, blockType: 'classical' | 'hybrid' | 'quantum'): boolean {
     return projectBlocks[projectId]?.has(blockType) || false;
   }
   
   // Helper function to add a block type to a project
+  // Updates the Set of placed blocks for the project
   function addBlockTypeToProject(projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') {
     setProjectBlocks(prev => ({
       ...prev,
@@ -892,6 +1046,7 @@ function App() {
   }
   
   // Helper function to remove a block type from a project
+  // Also handles cleanup if no blocks remain
   function removeBlockTypeFromProject(projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') {
     setProjectBlocks(prev => {
       const currentBlocks = new Set(prev[projectId] || []);
@@ -903,7 +1058,8 @@ function App() {
     });
   }
 
-  // Poll for project list changes (for create/delete operations)
+  // Poll for project list changes to detect external create/delete operations
+  // This enables real-time updates when projects are modified outside the UI
   useProjectListPolling({
     enabled: true,
     onProjectsChanged: () => {
@@ -913,7 +1069,8 @@ function App() {
     pollingInterval: 1000, // Check every second
   });
 
-  // Poll for test run changes
+  // Poll for test run changes to update the project explorer
+  // Shows new test runs created by Noira or other sources
   useTestRunPolling({
     enabled: true,
     onTestRunsChanged: () => {
@@ -923,7 +1080,8 @@ function App() {
     pollingInterval: 2000, // Check every 2 seconds
   });
 
-  // Poll for current project changes (for block operations)
+  // Poll for current project changes to sync block modifications
+  // Detects when Noira or other sources modify the active project
   const currentProject = openProjects.find(p => p.id === currentProjectId);
   useProjectPolling({
     projectName: currentProject?.name || null,
@@ -941,7 +1099,11 @@ function App() {
   });
   
 
-  // File Manager handlers
+  // Handler to open a project from the file system
+  // Loads all project data including:
+  // - Block placements and positions
+  // - Block parameters (portfolio configurations)
+  // - UI state (current mode, etc.)
   async function handleOpenProject(projectName: string) {
     try {
       const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
@@ -959,7 +1121,7 @@ function App() {
         // Initialize project state if not exists
         setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
         
-        // Load project configuration
+        // Load project configuration from .ksm file
         if (project.configuration) {
           // Load placed blocks
           const placedBlocks = new Set<'classical' | 'hybrid' | 'quantum'>();
@@ -1006,6 +1168,12 @@ function App() {
     }
   }
 
+  // Handler to open a test run from the project explorer
+  // Test runs are stored separately from projects and linked by project_id
+  // This function:
+  // 1. Fetches the test run data
+  // 2. Finds and opens the associated project
+  // 3. Creates a results tab to display the analysis
   async function handleOpenTestRun(testRunId: string) {
     try {
       const response = await fetch(`http://localhost:5001/api/test-runs/${testRunId}`);
@@ -1093,6 +1261,8 @@ function App() {
     }
   }
 
+  // Handler to close a test run results tab
+  // Searches through all projects to find which one contains the test run
   function handleCloseTestRun(testRunId: string) {
     // Close the results tab for this test run in the appropriate project
     for (const [projectId, tabs] of Object.entries(resultsTabs)) {
@@ -1104,16 +1274,20 @@ function App() {
     }
   }
   
+  // Handler to close a project tab
+  // Cleans up all associated state and switches to another open project
   function closeProject(id: string) {
     const idx = openProjects.findIndex(p => p.id === id);
     if (idx !== -1) {
       const newOpen = openProjects.filter(p => p.id !== id);
       setOpenProjects(newOpen);
+      // Clean up project-specific state
       setProjectBlocks(prev => {
         const newBlocks = { ...prev };
         delete newBlocks[id];
         return newBlocks;
       });
+      // Switch to another project if this was the active one
       if (currentProjectId === id && newOpen.length > 0) {
         setCurrentProjectId(newOpen[Math.max(0, idx - 1)].id);
       }
@@ -1121,17 +1295,21 @@ function App() {
   }
 
 
+  // Handler for @dnd-kit drag start event
+  // Tracks which block is being dragged for visual feedback
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
     setContextMenu(null); // Hide context menu if dragging
   }
 
+  // Handler for @dnd-kit drag end event
+  // Main logic for placing blocks from BlockBar or moving existing blocks
   function handleDragEnd(event: DragEndEvent) {
     if (event.over) {
       if (event.over.id === 'center-dropzone') {
         const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
-        let dropX = 200, dropY = 120; // fallback default
+        let dropX = 200, dropY = 120; // fallback default position
 
         if (
           (activeId === 'blockbar-classical' ||
@@ -1350,7 +1528,9 @@ function App() {
     setContextMenu(null);
   }
 
-  // On Run Model, POST to backend and add results tab
+  // Handler to run the sensitivity analysis
+  // Sends portfolio configuration to the appropriate backend engine
+  // Creates a results tab when analysis completes
   async function handleRunModel() {
     // Get the current block mode for this project
     const blockMode = projectBlockModes[currentProjectId] || 'classical';
@@ -1441,7 +1621,8 @@ function App() {
     }
   }
 
-  // Helper to add a results tab
+  // Helper to add a results tab after analysis completes
+  // Each tab contains the sensitivity analysis data for one test run
   function addResultsTab(projectId: string, data: any) {
     setResultsTabs(prev => {
       const tabs = prev[projectId] || [];
@@ -1453,6 +1634,7 @@ function App() {
   }
 
   // Helper to close a results tab
+  // Handles tab switching logic when closing the active tab
   function closeResultsTab(projectId: string, tabId: string) {
     setResultsTabs(prev => {
       const tabs = (prev[projectId] || []).filter(tab => tab.id !== tabId);
@@ -1463,6 +1645,7 @@ function App() {
       const idx = tabs.findIndex(tab => tab.id === tabId);
       let newTabId = null;
       if (tabs.length > 1) {
+        // Switch to previous tab if available, otherwise next tab
         if (idx > 0) newTabId = tabs[idx - 1].id;
         else newTabId = tabs[1].id;
       }
@@ -1470,7 +1653,9 @@ function App() {
     });
   }
 
-  // Render results tab bar and ResultsChart
+  // Component to render the results tabs bar
+  // Similar to project tabs but for test run results within a project
+  // Green highlighting indicates active results tab
   function ResultsTabsBar({ projectId }: { projectId: string }) {
     const tabs = resultsTabs[projectId] || [];
     const activeTabId = currentResultsTab[projectId];
@@ -1497,6 +1682,8 @@ function App() {
     );
   }
 
+  // Component to render the active results tab content
+  // Passes the sensitivity analysis data to ResultsChart for visualization
   function ResultsTabContent({ projectId }: { projectId: string }) {
     const tabs = resultsTabs[projectId] || [];
     const activeTabId = currentResultsTab[projectId];
@@ -1610,7 +1797,8 @@ function App() {
     setContextMenu(null);
   }
 
-  // Add handler to create a new project
+  // Handler to create a new project
+  // Creates a .ksm file in the backend projects directory
   async function handleCreateProject() {
     if (!newProjectName.trim()) return;
     
@@ -1651,6 +1839,8 @@ function App() {
     setProjectFolderMenu({ x: e.clientX, y: e.clientY, project });
     // TODO: Add context menu for project folder
   }
+  // Handler to delete a project after confirmation
+  // Removes the .ksm file and all associated test runs
   async function handleDeleteProjectConfirm() {
     if (!projectToDelete) return;
     
@@ -1661,9 +1851,11 @@ function App() {
       
       const data = await response.json();
       if (data.success) {
+        // Remove from projects list
         setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
         // Close tab if open
         setOpenProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+        // Clean up all project-related state
         setProjectBlocks(prev => {
           const copy = { ...prev };
           delete copy[projectToDelete.id];
@@ -1692,8 +1884,18 @@ function App() {
   // Add state for block edit modal
   const [showBlockEditModal, setShowBlockEditModal] = useState(false);
 
-  // Edit Modal for block parameters
-  function BlockEditModal({ open, onClose, params, onSave }: { open: boolean; onClose: () => void; params: any; onSave: (params: any) => void }) {
+  // BlockEditModal is the main configuration interface for sensitivity analysis
+  // Features:
+  // - Portfolio configuration (assets, weights, volatilities, correlations)
+  // - Sensitivity analysis parameters (parameter type, range, steps)
+  // - Market data fetching for volatility and correlation estimates
+  // - Dynamic form updates based on parameter selection
+  function BlockEditModal({ open, onClose, params, onSave }: { 
+    open: boolean; 
+    onClose: () => void; 
+    params: any; 
+    onSave: (params: any) => void 
+  }) {
     const [form, setForm] = useState(params || {
       portfolio: {
         assets: ['AAPL', 'GOOG', 'MSFT'],
@@ -1904,6 +2106,8 @@ function App() {
     function handleNoiseTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
       setForm((prev: any) => ({ ...prev, noise_model_type: e.target.value }));
     }
+
+    // TODO: Where the fuck did this go?
 
     const blockTypeLabel =
       projectBlockModes[currentProjectId] === 'classical'
@@ -2151,6 +2355,7 @@ function App() {
     }
 
     const [showRangeWarning, setShowRangeWarning] = useState(false);
+    // TODO: add a warning if the range is too large
 
     function handleSave(e: React.FormEvent) {
       e.preventDefault();
@@ -2495,9 +2700,10 @@ function App() {
     ) : null;
   }
 
+  // Main render - wraps entire app in DndContext for drag-and-drop
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      {/* Monitor each open project for deletion */}
+      {/* Monitor each open project for external deletion */}
       {openProjects.map(project => (
         <ProjectDeletionMonitor
           key={project.id}
