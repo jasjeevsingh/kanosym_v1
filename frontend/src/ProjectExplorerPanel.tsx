@@ -218,23 +218,23 @@ export default function ProjectExplorerPanel({
         body: formData,
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        // Show success modal
-        setUploadedFileName(file.name);
-        setShowUploadSuccessModal(true);
+    //   if (res.ok && data.success) {
+    //     // Show success modal
+    //     setUploadedFileName(file.name);
+    //     setShowUploadSuccessModal(true);
         
-        // Refresh the file tree to show the new file
-        const fileTreeRes = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
-        const fileTreeData = await fileTreeRes.json();
-        setFileTrees(prev => ({ ...prev, [projectId]: fileTreeData }));
+    //     // Refresh the file tree to show the new file
+    //     const fileTreeRes = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+    //     const fileTreeData = await fileTreeRes.json();
+    //     setFileTrees(prev => ({ ...prev, [projectId]: fileTreeData }));
         
-        // If file tree was already expanded, keep it expanded
-        if (expandedFileTreeProjectId !== projectId) {
-          setExpandedFileTreeProjectId(projectId);
-        }
-      } else {
-        setUploadStatus(prev => ({ ...prev, [projectId]: data.error || 'Upload failed' }));
-      }
+    //     // If file tree was already expanded, keep it expanded
+    //     if (expandedFileTreeProjectId !== projectId) {
+    //       setExpandedFileTreeProjectId(projectId);
+    //     }
+    //   } else {
+    //     setUploadStatus(prev => ({ ...prev, [projectId]: data.error || 'Upload failed' }));
+    //   }
     } catch (err) {
       setUploadStatus(prev => ({ ...prev, [projectId]: 'Upload failed' }));
     }
@@ -707,7 +707,7 @@ export default function ProjectExplorerPanel({
       )}
 
       {/* Upload Success Modal */}
-      {showUploadSuccessModal && (
+      {/* {showUploadSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-zinc-800 rounded-lg shadow-lg p-6 min-w-[320px] border border-zinc-700">
             <div className="flex items-center justify-between mb-4">
@@ -732,7 +732,7 @@ export default function ProjectExplorerPanel({
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 } 
