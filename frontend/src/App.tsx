@@ -2479,7 +2479,7 @@ function App() {
                     required
                   />
                   {form.param === 'correlation' && correlationValidity && correlationValidity.invalid_min > 0 && (
-                    <div className="text-xs text-red-500 mt-1">{correlationValidity.invalid_min} step(s) at the minimum would result in invalid correlation matrices.</div>
+                    <div className="text-xs text-red-500 mt-1">{correlationValidity.invalid_min} step(s) on this end will result in invalid correlation matrices. Please increase this value.</div>
                   )}
                   {form.param === 'correlation' && (
                     <div className="text-xs text-zinc-400 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
@@ -2501,7 +2501,7 @@ function App() {
                     required
                   />
                   {form.param === 'correlation' && correlationValidity && correlationValidity.invalid_max > 0 && (
-                    <div className="text-xs text-red-500 mt-1">{correlationValidity.invalid_max} step(s) at the maximum would result in invalid correlation matrices.</div>
+                    <div className="text-xs text-red-500 mt-1">{correlationValidity.invalid_max} step(s) on this end will result in invalid correlation matrices. Please decrease this value.</div>
                   )}
                   {form.param === 'correlation' ? (
                     <div className="text-xs text-zinc-400 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
