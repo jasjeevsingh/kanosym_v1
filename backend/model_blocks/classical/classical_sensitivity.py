@@ -74,6 +74,11 @@ def classical_sensitivity_test(
         analytics=analytics.get_analytics_summary()
     )
     
+    # Add note about skipped perturbation values if applicable
+    if param == 'correlation' and len(results) < steps:
+        skipped_count = steps - len(results)
+        output["note"] = f"Note: {skipped_count} perturbation value(s) were skipped because they would create invalid correlation matrices. This is normal behavior for large correlation deltas."
+    
     logger.info(f"Classical analysis complete")
     
     return output

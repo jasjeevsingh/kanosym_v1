@@ -1805,12 +1805,32 @@ function App() {
       const { name, value } = e.target;
       setForm((prev: any) => {
         if (name === 'asset') {
-          // Find the volatility for the new asset
           const idx = prev.portfolio.assets.indexOf(value);
           let newRange = prev.range;
-          if (idx !== -1) {
+          if (idx !== -1 && prev.param === 'volatility') {
             const v = prev.portfolio.volatility[idx];
             newRange = [Number((v - 0.05).toFixed(4)), Number((v + 0.05).toFixed(4))];
+          } else if (idx !== -1 && prev.param === 'weight') {
+            const w = prev.portfolio.weights[idx];
+            newRange = [Number((w - 0.1).toFixed(4)), Number((w + 0.1).toFixed(4))];
+          }
+          return { ...prev, [name]: value, range: newRange };
+        } else if (name === 'param') {
+          let newRange = prev.range;
+          if (value === 'volatility') {
+            const idx = prev.portfolio.assets.indexOf(prev.asset);
+            if (idx !== -1) {
+              const v = prev.portfolio.volatility[idx];
+              newRange = [Number((v - 0.05).toFixed(4)), Number((v + 0.05).toFixed(4))];
+            }
+          } else if (value === 'weight') {
+            const idx = prev.portfolio.assets.indexOf(prev.asset);
+            if (idx !== -1) {
+              const w = prev.portfolio.weights[idx];
+              newRange = [Number((w - 0.1).toFixed(4)), Number((w + 0.1).toFixed(4))];
+            }
+          } else if (value === 'correlation') {
+            newRange = [-0.5, 0.5];
           }
           return { ...prev, [name]: value, range: newRange };
         }
@@ -1859,8 +1879,8 @@ function App() {
         const volatility = [...prev.portfolio.volatility];
         volatility[idx] = Number(value);
         let newRange = prev.range;
-        // If this asset is the selected one for sensitivity, auto-adjust range
-        if (prev.asset === prev.portfolio.assets[idx]) {
+        // If this asset is the selected one for sensitivity AND parameter is volatility, auto-adjust range
+        if (prev.asset === prev.portfolio.assets[idx] && prev.param === 'volatility') {
           const v = Number(value);
           newRange = [Number((v - 0.05).toFixed(4)), Number((v + 0.05).toFixed(4))];
         }
@@ -2134,13 +2154,18 @@ function App() {
 
     function handleSave(e: React.FormEvent) {
       e.preventDefault();
-      const selectedIdx = form.portfolio.assets.findIndex((a: string) => a === form.asset);
-      const v = form.portfolio.volatility[selectedIdx];
-      const [min, max] = form.range;
-      if (v < min || v > max) {
-        setShowRangeWarning(true);
-        return;
+      
+      // Only validate range for volatility perturbation
+      if (form.param === 'volatility') {
+        const selectedIdx = form.portfolio.assets.findIndex((a: string) => a === form.asset);
+        const v = form.portfolio.volatility[selectedIdx];
+        const [min, max] = form.range;
+        if (v < min || v > max) {
+          setShowRangeWarning(true);
+          return;
+        }
       }
+      
       setShowRangeWarning(false);
       onSave(form);
       onClose();

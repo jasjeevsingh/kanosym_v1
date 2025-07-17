@@ -19,6 +19,7 @@ interface ResultsChartProps {
     results: Result[];
     analytics?: any;
     testType?: 'classical' | 'hybrid' | 'quantum';
+    note?: string;
   };
 }
 
@@ -86,6 +87,11 @@ const ResultsChart: React.FC<ResultsChartProps> = ({ data }) => {
         <div className="text-base text-zinc-400 font-medium text-center">
           Perturbing <span className="font-bold text-blue-500">{data.perturbation}</span> for <span className="font-bold text-green-500">{data.asset}</span>
         </div>
+        {data.note && (
+          <div className="text-sm text-zinc-500 mt-2 text-center">
+            {data.note}
+          </div>
+        )}
       </div>
       {/* Metric Selector & Analytics Button Row */}
       <div className="w-full max-w-3xl flex flex-row items-center justify-between gap-3 mb-3 px-1">
