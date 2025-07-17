@@ -60,7 +60,22 @@ function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, clos
   );
 }
 
-function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical' }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
+function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical', isSelected = false }: { isDragging?: boolean; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum'; isSelected?: boolean }) {
+  // Determine glow color based on mode and selection
+  const getGlowStyle = () => {
+    if (!isSelected) return 'none';
+    switch (mode) {
+      case 'classical':
+        return '0 0 0 2px white, 0 0 8px 2px rgba(255, 255, 255, 0.5)';
+      case 'hybrid':
+        return '0 0 0 2px #a855f7, 0 0 8px 2px rgba(168, 85, 247, 0.5)';
+      case 'quantum':
+        return '0 0 0 2px #3b82f6, 0 0 8px 2px rgba(59, 130, 246, 0.5)';
+      default:
+        return '0 0 0 2px #3b82f6, 0 0 8px 2px rgba(59, 130, 246, 0.5)';
+    }
+  };
+
   return (
     <div
       style={{
@@ -71,6 +86,8 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
         padding: '6px 12px',
         fontSize: '14px',
         whiteSpace: 'nowrap',
+        boxShadow: getGlowStyle(),
+        transition: 'box-shadow 0.15s ease',
       }}
       className={`rounded shadow mr-2 cursor-pointer transition select-none border-2 ${blockModeStyles[mode]} ${isDragging ? 'opacity-50' : ''}`}
       onContextMenu={onContextMenu}
@@ -80,11 +97,11 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
   );
 }
 
-function DraggableBlock({ id, onContextMenu, mode = 'classical' }: { id: string; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum' }) {
+function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = false }: { id: string; onContextMenu?: (e: React.MouseEvent) => void; mode?: 'classical' | 'hybrid' | 'quantum'; isSelected?: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
-      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} mode={mode} />
+      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} mode={mode} isSelected={isSelected} />
     </div>
   );
 }
@@ -336,13 +353,12 @@ style={{
             handleMouseDown(e, blockType);
           }}
           >
-            <div className={`transition border-2 rounded ${isSelected && selectedBlockType === blockType ? 'border-blue-500 shadow-lg' : 'border-transparent'}`}>
-              <DraggableBlock 
-                id={`main-${blockType}`} 
-                onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
-                mode={blockType as 'classical' | 'hybrid' | 'quantum'} 
-              />
-            </div>
+            <DraggableBlock 
+              id={`main-${blockType}`} 
+              onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
+              mode={blockType as 'classical' | 'hybrid' | 'quantum'}
+              isSelected={isSelected && selectedBlockType === blockType}
+            />
           </div>
         );
       })
