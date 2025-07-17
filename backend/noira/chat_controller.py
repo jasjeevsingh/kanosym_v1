@@ -52,6 +52,44 @@ class ChatController:
             "timestamp": datetime.now().isoformat()
         })
     
+    def _extract_response(self, content: str) -> str:
+        """
+        Extract response from content with fallback logic.
+        
+        1. If there are complete <response></response> tags, extract content between them
+        2. If there's an opening <response> tag but no closing tag, return everything after the opening tag
+        3. If there are no response tags but there are thinking tags, return empty string (hide thinking from user)
+        4. If there are no tags at all, return the entire content
+        
+        Args:
+            content: The raw response content
+            
+        Returns:
+            The extracted response text
+        """
+        if not content:
+            return ""
+        
+        # Check for complete response tags
+        response_match = re.search(r'<response>(.*?)</response>', content, re.DOTALL)
+        if response_match:
+            return response_match.group(1).strip()
+        
+        # Check for opening tag without closing tag
+        opening_match = re.search(r'<response>(.*)', content, re.DOTALL)
+        if opening_match:
+            logger.warning("Found opening <response> tag without closing tag, using content after opening tag")
+            return opening_match.group(1).strip()
+        
+        # Check if there are thinking tags but no response tags
+        if '<thinking>' in content or '</thinking>' in content:
+            logger.warning("Found thinking tags but no response tags, returning empty response")
+            return ""
+        
+        # No tags found, return entire content
+        logger.warning("No response tags found, using entire content as response")
+        return content.strip()
+    
     def set_api_key(self, api_key: str) -> Dict[str, Any]:
         """
         Set OpenAI API key and initialize client.
@@ -247,17 +285,17 @@ Remember: Tool calls first (no tags), thinking/response later!"""
                         logger.info(thinking_content)
                         logger.info('-' * 40)
                         
-                        # Check for response tags
-                        response_match = re.search(r'<response>(.*?)</response>', thinking_content, re.DOTALL)
-                        if response_match:
-                            final_response = response_match.group(1).strip()
-                            logger.info("✅ Found final response in tags, exiting thinking loop...")
+                        # Check for response
+                        extracted_response = self._extract_response(thinking_content)
+                        if extracted_response:
+                            final_response = extracted_response
+                            logger.info("✅ Found final response, exiting thinking loop...")
                             break
                     
                     # Check if there are tool calls
                     if not thinking_response.choices[0].message.tool_calls:
                         # No tools called - check if there's a response
-                        if not response_match:
+                        if not extracted_response:
                             # No tools AND no response tags - this shouldn't happen
                             logger.warning("⚠️ No tool calls and no response tags found. Prompting for action...")
                             
@@ -398,13 +436,8 @@ Your answer here...
                     logger.info(response_content)
                     logger.info('-' * 40)
                     
-                    # Extract response from tags if present
-                    response_match = re.search(r'<response>(.*?)</response>', response_content, re.DOTALL)
-                    if response_match:
-                        final_response = response_match.group(1).strip()
-                    else:
-                        # Use the whole response if no tags found
-                        final_response = response_content
+                    # Extract response
+                    final_response = self._extract_response(response_content)
                 
                 # Store response for usage tracking
                 thinking_responses.append(response)
@@ -473,14 +506,8 @@ Your answer here...
                     logger.info(fallback_content)
                     logger.info('-' * 40)
                     
-                    # Extract response from tags if present
-                    response_match = re.search(r'<response>(.*?)</response>', fallback_content, re.DOTALL)
-                    if response_match:
-                        assistant_response = response_match.group(1).strip()
-                    else:
-                        # Use the whole content if no tags found
-                        logger.warning("⚠️ No response tags found in fallback response, using full content")
-                        assistant_response = fallback_content
+                    # Extract response
+                    assistant_response = self._extract_response(fallback_content)
                 else:
                     assistant_response = ""
             
