@@ -2,71 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* Custom scrollbar styles for dark theme */
+@layer utilities {
+  /* For Webkit browsers (Chrome, Safari, Edge) */
+  .custom-scrollbar::-webkit-scrollbar,
+  .custom-scrollbar *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  .custom-scrollbar::-webkit-scrollbar-track,
+  .custom-scrollbar *::-webkit-scrollbar-track {
+    background: rgba(39, 39, 42, 0.5); /* zinc-800 with 50% opacity */
+    border-radius: 9999px;
+  }
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  .custom-scrollbar::-webkit-scrollbar-thumb,
+  .custom-scrollbar *::-webkit-scrollbar-thumb {
+    background: rgba(113, 113, 122, 0.7); /* zinc-500 with 70% opacity */
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+  .custom-scrollbar *::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 161, 170, 0.9); /* zinc-400 with 90% opacity */
+    border-radius: 9999px;
+  }
+
+  /* For Firefox */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #71717a #27272a;
+  }
+
+  .custom-scrollbar * {
+    scrollbar-width: thin;
+    scrollbar-color: #71717a #27272a;
+  }
+}
+/* Global scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+::-webkit-scrollbar-track {
+  background: rgba(39, 39, 42, 0.5); /* zinc-800 with 50% opacity */
+  border-radius: 9999px;
 }
 
-body {
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.7); /* zinc-500 with 70% opacity */
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.9); /* zinc-400 with 90% opacity */
+}
+
+/* Prevent scrolling on the main app */
+html, body {
+  height: 100%;
+  overflow: hidden;
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  padding: 0;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+#root {
+  height: 100vh;
+  overflow: hidden;
 }
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-} */
