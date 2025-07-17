@@ -46,6 +46,8 @@ export default function ProjectExplorerPanel({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editProjectName, setEditProjectName] = useState('');
+  const [showUploadSuccessModal, setShowUploadSuccessModal] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
 
   // Add at the top of the component
   const [expandedFileTreeProjectId, setExpandedFileTreeProjectId] = useState<string | null>(null);
@@ -233,13 +235,28 @@ export default function ProjectExplorerPanel({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setUploadStatus(prev => ({ ...prev, [projectId]: 'File uploaded successfully!' }));
+        // Show success modal
+        setUploadedFileName(file.name);
+        setShowUploadSuccessModal(true);
+        
+        // Refresh the file tree to show the new file
+        const fileTreeRes = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+        const fileTreeData = await fileTreeRes.json();
+        setFileTrees(prev => ({ ...prev, [projectId]: fileTreeData }));
+        
+        // If file tree was already expanded, keep it expanded
+        if (expandedFileTreeProjectId !== projectId) {
+          setExpandedFileTreeProjectId(projectId);
+        }
       } else {
         setUploadStatus(prev => ({ ...prev, [projectId]: data.error || 'Upload failed' }));
       }
     } catch (err) {
       setUploadStatus(prev => ({ ...prev, [projectId]: 'Upload failed' }));
     }
+    
+    // Reset the file input
+    e.target.value = '';
   };
 
   const handleToggleFileTree = async (projectId: string, projectName: string) => {
@@ -247,15 +264,13 @@ export default function ProjectExplorerPanel({
       setExpandedFileTreeProjectId(null);
       return;
     }
-    // Fetch file tree if not already loaded
-    if (!fileTrees[projectId]) {
-      try {
-        const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
-        const data = await res.json();
-        setFileTrees(prev => ({ ...prev, [projectId]: data }));
-      } catch {
-        setFileTrees(prev => ({ ...prev, [projectId]: null }));
-      }
+    // Always fetch fresh file tree data instead of using cache
+    try {
+      const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+      const data = await res.json();
+      setFileTrees(prev => ({ ...prev, [projectId]: data }));
+    } catch {
+      setFileTrees(prev => ({ ...prev, [projectId]: null }));
     }
     setExpandedFileTreeProjectId(projectId);
   };
@@ -454,9 +469,6 @@ export default function ProjectExplorerPanel({
                       <div>Created: {formatDate(project.created)}</div>
                       <div>Modified: {formatDate(project.last_modified)}</div>
                     </div>
-                    {isOpen && uploadStatus[project.project_id] && (
-                      <div className={`mt-2 text-xs ${uploadStatus[project.project_id]?.includes('success') ? 'text-green-400' : 'text-red-400'}`}>{uploadStatus[project.project_id]}</div>
-                    )}
                     {/* View Project Files button and file tree */}
                     {isOpen && (
                       <div className="mt-2">
@@ -714,6 +726,34 @@ export default function ProjectExplorerPanel({
           >
             Delete
           </button>
+        </div>
+      )}
+
+      {/* Upload Success Modal */}
+      {showUploadSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-zinc-800 rounded-lg shadow-lg p-6 min-w-[320px] border border-zinc-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-green-400">Upload Successful!</h3>
+              <button
+                onClick={() => setShowUploadSuccessModal(false)}
+                className="text-zinc-400 hover:text-zinc-200 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="text-zinc-100 mb-4">
+              <p className="mb-2">File <span className="font-mono text-blue-400">{uploadedFileName}</span> has been uploaded successfully.</p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowUploadSuccessModal(false)}
+                className="px-4 py-2 rounded bg-green-600 text-white font-bold hover:bg-green-700"
+              >
+                OK
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
