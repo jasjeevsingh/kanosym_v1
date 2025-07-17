@@ -958,13 +958,10 @@ class NoiraFileAccessService:
         """Handle run_sensitivity_test tool call"""
         project_name = arguments.get("project_name")
         block_type = arguments.get("block_type")
-        use_noise_model = arguments.get("use_noise_model", False)
-        noise_model_type = arguments.get("noise_model_type", "fast")
         
-        return self.run_sensitivity_test(project_name, block_type, use_noise_model, noise_model_type)
+        return self.run_sensitivity_test(project_name, block_type)
     
-    def run_sensitivity_test(self, project_name: str, block_type: str, 
-                           use_noise_model: bool = False, noise_model_type: str = "fast") -> Dict[str, Any]:
+    def run_sensitivity_test(self, project_name: str, block_type: str) -> Dict[str, Any]:
         """Run a sensitivity test for a specific block"""
         try:
             # Load project to get block parameters
@@ -995,10 +992,10 @@ class NoiraFileAccessService:
                 "project_id": project_config.get("metadata", {}).get("project_id")
             }
             
-            # Add quantum-specific parameters
+            # Add quantum-specific parameters from block configuration
             if block_type == "quantum":
-                request_data["use_noise_model"] = use_noise_model
-                request_data["noise_model_type"] = noise_model_type
+                request_data["use_noise_model"] = params.get("use_noise_model", False)
+                request_data["noise_model_type"] = params.get("noise_model_type", "fast")
             
             # Log the request data for debugging
             logger.info(f"Sending sensitivity test request to {api_endpoint}")
