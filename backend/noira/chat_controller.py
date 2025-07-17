@@ -37,8 +37,8 @@ class ChatController:
         self.api_key: Optional[str] = None
         self.chat_history: List[Dict[str, Any]] = []
         self.debug_mode: bool = False
-        self.model: str = "gpt-4o"
-        self.max_tokens: int = 1000
+        self.model: str = "gpt-4.1"
+        self.max_tokens: int = 9998
         self.temperature: float = 0.7
         
         # Initialize file access service
@@ -227,7 +227,7 @@ Remember: Tool calls first (no tags), thinking/response later!"""
                         messages=thinking_messages,
                         tools=NOIRA_TOOLS,
                         tool_choice="auto",
-                        max_tokens=500,
+                        max_tokens=9998,
                         temperature=0.3  # Lower temperature for reasoning
                     )
                     
