@@ -1713,6 +1713,49 @@ function App() {
       noise_model_type: 'fast', // Add noise model type selector
     });
 
+    // Add state for correlation validity warnings
+    const [correlationValidity, setCorrelationValidity] = useState<{invalid_min: number, invalid_max: number, loading: boolean, error?: string} | null>(null);
+
+    // Effect to check correlation validity when relevant fields change
+    useEffect(() => {
+      if (form.param === 'correlation') {
+        setCorrelationValidity({ invalid_min: 0, invalid_max: 0, loading: true });
+        const assetIdx = form.portfolio.assets.indexOf(form.asset);
+        if (assetIdx === -1) {
+          setCorrelationValidity({ invalid_min: 0, invalid_max: 0, loading: false, error: 'Selected asset not found.' });
+          return;
+        }
+        fetch('http://localhost:5001/api/check_correlation_validity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            correlation_matrix: form.portfolio.correlation_matrix,
+            asset_idx: assetIdx,
+            range_vals: form.range,
+            steps: form.steps,
+          })
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              setCorrelationValidity({
+                invalid_min: data.invalid_min,
+                invalid_max: data.invalid_max,
+                loading: false
+              });
++              console.log('[Debug] correlationValidity updated', data);
+            } else {
+              setCorrelationValidity({ invalid_min: 0, invalid_max: 0, loading: false, error: data.error || 'Unknown error' });
+            }
+          })
+          .catch(err => {
+            setCorrelationValidity({ invalid_min: 0, invalid_max: 0, loading: false, error: err.message || 'Network error' });
+          });
+      } else {
+        setCorrelationValidity(null);
+      }
+    }, [form.param, form.asset, form.range[0], form.range[1], form.steps, JSON.stringify(form.portfolio.correlation_matrix)]);
+
     // Helper function to update correlation matrix when assets change
     function updateCorrelationMatrix(newAssets: string[]) {
       const currentMatrix = form.portfolio.correlation_matrix;
@@ -2151,10 +2194,12 @@ function App() {
     }
 
     const [showRangeWarning, setShowRangeWarning] = useState(false);
+    const [showCorrelationWarning, setShowCorrelationWarning] = useState(false);
 
     function handleSave(e: React.FormEvent) {
       e.preventDefault();
-      
+      console.log('[Debug] handleSave clicked - correlationValidity', correlationValidity);
+      setShowCorrelationWarning(false);
       // Only validate range for volatility perturbation
       if (form.param === 'volatility') {
         const selectedIdx = form.portfolio.assets.findIndex((a: string) => a === form.asset);
@@ -2165,11 +2210,22 @@ function App() {
           return;
         }
       }
-      
+      // For correlation, show warning if there are invalid steps
+      if (form.param === 'correlation' && correlationValidity && (correlationValidity.invalid_min > 0 || correlationValidity.invalid_max > 0)) {
+        setShowCorrelationWarning(true);
+        return;
+      }
       setShowRangeWarning(false);
+      setShowCorrelationWarning(false);
       onSave(form);
       onClose();
     }
+
+    // Disable Save button when correlation check is loading
+    const isSaveDisabled = form.param === 'correlation' && (
+      (!correlationValidity || correlationValidity.loading || correlationValidity.invalid_min > 0 || correlationValidity.invalid_max > 0)
+    );
+    console.log('[Debug] isSaveDisabled:', isSaveDisabled, 'correlationValidity:', correlationValidity);
 
     return open ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
@@ -2422,6 +2478,9 @@ function App() {
                     step={form.param === 'correlation' ? 0.0001 : undefined}
                     required
                   />
+                  {form.param === 'correlation' && correlationValidity && correlationValidity.invalid_min > 0 && (
+                    <div className="text-xs text-red-500 mt-1">{correlationValidity.invalid_min} step(s) at the minimum would result in invalid correlation matrices.</div>
+                  )}
                   {form.param === 'correlation' && (
                     <div className="text-xs text-zinc-400 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
                   )}
@@ -2441,6 +2500,9 @@ function App() {
                     step={form.param === 'correlation' ? 0.0001 : undefined}
                     required
                   />
+                  {form.param === 'correlation' && correlationValidity && correlationValidity.invalid_max > 0 && (
+                    <div className="text-xs text-red-500 mt-1">{correlationValidity.invalid_max} step(s) at the maximum would result in invalid correlation matrices.</div>
+                  )}
                   {form.param === 'correlation' ? (
                     <div className="text-xs text-zinc-400 mt-1">Delta range: -0.5 to +0.5 (shifts existing correlations)</div>
                   ) : null}
@@ -2467,7 +2529,9 @@ function App() {
                 <></>
               )}
               
-              
+              {form.param === 'correlation' && correlationValidity && correlationValidity.error && (
+                <div className="text-xs text-red-500 mt-1">Error: {correlationValidity.error}</div>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -2482,6 +2546,7 @@ function App() {
               <button
                 type="submit"
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
+                disabled={isSaveDisabled}
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -2489,6 +2554,16 @@ function App() {
                 Save Configuration
               </button>
             </div>
+            {/* {showCorrelationWarning && correlationValidity && (
+              <div className="text-xs text-red-500 mt-2">
+                {correlationValidity.invalid_min > 0 && (
+                  <div>{correlationValidity.invalid_min} step(s) at the minimum would result in invalid correlation matrices.</div>
+                )}
+                {correlationValidity.invalid_max > 0 && (
+                  <div>{correlationValidity.invalid_max} step(s) at the maximum would result in invalid correlation matrices.</div>
+                )}
+              </div>
+            )} */}
           </form>
         </div>
       </div>
@@ -2767,6 +2842,16 @@ function App() {
         {isRunningModel && (
           <div className="w-full h-1 bg-gradient-to-r from-blue-400 via-green-400 to-teal-400 animate-pulse absolute top-0 left-0 z-50" />
         )}
+        {/* {showCorrelationWarning && correlationValidity && (
+          <div className="text-xs text-red-500 mt-2">
+            {correlationValidity.invalid_min > 0 && (
+              <div>{correlationValidity.invalid_min} step(s) at the minimum would result in invalid correlation matrices.</div>
+            )}
+            {correlationValidity.invalid_max > 0 && (
+              <div>{correlationValidity.invalid_max} step(s) at the maximum would result in invalid correlation matrices.</div>
+            )}
+          </div>
+        )} */}
       </div>
     </DndContext>
   );

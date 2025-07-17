@@ -20,6 +20,7 @@ from datetime import datetime
 import math
 from price_data import get_asset_volatility
 from price_data import fetch_correlation_matrix
+from utils import check_correlation_perturbation_validity
 
 # Load environment variables
 load_dotenv()
@@ -1093,6 +1094,30 @@ def fetch_correlation_matrix_api():
     if matrix is None:
         return jsonify({"success": False, "error": "Insufficient data or error."}), 200
     return jsonify({"success": True, "correlation_matrix": matrix})
+
+@app.route('/api/check_correlation_validity', methods=['POST'])
+def check_correlation_validity_api():
+    data = request.get_json()
+    correlation_matrix = data.get('correlation_matrix')
+    asset_idx = data.get('asset_idx')
+    range_vals = data.get('range_vals')
+    steps = data.get('steps')
+    # Debug logging
+    print(f"[DEBUG] Received /api/check_correlation_validity request: asset_idx={asset_idx}, range_vals={range_vals}, steps={steps}")
+    if correlation_matrix is None or asset_idx is None or range_vals is None or steps is None:
+        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+    try:
+        result = check_correlation_perturbation_validity(
+            correlation_matrix=correlation_matrix,
+            asset_idx=asset_idx,
+            range_vals=tuple(range_vals),
+            steps=steps
+        )
+        print(f"[DEBUG] Correlation validity result: invalid_min={result.get('invalid_min')}, invalid_max={result.get('invalid_max')}, invalid_indices_count={len(result.get('invalid_indices', []))}")
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        print(f"[DEBUG] Error during correlation validity check: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 class NoPollingRequestFilter(logging.Filter):
     """Filter out frequent polling requests from Flask logs"""
