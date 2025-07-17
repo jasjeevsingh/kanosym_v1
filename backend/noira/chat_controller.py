@@ -103,7 +103,13 @@ class ChatController:
             "timestamp": datetime.now().isoformat()
         }
     
-    def send_message(self, message: str, context: Optional[Dict[str, Any]] = None, use_tools: bool = True) -> Dict[str, Any]:
+    def send_message(
+        self,
+        message: str,
+        context: Optional[Dict[str, Any]] = None,
+        use_tools: bool = True,
+        tool_callback: Optional[callable] = None
+    ) -> Dict[str, Any]:
         """
         Send a message to the OpenAI API and get response, optionally using function calling.
         
@@ -300,6 +306,14 @@ Remember: Tool calls first (no tags), thinking/response later!"""
                         tool_args = json.loads(tool_call.function.arguments)
                         
                         result = self.file_access_service.execute_tool_call(tool_name, tool_args)
+
+                        # If a callback is provided, notify as soon as this tool finishes
+                        if tool_callback:
+                            try:
+                                tool_callback(tool_name, result.get("summary", ""))
+                            except Exception as cb_err:
+                                logger.error(f"Tool callback error for {tool_name}: {cb_err}")
+                        
                         tool_results.append({
                             "tool_name": tool_name,
                             "result": result
