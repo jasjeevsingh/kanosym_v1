@@ -13,19 +13,20 @@
 
   .custom-scrollbar::-webkit-scrollbar-track,
   .custom-scrollbar *::-webkit-scrollbar-track {
-    background: #27272a; /* zinc-800 */
-    border-radius: 5px;
+    background: rgba(39, 39, 42, 0.5); /* zinc-800 with 50% opacity */
+    border-radius: 9999px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb,
   .custom-scrollbar *::-webkit-scrollbar-thumb {
-    background: #71717a; /* zinc-500 */
-    border-radius: 5px;
+    background: rgba(113, 113, 122, 0.7); /* zinc-500 with 70% opacity */
+    border-radius: 9999px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover,
   .custom-scrollbar *::-webkit-scrollbar-thumb:hover {
-    background: #a1a1aa; /* zinc-400 */
+    background: rgba(161, 161, 170, 0.9); /* zinc-400 with 90% opacity */
+    border-radius: 9999px;
   }
 
   /* For Firefox */
@@ -39,6 +40,26 @@
     scrollbar-color: #71717a #27272a;
   }
 }
+/* Global scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(39, 39, 42, 0.5); /* zinc-800 with 50% opacity */
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.7); /* zinc-500 with 70% opacity */
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.9); /* zinc-400 with 90% opacity */
+}
+
 /* Prevent scrolling on the main app */
 html, body {
   height: 100%;

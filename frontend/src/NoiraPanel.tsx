@@ -630,6 +630,7 @@ export default function NoiraPanel() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const apiService = useRef(new ChatApiService());
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load status on mount
   useEffect(() => {
@@ -666,6 +667,26 @@ export default function NoiraPanel() {
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
   }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      if (!input) {
+        // When empty, set to min height
+        textareaRef.current.style.height = '36px';
+        textareaRef.current.style.overflowY = 'hidden';
+      } else {
+        // Reset height to auto to get the correct scrollHeight
+        textareaRef.current.style.height = 'auto';
+        // Set height to scrollHeight but constrain to max-height
+        const scrollHeight = textareaRef.current.scrollHeight;
+        const newHeight = Math.min(scrollHeight, 200);
+        textareaRef.current.style.height = `${newHeight}px`;
+        // Only show scrollbar if content exceeds max height
+        textareaRef.current.style.overflowY = scrollHeight > 200 ? 'auto' : 'hidden';
+      }
+    }
+  }, [input]);
 
   // Chat now works with direct message sending and receiving
 
@@ -817,34 +838,53 @@ export default function NoiraPanel() {
       </div>
 
       {/* Input Form */}
-      <form
-        className="flex items-center gap-2 p-2 border-t border-zinc-800 bg-zinc-900"
-        onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
-      >
-        <input
-          className="flex-1 bg-zinc-800 text-zinc-100 rounded px-3 py-2 outline-none border border-zinc-700 focus:border-blue-500 disabled:opacity-50"
-          placeholder={status?.api_key_set ? "Ask Noira..." : "Set API key in debug panel first..."}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={loading || !status?.api_key_set}
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim() || !status?.api_key_set}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
+      <div className="p-2 border-t border-zinc-800 bg-zinc-900">
+        <form
+          className="flex items-start gap-2"
+          onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
         >
-          Send
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowDebug(true)}
-          className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm transition"
-          title="Debug Panel"
-        >
-          ⚙️
-        </button>
-      </form>
+          <div className="flex-1 relative h-fit">
+            <textarea
+              ref={textareaRef}
+              className="w-full bg-zinc-800 text-zinc-100 rounded-lg px-3 py-1.5 pr-12 outline-none border border-zinc-700 focus:border-blue-500 disabled:opacity-50 resize-none overflow-hidden min-h-[36px] max-h-[200px] block"
+              placeholder={status?.api_key_set ? "Ask Noira..." : "SET API KEY"}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading || !status?.api_key_set}
+              rows={1}
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim() || !status?.api_key_set}
+              className="absolute bottom-[5px] right-[5px] w-[26px] h-[26px] bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Send message"
+            >
+              <svg 
+                className="w-4 h-4" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M7 11l5-5m0 0l5 5m-5-5v12" 
+                />
+              </svg>
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDebug(true)}
+            className="bg-gray-700 hover:bg-gray-600 text-white w-9 h-9 rounded text-sm transition flex items-center justify-center"
+            title="Debug Panel"
+          >
+            ⚙️
+          </button>
+        </form>
+      </div>
 
       {/* Debug Panel */}
       {showDebug && debugInfo && (
