@@ -294,11 +294,11 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Average Quantum Correction:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.mean_quantum_correction, 6)}</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.mean_quantum_correction, 4)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Max Quantum Correction:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.max_quantum_correction, 6)}</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.max_quantum_correction, 4)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Scenarios with Significant Quantum Impact:</span>
@@ -306,11 +306,11 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Hybrid vs Quantum Baseline Agreement:</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.hybrid_baseline_vs_quantum, 6)}</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.hybrid_baseline_vs_quantum, 4)}</span>
                   </div>
                   <div className="flex justify-between" title="Mean squared error between GP fit and quantum-calibrated points (lower is better)">
                     <span className="text-zinc-400">Quantum Correction Fit Error (MSE):</span>
-                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.gp_interpolation_mse, 6)}</span>
+                    <span className="text-white font-mono">{formatNumber(analytics.hybrid_metrics.gp_interpolation_mse, 4)}</span>
                   </div>
                   <div className="flex justify-between" title="Length scale parameter of the GP kernel (higher = smoother correction)">
                     <span className="text-zinc-400">Quantum Correction Surface Smoothness (Length Scale):</span>
@@ -339,25 +339,25 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ isOpen, onClose, analyt
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Baseline Portfolio Volatility:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.baseline_portfolio_volatility_daily?.toFixed(4) ?? 'N/A'}</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.baseline_portfolio_volatility_daily !== undefined ? formatNumber(analytics.sensitivity_metrics.baseline_portfolio_volatility_daily, 4) : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Volatility Range:</span>
                   <span className="text-white font-mono">
-                    {analytics.sensitivity_metrics?.portfolio_volatility_range ? `${analytics.sensitivity_metrics.portfolio_volatility_range[0].toFixed(4)} - ${analytics.sensitivity_metrics.portfolio_volatility_range[1].toFixed(4)}` : 'N/A'}
+                    {analytics.sensitivity_metrics?.portfolio_volatility_range ? `${formatNumber(analytics.sensitivity_metrics.portfolio_volatility_range[0], 4)} - ${formatNumber(analytics.sensitivity_metrics.portfolio_volatility_range[1], 4)}` : 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Max Sensitivity Point:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_sensitivity_point?.toFixed(4) ?? 'N/A'}</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.max_sensitivity_point !== undefined ? formatNumber(analytics.sensitivity_metrics.max_sensitivity_point, 4) : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Curve Steepness:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.curve_steepness?.toFixed(4) ?? 'N/A'}</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.curve_steepness !== undefined ? formatNumber(analytics.sensitivity_metrics.curve_steepness, 4) : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">95th Percentile Volatility:</span>
-                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.percentile_95_volatility !== undefined ? analytics.sensitivity_metrics.percentile_95_volatility.toFixed(4) : 'N/A'}</span>
+                  <span className="text-white font-mono">{analytics.sensitivity_metrics?.percentile_95_volatility !== undefined ? formatNumber(analytics.sensitivity_metrics.percentile_95_volatility, 4) : 'N/A'}</span>
                 </div>
               </div>
             </div>
