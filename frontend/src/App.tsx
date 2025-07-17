@@ -906,19 +906,18 @@ function App() {
     function handleResize() {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
-        const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
+        const dropzoneElem = document.getElementById('kanosym-mbe');
         if (!dropzoneElem) return;
         
         const dropzoneRect = dropzoneElem.getBoundingClientRect();
         const blockWidth = 203;
-        const blockHeight = 50;
+        const blockHeight = 44;
         
         setProjectBlockPositions(prev => {
           const newPositions = { ...prev };
           Object.keys(newPositions).forEach(projectId => {
             const position = newPositions[projectId];
             const moveCount = blockMoveCount[projectId] || 0;
-            
             // Only recenter blocks that haven't been moved by the user (moveCount === 0)
             if (position && moveCount === 0) {
               console.log('Recentering block for project:', projectId, 'moveCount:', moveCount);
@@ -1307,7 +1306,8 @@ function App() {
   function handleDragEnd(event: DragEndEvent) {
     if (event.over) {
       if (event.over.id === 'center-dropzone') {
-        const dropzoneElem = document.getElementById('kanosym-mbe-dropzone');
+        // Get the dropzone element and ensure it's properly sized
+        const dropzoneElem = document.getElementById('kanosym-mbe');
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
         let dropX = 200, dropY = 120; // fallback default position
 
@@ -1335,8 +1335,10 @@ function App() {
             dropX = pointerX - dropzoneRect.left;
             dropY = pointerY - dropzoneRect.top;
           } else {
-            dropX = dropzoneRect.width / 2;
-            dropY = dropzoneRect.height / 2;
+            const blockWidth = 203; // match your block width
+            const blockHeight = 44;
+            dropX = dropzoneRect.width / 2 - blockWidth / 2;
+            dropY = dropzoneRect.height / 2 - blockHeight / 2;
           }
         } else if (
           activeId?.startsWith('main-') &&
@@ -1384,8 +1386,8 @@ function App() {
           // Offset to prevent stacking
           const existingBlocks = projectBlockPositions[currentProjectId] || {};
           const offset = Object.keys(existingBlocks).length * 20;
-          const finalDropX = dropX + offset;
-          const finalDropY = dropY + offset;
+          const finalDropX = dropX;
+          const finalDropY = dropY;
 
           addBlockTypeToProject(currentProjectId, blockMode);
           setProjectBlockPositions(prev => {
@@ -1438,6 +1440,12 @@ function App() {
           blockTypeToRemove = projectBlockModes[currentProjectId];
         }
         if (blockTypeToRemove) {
+          console.log('handleBlockDelete: resetting move count for', currentProjectId, 'before:', blockMoveCount[currentProjectId]);
+          setBlockMoveCount(prev => {
+            const updated = { ...prev, [currentProjectId]: -1 };
+            console.log('handleBlockDelete: after reset:', updated[currentProjectId]);
+            return updated;
+          });
           removeBlockTypeFromProject(currentProjectId, blockTypeToRemove);
           setProjectBlockPositions(prev => {
             const newPositions = { ...prev };
@@ -1717,9 +1725,16 @@ function App() {
     // Remove the specific block type that was right-clicked
     const blockTypeToDelete = contextMenu?.blockType;
     if (blockTypeToDelete) {
+      console.log('handleBlockDelete: resetting move count for', currentProjectId, 'before:', blockMoveCount[currentProjectId]);
+      setBlockMoveCount(prev => {
+        const updated = { ...prev, [currentProjectId]: 0 };
+        console.log('handleBlockDelete: after reset:', updated[currentProjectId]);
+        return updated;
+      });
       removeBlockTypeFromProject(currentProjectId, blockTypeToDelete);
       setProjectBlockPositions(prev => {
         const newPositions = { ...prev };
+        
         if (newPositions[currentProjectId]) {
           delete newPositions[currentProjectId][blockTypeToDelete];
           // Remove the project entry if no blocks remain
@@ -1795,6 +1810,7 @@ function App() {
     }
     setSelectedBlockProject(null);
     setContextMenu(null);
+    console.log('handleBlockDelete called', { contextMenu });
   }
 
   // Handler to create a new project
