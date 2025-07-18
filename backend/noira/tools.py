@@ -444,11 +444,11 @@ NOIRA_TOOLS = [
                     },
                     "start_date": {
                         "type": "string",
-                        "description": "Start date for historical data in YYYY-MM-DD format"
+                        "description": "Start date for historical data in YYYY-MM-DD format (optional - omit to use default 6 months ago)"
                     },
                     "end_date": {
                         "type": "string",
-                        "description": "End date for historical data in YYYY-MM-DD format"
+                        "description": "End date for historical data in YYYY-MM-DD format (optional - omit to use default today)"
                     },
                     "window": {
                         "type": "integer",
@@ -462,7 +462,7 @@ NOIRA_TOOLS = [
                         "description": "Data frequency (default: '1d' for daily)"
                     }
                 },
-                "required": ["symbols", "start_date", "end_date"]
+                "required": ["symbols"]
             }
         }
     },
@@ -481,11 +481,11 @@ NOIRA_TOOLS = [
                     },
                     "start_date": {
                         "type": "string",
-                        "description": "Start date for historical data in YYYY-MM-DD format"
+                        "description": "Start date for historical data in YYYY-MM-DD format (optional - omit to use default 6 months ago)"
                     },
                     "end_date": {
                         "type": "string",
-                        "description": "End date for historical data in YYYY-MM-DD format"
+                        "description": "End date for historical data in YYYY-MM-DD format (optional - omit to use default today)"
                     },
                     "frequency": {
                         "type": "string",
@@ -493,7 +493,7 @@ NOIRA_TOOLS = [
                         "description": "Data frequency (default: '1d' for daily)"
                     }
                 },
-                "required": ["symbols", "start_date", "end_date"]
+                "required": ["symbols"]
             }
         }
     },

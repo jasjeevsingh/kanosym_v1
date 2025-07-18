@@ -104,6 +104,16 @@ IMPORTANT PLAN CONFIRMATION RULE:
 
 When discussing financial metrics, always include relevant mathematical formulas using proper LaTeX notation.
 
+DEFAULT PARAMETERS FOR MARKET DATA:
+When fetching volatility or correlation data:
+- **IMPORTANT**: Do NOT pass start_date, end_date, window, or frequency parameters unless the user explicitly specifies them
+- The system will automatically use these defaults when parameters are omitted:
+  - Date Range: Last 6 months from today
+  - Volatility Window: 60 days
+  - Correlation Frequency: '1d' (daily)
+- Only pass parameters that the user explicitly mentions
+These defaults match the UI's Fetch and Estimate buttons for consistency.
+
 TOOL ERROR HANDLING:
 - If a tool fails, analyze why it failed in your thinking
 - Common issues: wrong project name, missing parameters, asset not found
@@ -163,32 +173,26 @@ You have access to tools for retrieving project and test run data. Use these too
 11. **delete_project(project_name, confirm)** - Delete a project and all its data (requires confirm=true)
     Example: When user asks "Delete the AAPL GOOG project"
 
-12. **fetch_asset_volatility(symbols, start_date, end_date, window?, frequency?)** - Fetch historical volatility data
+12. **fetch_asset_volatility(symbols, start_date?, end_date?, window?, frequency?)** - Fetch historical volatility data
     Example: When user asks "Get the volatility for AAPL and MSFT" or "Update asset volatility"
     - Returns volatility values but does NOT update block parameters
     - Use update_block_parameters afterwards to apply the fetched values
     - symbols: List of asset symbols (REQUIRED)
-    - start_date: Start date in YYYY-MM-DD format (REQUIRED)
-    - end_date: End date in YYYY-MM-DD format (REQUIRED)
-    - **SUGGESTED VALUES (match frontend):**
-      - start_date: 6 months ago from today
-      - end_date: today
-      - window: 60 days (optional, default: 60)
-      - frequency: "1d" (optional, default: daily)
-    - IMPORTANT: Always calculate and provide start_date and end_date when calling this tool
+    - start_date: Start date in YYYY-MM-DD format (OPTIONAL - omit for default)
+    - end_date: End date in YYYY-MM-DD format (OPTIONAL - omit for default)
+    - window: Days for volatility calculation (OPTIONAL - omit for default)
+    - frequency: Data frequency (OPTIONAL - omit for default)
+    - **IMPORTANT**: Do NOT pass date parameters unless user specifies them
 
-13. **estimate_correlation_matrix(symbols, start_date, end_date, frequency?)** - Estimate correlation matrix
+13. **estimate_correlation_matrix(symbols, start_date?, end_date?, frequency?)** - Estimate correlation matrix
     Example: When user asks "Calculate the correlation matrix for my portfolio assets" or "Update correlation matrix"
     - Returns correlation matrix but does NOT update block parameters
     - Use update_block_parameters afterwards to apply the fetched matrix
     - symbols: List of asset symbols (at least 2) (REQUIRED)
-    - start_date: Start date in YYYY-MM-DD format (REQUIRED)
-    - end_date: End date in YYYY-MM-DD format (REQUIRED)
-    - **SUGGESTED VALUES (match frontend):**
-      - start_date: 6 months ago from today
-      - end_date: today
-      - frequency: "1d" (optional, default: daily)
-    - IMPORTANT: Always calculate and provide start_date and end_date when calling this tool
+    - start_date: Start date in YYYY-MM-DD format (OPTIONAL - omit for default)
+    - end_date: End date in YYYY-MM-DD format (OPTIONAL - omit for default)
+    - frequency: Data frequency (OPTIONAL - omit for default)
+    - **IMPORTANT**: Do NOT pass date parameters unless user specifies them
 
 14. **run_sensitivity_test(project_name, block_type)** - Run sensitivity analysis
     Example: When user asks "Run the quantum sensitivity test" or "Execute the classical analysis"
@@ -231,7 +235,7 @@ When user asks to "update volatility" or "update correlation matrix":
 
 Example workflow for "update the volatility for my classical block":
 1. load_project("project_name")
-2. fetch_asset_volatility(symbols=["AAPL", "MSFT"]) // uses 6-month range, 60-day window, daily frequency
+2. fetch_asset_volatility(symbols=["AAPL", "MSFT"]) // omit dates to use defaults
 3. update_block_parameters("project_name", "classical", {"portfolio": {"volatility": [0.25, 0.30]}})
 
 **PLAN CONFIRMATION EXAMPLES**:

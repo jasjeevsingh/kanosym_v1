@@ -27,6 +27,28 @@ class NoiraFileAccessService:
         """
         self.file_manager = file_manager
     
+    def _get_default_dates(self):
+        """
+        Get default date range matching the UI's getDefaultDates() function.
+        Returns dates in YYYY-MM-DD format for the last 6 months.
+        """
+        end = datetime.now()
+        # Use the same logic as JavaScript's setMonth(-6)
+        # This handles month boundaries correctly
+        if end.month <= 6:
+            start = end.replace(year=end.year - 1, month=end.month + 6)
+        else:
+            start = end.replace(month=end.month - 6)
+        
+        # Add one day to both dates to match the UI behavior
+        start = start + timedelta(days=1)
+        end = end + timedelta(days=1)
+        
+        return {
+            'start': start.strftime('%Y-%m-%d'),
+            'end': end.strftime('%Y-%m-%d')
+        }
+    
     def execute_tool_call(self, tool_name: str, arguments: dict) -> dict:
         """
         Execute a tool call and return results.
@@ -839,6 +861,14 @@ class NoiraFileAccessService:
                                window: int = 60, frequency: str = "1d") -> Dict[str, Any]:
         """Fetch historical volatility for assets using the existing API endpoint."""
         try:
+            # Use default dates if not provided
+            if not start_date or not end_date:
+                dates = self._get_default_dates()
+                if not start_date:
+                    start_date = dates['start']
+                if not end_date:
+                    end_date = dates['end']
+            
             # Use existing API endpoint
             import requests
             response = requests.post(
@@ -886,6 +916,14 @@ class NoiraFileAccessService:
                                    end_date: str = None, frequency: str = "1d") -> Dict[str, Any]:
         """Estimate correlation matrix for assets using the existing API endpoint."""
         try:
+            # Use default dates if not provided
+            if not start_date or not end_date:
+                dates = self._get_default_dates()
+                if not start_date:
+                    start_date = dates['start']
+                if not end_date:
+                    end_date = dates['end']
+            
             # Use existing API endpoint
             import requests
             response = requests.post(
