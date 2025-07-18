@@ -339,12 +339,18 @@ class FileManager:
         if not project_config:
             return False
         
+        # Load the test run data to get block_type and parameters
+        test_run_data = self.load_test_run(test_run_id)
+        if not test_run_data:
+            logger.error(f"Could not load test run {test_run_id} to update project")
+            return False
+        
         # Add test run to project's test runs list
         test_run_info = {
             "id": test_run_id,
             "timestamp": datetime.now().isoformat(),
-            "block_type": "classical",  # This should come from the test run data
-            "parameters": {},  # This should come from the test run data
+            "block_type": test_run_data.get("block_type", "classical"),
+            "parameters": test_run_data.get("parameters", {}),
             "results_file": f"test-runs/{test_run_id}.json"
         }
         
