@@ -33,7 +33,11 @@ file_manager = FileManager()
 
 # Set up logger
 logger = logging.getLogger("kanosym")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Custom logger to filter out polling noise
 class FilteredRequestHandler(werkzeug.serving.WSGIRequestHandler):
@@ -1054,6 +1058,9 @@ def fetch_volatility():
     start = data.get('start')
     end = data.get('end')
     window = data.get('window', 252)
+    
+    # Log the request parameters
+    logger.info(f"fetch_volatility called with params: symbols={symbols}, start={start}, end={end}, window={window}")
 
     if not symbols or not isinstance(symbols, list):
         return jsonify({"success": False, "error": "'symbols' must be a list of asset symbols."}), 400
@@ -1084,6 +1091,9 @@ def fetch_correlation_matrix_api():
     start = data.get('start')
     end = data.get('end')
     frequency = data.get('frequency', '1d')
+    
+    # Log the request parameters
+    logger.info(f"fetch_correlation_matrix called with params: symbols={symbols}, start={start}, end={end}, frequency={frequency}")
 
     if not symbols or not isinstance(symbols, list) or len(symbols) < 2:
         return jsonify({"success": False, "error": "At least two symbols are required."}), 400
