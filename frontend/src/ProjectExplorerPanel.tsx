@@ -22,6 +22,8 @@ interface ProjectExplorerPanelProps {
   onCloseProject: (projectId: string) => void;
   onOpenTestRun: (testRunId: string) => void;
   onCloseTestRun: (testRunId: string) => void;
+  onTestRunDeleted?: (testRunId: string) => void;
+  onProjectDeleted?: (projectId: string, projectName: string) => void;
   openProjects: { id: string; name: string }[];
   currentProjectId: string;
   refreshTrigger?: number;
@@ -32,6 +34,8 @@ export default function ProjectExplorerPanel({
   onCloseProject,
   onOpenTestRun,
   onCloseTestRun: _onCloseTestRun,
+  onTestRunDeleted,
+  onProjectDeleted,
   openProjects,
   currentProjectId: _currentProjectId,
   refreshTrigger
@@ -143,12 +147,19 @@ export default function ProjectExplorerPanel({
   const handleDeleteProject = async (projectName: string) => {
     setError(null);
     try {
+      // Get the project ID before deletion
+      const projectToDelete = projects.find(p => p.name === projectName);
+      
       const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`, {
         method: 'DELETE'
       });
       const data = await response.json();
       if (data.success) {
         setProjects(prev => prev.filter(p => p.name !== projectName));
+        // Notify parent component about the deletion
+        if (onProjectDeleted && projectToDelete) {
+          onProjectDeleted(projectToDelete.project_id, projectName);
+        }
       } else {
         setError(data.error || 'Failed to delete project');
       }
@@ -167,6 +178,10 @@ export default function ProjectExplorerPanel({
       const data = await response.json();
       if (data.success) {
         setTestRuns(prev => prev.filter(t => t.test_run_id !== testRunId));
+        // Notify parent component about the deletion
+        if (onTestRunDeleted) {
+          onTestRunDeleted(testRunId);
+        }
       } else {
         setError(data.error || 'Failed to delete test run');
       }

@@ -780,39 +780,18 @@ class NoiraFileAccessService:
         if not confirm:
             return {"success": False, "error": "Please set confirm=true to delete the test run"}
         
-        # Load test run to get project info
-        test_run = self.file_manager.load_test_run(test_run_id)
-        if not test_run:
-            return {"success": False, "error": f"Test run '{test_run_id}' not found"}
+        # Use file_manager.delete_test_run which now handles project references
+        success = self.file_manager.delete_test_run(test_run_id)
         
-        project_id = test_run.get("project_id")
-        
-        # Delete the test run file
-        test_run_path = self.file_manager.test_runs_dir / f"{test_run_id}.json"
-        try:
-            test_run_path.unlink()
-            logger.info(f"Deleted test run file: {test_run_id}")
-            
-            # Update project to remove test run reference
-            projects = self.file_manager.list_projects()
-            for project in projects:
-                if project["project_id"] == project_id:
-                    project_config = self.file_manager.load_project(project["name"])
-                    if project_config:
-                        test_runs = project_config.get("results", {}).get("test_runs", [])
-                        if test_run_id in test_runs:
-                            test_runs.remove(test_run_id)
-                            self.file_manager.save_project(project["name"], project_config)
-                    break
-            
-            logger.warning(f"⚠️ Deleted test run {test_run_id} from project {project_id}")
+        if success:
+            logger.warning(f"⚠️ Deleted test run {test_run_id}")
             return {
                 "success": True,
                 "data": {"test_run_id": test_run_id},
                 "summary": f"Deleted test run {test_run_id}"
             }
-        except Exception as e:
-            return {"success": False, "error": f"Failed to delete test run: {str(e)}"}
+        else:
+            return {"success": False, "error": f"Test run '{test_run_id}' not found"}
     
     def _handle_delete_project(self, arguments: dict) -> dict:
         """Handle delete_project tool call"""
@@ -826,37 +805,25 @@ class NoiraFileAccessService:
         if not confirm:
             return {"success": False, "error": "Please set confirm=true to delete the project"}
         
-        # Check if project exists
+        # Check if project exists and get test run count before deletion
         project_config = self.file_manager.load_project(project_name)
         if not project_config:
             return {"success": False, "error": f"Project '{project_name}' not found"}
         
-        # Delete associated test runs
-        test_runs = project_config.get("results", {}).get("test_runs", [])
-        for test_run_id in test_runs:
-            test_run_path = self.file_manager.test_runs_dir / f"{test_run_id}.json"
-            if test_run_path.exists():
-                test_run_path.unlink()
-                logger.info(f"Deleted test run: {test_run_id}")
+        test_run_count = len(project_config.get("results", {}).get("test_runs", []))
         
-        # Delete project file
-        project_path = self.file_manager.projects_dir / project_name / f"{project_name}.ksm"
-        project_dir = self.file_manager.projects_dir / project_name
+        # Use file_manager.delete_project which now handles test run cleanup
+        success = self.file_manager.delete_project(project_name)
         
-        try:
-            if project_path.exists():
-                project_path.unlink()
-            if project_dir.exists():
-                project_dir.rmdir()
-            
-            logger.warning(f"⚠️ Deleted project '{project_name}' and {len(test_runs)} test runs")
+        if success:
+            logger.warning(f"⚠️ Deleted project '{project_name}' and {test_run_count} test runs")
             return {
                 "success": True,
-                "data": {"project_name": project_name, "test_runs_deleted": len(test_runs)},
-                "summary": f"Deleted project '{project_name}' and {len(test_runs)} test runs"
+                "data": {"project_name": project_name, "test_runs_deleted": test_run_count},
+                "summary": f"Deleted project '{project_name}' and {test_run_count} test runs"
             }
-        except Exception as e:
-            return {"success": False, "error": f"Failed to delete project: {str(e)}"}
+        else:
+            return {"success": False, "error": f"Failed to delete project '{project_name}'"}
     
     def _handle_fetch_asset_volatility(self, arguments: dict) -> dict:
         """Handle fetch_asset_volatility tool call"""

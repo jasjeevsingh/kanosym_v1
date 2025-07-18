@@ -137,7 +137,7 @@ class FileManager:
 
     def delete_project(self, name: str) -> bool:
         """
-        Delete a project folder and its .ksm file.
+        Delete a project folder, its .ksm file, and all associated test runs.
         Args:
             name: Project name (without .ksm extension)
         Returns:
@@ -147,6 +147,27 @@ class FileManager:
         filename = f"{name}.ksm"
         filepath = project_folder / filename
         try:
+            # Load project to get test runs before deletion
+            project_config = self.load_project(name)
+            test_runs_to_delete = []
+            
+            if project_config and 'results' in project_config:
+                # Collect all test run IDs associated with this project
+                test_runs = project_config['results'].get('test_runs', [])
+                test_runs_to_delete = [tr.get('id') for tr in test_runs if tr.get('id')]
+                logger.info(f"Found {len(test_runs_to_delete)} test runs to delete for project {name}")
+            
+            # Delete all associated test runs
+            for test_run_id in test_runs_to_delete:
+                test_run_file = self.test_runs_dir / f"{test_run_id}.json"
+                try:
+                    if test_run_file.exists():
+                        test_run_file.unlink()
+                        logger.info(f"Deleted test run {test_run_id} associated with project {name}")
+                except Exception as e:
+                    logger.error(f"Failed to delete test run {test_run_id}: {e}")
+            
+            # Delete the project file
             if filepath.exists():
                 filepath.unlink()
             # Remove the folder if empty
@@ -254,7 +275,7 @@ class FileManager:
     
     def delete_test_run(self, test_run_id: str) -> bool:
         """
-        Delete a test run output file.
+        Delete a test run output file and remove references from all projects.
         
         Args:
             test_run_id: ID of the test run to delete
@@ -266,6 +287,30 @@ class FileManager:
         filepath = self.test_runs_dir / filename
         
         try:
+            # First, remove references from all projects
+            projects = self.list_projects()
+            for project in projects:
+                project_config = self.load_project(project['name'])
+                if project_config and 'results' in project_config:
+                    # Check if this test run is referenced in the project
+                    test_runs = project_config['results'].get('test_runs', [])
+                    original_count = len(test_runs)
+                    # Filter out the test run being deleted
+                    updated_test_runs = [tr for tr in test_runs if tr.get('id') != test_run_id]
+                    
+                    if len(updated_test_runs) < original_count:
+                        # Test run was found and removed, update the project
+                        project_config['results']['test_runs'] = updated_test_runs
+                        
+                        # If the current tab was this test run, clear it
+                        if project_config['results'].get('current_tab') == test_run_id:
+                            project_config['results']['current_tab'] = None
+                        
+                        # Save the updated project
+                        self.save_project(project['name'], project_config)
+                        logger.info(f"Removed test run {test_run_id} reference from project {project['name']}")
+            
+            # Then delete the test run file
             if filepath.exists():
                 filepath.unlink()
                 logger.info(f"Deleted test run file: {filepath}")
