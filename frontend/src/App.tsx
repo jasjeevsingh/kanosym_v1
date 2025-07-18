@@ -69,6 +69,7 @@ function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, clos
           <button
             className={`px-3 py-1 rounded-t text-sm font-medium ${currentProjectId === p.id ? 'bg-zinc-800 text-blue-500' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
             onClick={() => setCurrentProjectId(p.id)}
+            title={p.name}
           >
             {p.name}
           </button>
