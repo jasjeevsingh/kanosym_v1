@@ -5,7 +5,11 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'sans': ['Nunito Sans', 'system-ui', '-apple-system', 'sans-serif'],
+      }
+    },
   },
   plugins: [
     require('@tailwindcss/typography'),
