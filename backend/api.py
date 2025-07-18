@@ -308,6 +308,9 @@ def send_message_stream():
         # Send the final response or error
         if result.get('success'):
             yield f"data: {json.dumps({'type': 'response', 'content': result.get('response', ''), 'timestamp': result.get('timestamp')})}\n\n"
+            # Send frontend actions if any
+            if result.get('frontend_actions'):
+                yield f"data: {json.dumps({'type': 'frontend_actions', 'actions': result.get('frontend_actions')})}\n\n"
         else:
             yield f"data: {json.dumps({'type': 'error', 'message': result.get('message', 'Unknown error')})}\n\n"
 
