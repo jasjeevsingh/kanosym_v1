@@ -1272,6 +1272,49 @@ function App() {
       }
     }
   }
+
+  // Handler for when a test run is deleted from the ProjectExplorerPanel
+  function handleTestRunDeleted(testRunId: string) {
+    // Close any open tabs for this test run across all projects
+    setResultsTabs(prev => {
+      const updated = { ...prev };
+      for (const projectId in updated) {
+        updated[projectId] = updated[projectId].filter(tab => tab.id !== testRunId);
+      }
+      return updated;
+    });
+    
+    // Update current tab if it was the deleted test run
+    setCurrentResultsTab(prev => {
+      const updated = { ...prev };
+      for (const projectId in updated) {
+        if (updated[projectId] === testRunId) {
+          // Find another tab to switch to
+          const remainingTabs = resultsTabs[projectId]?.filter(tab => tab.id !== testRunId) || [];
+          updated[projectId] = remainingTabs.length > 0 ? remainingTabs[0].id : null;
+        }
+      }
+      return updated;
+    });
+  }
+
+  // Handler for when a project is deleted from the ProjectExplorerPanel
+  function handleProjectDeleted(projectId: string, projectName: string) {
+    // Clean up all project-related state
+    closeProject(projectId);
+    
+    // Clean up results tabs for this project
+    setResultsTabs(prev => {
+      const copy = { ...prev };
+      delete copy[projectId];
+      return copy;
+    });
+    setCurrentResultsTab(prev => {
+      const copy = { ...prev };
+      delete copy[projectId];
+      return copy;
+    });
+  }
   
   // Handler to close a project tab
   // Cleans up all associated state and switches to another open project
@@ -1883,6 +1926,17 @@ function App() {
           return copy;
         });
         setProjectBlockModes(prev => {
+          const copy = { ...prev };
+          delete copy[projectToDelete.id];
+          return copy;
+        });
+        // Clean up results tabs for this project
+        setResultsTabs(prev => {
+          const copy = { ...prev };
+          delete copy[projectToDelete.id];
+          return copy;
+        });
+        setCurrentResultsTab(prev => {
           const copy = { ...prev };
           delete copy[projectToDelete.id];
           return copy;
@@ -2891,6 +2945,8 @@ function App() {
               onCloseProject={closeProject}
               onOpenTestRun={handleOpenTestRun}
               onCloseTestRun={handleCloseTestRun}
+              onTestRunDeleted={handleTestRunDeleted}
+              onProjectDeleted={handleProjectDeleted}
               openProjects={openProjects}
               currentProjectId={currentProjectId}
               refreshTrigger={projectRefreshTrigger}
