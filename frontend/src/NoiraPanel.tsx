@@ -27,6 +27,11 @@ interface ApiResponse {
     tool_name: string;
     summary: string;
   }>;
+  frontend_actions?: Array<{
+    type: string;
+    test_run_id?: string;
+    project_name?: string;
+  }>;
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -138,7 +143,8 @@ class ChatApiService {
     onToolCall?: (toolName: string, summary: string) => void,
     onResponse?: (content: string, timestamp: string) => void,
     onError?: (error: string) => void,
-    onDone?: () => void
+    onDone?: () => void,
+    onFrontendActions?: (actions: any[]) => void
   ): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/send/stream`, {
@@ -182,6 +188,9 @@ class ChatApiService {
                   break;
                 case 'response':
                   onResponse?.(data.content, data.timestamp);
+                  break;
+                case 'frontend_actions':
+                  onFrontendActions?.(data.actions);
                   break;
                 case 'error':
                   onError?.(data.message);
@@ -698,8 +707,13 @@ function MessageContent({ message }: { message: ChatMessage }) {
   );
 }
 
+interface NoiraPanelProps {
+  onOpenTestRun?: (testRunId: string) => void;
+  onOpenProject?: (projectName: string) => void;
+}
+
 // Main NoiraPanel Component
-export default function NoiraPanel() {
+export default function NoiraPanel({ onOpenTestRun, onOpenProject }: NoiraPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -860,6 +874,16 @@ export default function NoiraPanel() {
         // Ensure the thinking placeholder is gone if still present
         setMessages(prev => prev.filter(msg => msg.messageId !== thinkingMessageId));
         refreshStatus();
+      },
+      // onFrontendActions
+      (actions) => {
+        for (const action of actions) {
+          if (action.type === 'open_test_run' && onOpenTestRun) {
+            onOpenTestRun(action.test_run_id);
+          } else if (action.type === 'open_project' && onOpenProject) {
+            onOpenProject(action.project_name);
+          }
+        }
       }
     );
   };
@@ -925,6 +949,17 @@ export default function NoiraPanel() {
           });
           return newMessages;
         });
+        
+        // Handle frontend actions if any
+        if (result.frontend_actions) {
+          for (const action of result.frontend_actions) {
+            if (action.type === 'open_test_run' && onOpenTestRun) {
+              onOpenTestRun(action.test_run_id);
+            } else if (action.type === 'open_project' && onOpenProject) {
+              onOpenProject(action.project_name);
+            }
+          }
+        }
       } else {
         // Replace thinking message with error
         setMessages(prev => prev.map(msg => 

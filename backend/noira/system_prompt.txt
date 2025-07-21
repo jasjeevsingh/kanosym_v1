@@ -202,12 +202,28 @@ You have access to tools for retrieving project and test run data. Use these too
     - For quantum blocks: noise settings are configured in the block parameters (use add_block or update_block_parameters)
     - **IMPORTANT**: Test will fail if portfolio has non-positive volatilities or if perturbation would result in negative values
 
+15. **open_test_run(test_run_id)** - Open a test run in the UI
+    Example: When user asks "Show me test run test-run-20250713-190352" or "Open the results"
+    - Opens the test run graph in the UI
+    - Automatically switches to the associated project
+    - test_run_id: Format is "test-run-YYYYMMDD-HHMMSS"
+
+16. **open_project(project_name)** - Open a project in the UI
+    Example: When user asks "Open the Tech Portfolio project" or "Switch to my AAPL project"
+    - Loads and opens the project in the UI
+    - Makes it the active project for editing
+    - project_name: Name of the project (case-insensitive)
+
 IMPORTANT TOOL USAGE GUIDELINES:
 - Always use tools to get actual data rather than making assumptions
 - **CRITICAL**: Before loading any project or test run, ALWAYS first:
   1. Use list_projects() to see current available projects before using load_project()
   2. Use search_test_runs() to find available test runs before using load_test_run()
   This ensures you're working with the most current directory state
+- **OPENING IN UI**: When showing test results or projects to the user:
+  1. After running a sensitivity test, use open_test_run() to display the results graph
+  2. When user asks to see a project, use open_project() after load_project()
+  3. These tools trigger the UI to open the item - just loading doesn't display it
 - **HANDLE EMPTY RESULTS**: When search_test_runs or list_projects returns empty results:
   - Inform the user that no items were found
   - Do NOT attempt to load non-existent items

@@ -1087,8 +1087,61 @@ function App() {
     onProjectChanged: async () => {
       console.log('Current project changed, reloading...');
       if (currentProject) {
-        // Reload the project data
-        await handleOpenProject(currentProject.name);
+        // Just reload the project configuration without re-opening it
+        // The project is already open, we just need to refresh its data
+        try {
+          const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(currentProject.name)}`);
+          const data = await response.json();
+          if (data.success) {
+            const project = data.project;
+            const projectId = project.metadata.project_id;
+            
+            // Update project configuration without adding to openProjects
+            if (project.configuration) {
+              // Load placed blocks
+              const placedBlocks = new Set<'classical' | 'hybrid' | 'quantum'>();
+              
+              // Load block positions
+              const blockPositions: { [blockType: string]: { x: number; y: number } } = {};
+              Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
+                if (blockConfig.placed && blockConfig.position) {
+                  blockPositions[blockType] = blockConfig.position;
+                  placedBlocks.add(blockType as 'classical' | 'hybrid' | 'quantum');
+                }
+              });
+              setProjectBlockPositions(prev => ({ 
+                ...prev, 
+                [projectId]: blockPositions 
+              }));
+              
+              // Update the projectBlocks state
+              setProjectBlocks(prev => ({ ...prev, [projectId]: placedBlocks }));
+              
+              // Load block modes
+              if (project.configuration.ui_state?.current_block_mode) {
+                setProjectBlockModes(prev => ({ 
+                  ...prev, 
+                  [projectId]: project.configuration.ui_state.current_block_mode 
+                }));
+              }
+              
+              // Load block parameters
+              const blockParams: { [blockType: string]: any } = {};
+              Object.entries(project.configuration.blocks).forEach(([blockType, blockConfig]: [string, any]) => {
+                if (blockConfig.parameters) {
+                  blockParams[blockType] = blockConfig.parameters;
+                }
+              });
+              setProjectBlockParams(prev => ({ 
+                ...prev, 
+                [projectId]: blockParams 
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Error reloading project:', error);
+        }
+        
         // Trigger refresh of ProjectExplorerPanel to show updated test run count
         setProjectRefreshTrigger(prev => prev + 1);
       }
@@ -1110,10 +1163,25 @@ function App() {
         const project = data.project;
         const projectId = project.metadata.project_id;
         
-        // Add to open projects if not already open
-        if (!openProjects.find(p => p.id === projectId)) {
-          setOpenProjects(prev => [...prev, { id: projectId, name: projectName }]);
+        // Check if project is already open
+        const isAlreadyOpen = openProjects.find(p => p.id === projectId);
+        
+        if (isAlreadyOpen) {
+          // Project is already open - just focus on it
+          setCurrentProjectId(projectId);
+          console.log(`Project '${projectName}' is already open. Switching focus to it.`);
+          return;
         }
+        
+        // Add to open projects if not already open
+        setOpenProjects(prev => {
+          // Double-check inside the state update to prevent race conditions
+          if (prev.find(p => p.id === projectId)) {
+            console.log(`Race condition avoided: Project '${projectName}' was added by another process`);
+            return prev;
+          }
+          return [...prev, { id: projectId, name: projectName }];
+        });
         setCurrentProjectId(projectId);
         
         // Initialize project state if not exists
@@ -1220,6 +1288,17 @@ function App() {
             // Set the project as current
             setCurrentProjectId(projectId);
             
+            // Check if test run tab already exists
+            const existingTabs = resultsTabs[projectId] || [];
+            const existingTab = existingTabs.find(tab => tab.id === testRunId);
+            
+            if (existingTab) {
+              // Test run is already open - just focus on it
+              console.log(`Test run '${testRunId}' is already open. Switching focus to it.`);
+              setCurrentResultsTab(prev => ({ ...prev, [projectId]: testRunId }));
+              return;
+            }
+            
             // Create a results tab for this test run
             // The test run already has all the data that ResultsChart expects
             const tabData = {
@@ -1233,19 +1312,16 @@ function App() {
               testType: testRun.block_type
             };
             
-            setResultsTabs(prev => {
-              const tabs = prev[projectId] || [];
-              const existingTab = tabs.find(tab => tab.id === testRunId);
-              if (!existingTab) {
-                const newTab = { 
-                  id: testRunId, 
-                  label: `${testRun.block_type} - ${new Date(testRun.timestamp).toLocaleTimeString()}`, 
-                  data: tabData 
-                };
-                return { ...prev, [projectId]: [...tabs, newTab] };
-              }
-              return prev;
-            });
+            // Add new tab
+            const newTab = { 
+              id: testRunId, 
+              label: `${testRun.block_type} - ${new Date(testRun.timestamp).toLocaleTimeString()}`, 
+              data: tabData 
+            };
+            setResultsTabs(prev => ({ 
+              ...prev, 
+              [projectId]: [...(prev[projectId] || []), newTab] 
+            }));
             
             // Set this tab as active
             setCurrentResultsTab(prev => ({ ...prev, [projectId]: testRunId }));
@@ -3002,7 +3078,10 @@ function App() {
             onResize={setNoiraWidth}
           >
             <div style={{ width: noiraWidth, minWidth: minNoira, maxWidth: 480, height: '100%' }}>
-              <NoiraPanel />
+              <NoiraPanel 
+                onOpenTestRun={handleOpenTestRun}
+                onOpenProject={handleOpenProject}
+              />
             </div>
           </SubtleResizableBorder>
         </div>

@@ -105,6 +105,12 @@ class NoiraFileAccessService:
             elif tool_name == "run_sensitivity_test":
                 return self._handle_run_sensitivity_test(arguments)
             
+            elif tool_name == "open_test_run":
+                return self._handle_open_test_run(arguments)
+            
+            elif tool_name == "open_project":
+                return self._handle_open_project(arguments)
+            
             else:
                 return {
                     "success": False,
@@ -1050,3 +1056,80 @@ class NoiraFileAccessService:
         
         except Exception as e:
             return {"success": False, "error": f"Failed to run sensitivity test: {str(e)}"}
+    
+    def _handle_open_test_run(self, arguments: dict) -> dict:
+        """Handle open_test_run tool call - triggers frontend to open a test run"""
+        test_run_id = arguments.get("test_run_id")
+        if not test_run_id:
+            return {"success": False, "error": "test_run_id is required"}
+        
+        # Verify the test run exists
+        test_run = self.file_manager.load_test_run(test_run_id)
+        if not test_run:
+            return {"success": False, "error": f"Test run '{test_run_id}' not found"}
+        
+        # Get project name for better summary
+        project_id = test_run.get("project_id")
+        project_name = "Unknown Project"
+        if project_id:
+            projects = self.file_manager.list_projects()
+            for project in projects:
+                if project["project_id"] == project_id:
+                    project_name = project["name"]
+                    break
+        
+        return {
+            "success": True,
+            "data": {
+                "test_run_id": test_run_id,
+                "project_id": project_id,
+                "block_type": test_run.get("block_type"),
+                "parameter": test_run.get("perturbation"),
+                "asset": test_run.get("asset")
+            },
+            "summary": f"Opening test run {test_run_id} from project '{project_name}'",
+            "frontend_action": {
+                "type": "open_test_run",
+                "test_run_id": test_run_id
+            }
+        }
+    
+    def _handle_open_project(self, arguments: dict) -> dict:
+        """Handle open_project tool call - triggers frontend to open a project"""
+        project_name = arguments.get("project_name")
+        if not project_name:
+            return {"success": False, "error": "project_name is required"}
+        
+        # Try case-insensitive matching
+        projects = self.file_manager.list_projects()
+        matching_project = None
+        for project in projects:
+            if project["name"].lower() == project_name.lower():
+                matching_project = project["name"]
+                break
+        
+        if not matching_project:
+            return {
+                "success": False,
+                "error": f"Project '{project_name}' not found. Available projects: {', '.join([p['name'] for p in projects])}"
+            }
+        
+        # Verify we can load the project
+        project_data = self.file_manager.load_project(matching_project)
+        if not project_data:
+            return {"success": False, "error": f"Failed to load project '{matching_project}'"}
+        
+        project_id = project_data.get("metadata", {}).get("project_id")
+        
+        return {
+            "success": True,
+            "data": {
+                "project_name": matching_project,
+                "project_id": project_id
+            },
+            "summary": f"Opening project '{matching_project}'",
+            "frontend_action": {
+                "type": "open_project",
+                "project_name": matching_project
+            }
+        }

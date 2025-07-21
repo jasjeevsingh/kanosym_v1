@@ -542,16 +542,20 @@ Your answer here...
             logger.info(f"📚 Chat History Updated: {len(self.chat_history)} total messages")
             logger.info("=" * 60)
             
-            # Extract tool details for frontend display
+            # Extract tool details and frontend actions for frontend display
             tool_details = []
+            frontend_actions = []
             for tr in tool_results:
                 if tr["result"]["success"]:
                     tool_details.append({
                         "tool_name": tr["tool_name"],
                         "summary": tr["result"]["summary"]
                     })
+                    # Check for frontend actions
+                    if "frontend_action" in tr["result"]:
+                        frontend_actions.append(tr["result"]["frontend_action"])
             
-            return {
+            response_data = {
                 "success": True,
                 "response": assistant_response,
                 "tools_used": len(tool_results),
@@ -559,6 +563,12 @@ Your answer here...
                 "usage": total_usage,
                 "timestamp": datetime.now().isoformat()
             }
+            
+            # Add frontend actions if any
+            if frontend_actions:
+                response_data["frontend_actions"] = frontend_actions
+            
+            return response_data
             
         except Exception as e:
             logger.error(f"\n❌ ERROR SENDING MESSAGE:")
