@@ -1,7 +1,11 @@
 # Potential Blocks for n8n-Style Workflow System
 
 ## Overview
-This document outlines potential blocks that could be added to transform Kanosym into an n8n-style workflow automation system for quantitative finance and portfolio management. Each block would have inputs, outputs, and configurable parameters.
+This document outlines potential blocks that could be added to transform Kanosym into an n8n-style workflow automation system for both quantitative finance/portfolio management and corporate finance professionals. Each block would have inputs, outputs, and configurable parameters.
+
+The platform targets two key user groups:
+1. **Quantitative Finance**: Portfolio managers, quants, and traders focused on market analysis and trading
+2. **Corporate Finance**: CFOs, FP&A teams, controllers, and treasury departments focused on internal financial operations
 
 ## Core Block Categories
 
@@ -291,10 +295,273 @@ interface Block {
   - Feature map
   - Entanglement structure
 
+## Corporate Finance Blocks
+
+### 9. ERP & Accounting Integration Blocks
+
+#### ERP Connector Block
+- **Purpose**: Direct integration with enterprise resource planning systems
+- **Inputs**: Query parameters, data filters
+- **Outputs**: Financial data, transactional records
+- **Parameters**:
+  - ERP system (SAP, Oracle, Workday, NetSuite, QuickBooks)
+  - Data scope (GL, AP, AR, inventory, payroll)
+  - Sync frequency
+  - Field mapping
+
+#### Spreadsheet Integration Block
+- **Purpose**: Robust Excel/Google Sheets import/export with validation
+- **Inputs**: File paths, sheet ranges
+- **Outputs**: Structured data, validation results
+- **Parameters**:
+  - File format (XLSX, CSV, Google Sheets)
+  - Data validation rules
+  - Error handling strategy
+  - Batch processing options
+
+### 10. Financial Process Automation Blocks
+
+#### Invoice Processing Block (OCR & RPA)
+- **Purpose**: Automated invoice capture and processing
+- **Inputs**: Invoice documents (PDF, images)
+- **Outputs**: Extracted data, validation status
+- **Parameters**:
+  - OCR engine selection
+  - Field extraction rules
+  - PO matching logic
+  - Approval routing rules
+
+#### Three-Way Match Block
+- **Purpose**: Automate PO, invoice, and receipt matching
+- **Inputs**: Purchase orders, invoices, receipts
+- **Outputs**: Match results, discrepancies
+- **Parameters**:
+  - Tolerance thresholds
+  - Exception handling rules
+  - Auto-approval limits
+
+#### Financial Close Automation Block
+- **Purpose**: Orchestrate month/quarter/year-end close processes
+- **Inputs**: Close checklist, data sources
+- **Outputs**: Close status, reconciliation results
+- **Parameters**:
+  - Close calendar
+  - Task dependencies
+  - Automated reconciliations
+  - Rollforward rules
+
+### 11. Compliance & Regulatory Blocks
+
+#### Regulatory Reporting Block
+- **Purpose**: Automate compliance report generation
+- **Inputs**: Financial data, report templates
+- **Outputs**: Formatted reports, submission confirmations
+- **Parameters**:
+  - Report types (ESG, SOX, SEC, AML, KYC)
+  - Jurisdiction requirements
+  - Filing deadlines
+  - Validation rules
+
+#### Audit Trail Block
+- **Purpose**: Comprehensive tracking of all changes and approvals
+- **Inputs**: Transaction data, user actions
+- **Outputs**: Audit logs, compliance reports
+- **Parameters**:
+  - Retention policies
+  - Change tracking granularity
+  - User access controls
+  - Report formats
+
+### 12. Planning & Analysis Blocks
+
+#### Budget Consolidation Block
+- **Purpose**: Aggregate and consolidate budgets across departments
+- **Inputs**: Department budgets, allocation rules
+- **Outputs**: Consolidated budget, variance analysis
+- **Parameters**:
+  - Consolidation hierarchy
+  - Currency conversion rules
+  - Elimination entries
+  - Version control
+
+#### Rolling Forecast Block
+- **Purpose**: Automated rolling forecast generation
+- **Inputs**: Historical data, assumptions, drivers
+- **Outputs**: Forecast scenarios, confidence intervals
+- **Parameters**:
+  - Forecast horizon
+  - Update frequency
+  - Driver-based models
+  - Scenario definitions
+
+#### Variance Analysis Block
+- **Purpose**: Automated actual vs. budget/forecast analysis
+- **Inputs**: Actuals, budgets, forecasts
+- **Outputs**: Variance reports, root cause analysis
+- **Parameters**:
+  - Materiality thresholds
+  - Drill-down levels
+  - Commentary templates
+  - Exception highlighting
+
+### 13. Treasury & Cash Management Blocks
+
+#### Cash Flow Forecasting Block
+- **Purpose**: Predict cash positions and liquidity needs
+- **Inputs**: AR/AP data, historical patterns
+- **Outputs**: Cash projections, liquidity alerts
+- **Parameters**:
+  - Forecast methods (direct, indirect)
+  - Time horizons
+  - Probability distributions
+  - Working capital assumptions
+
+#### Bank Reconciliation Block
+- **Purpose**: Automated bank statement matching
+- **Inputs**: Bank statements, GL transactions
+- **Outputs**: Reconciliation results, unmatched items
+- **Parameters**:
+  - Matching rules
+  - Auto-clear thresholds
+  - Exception workflows
+  - Multi-bank support
+
+### 14. Risk & Fraud Detection Blocks
+
+#### Anomaly Detection Block (Corporate)
+- **Purpose**: Identify unusual patterns in financial data
+- **Inputs**: Transaction streams, historical baselines
+- **Outputs**: Anomaly scores, investigation alerts
+- **Parameters**:
+  - ML algorithms (Isolation Forest, DBSCAN)
+  - Sensitivity settings
+  - Alert thresholds
+  - Investigation workflows
+
+#### Expense Policy Enforcement Block
+- **Purpose**: Automated expense report validation
+- **Inputs**: Expense submissions, policy rules
+- **Outputs**: Approval decisions, policy violations
+- **Parameters**:
+  - Policy rule engine
+  - Receipt requirements
+  - Approval matrices
+  - Reimbursement limits
+
+### 15. Advanced Analytics & AI Blocks
+
+#### Financial Explainer AI Block
+- **Purpose**: Natural language explanations of financial results
+- **Inputs**: Financial data, user queries
+- **Outputs**: Plain language explanations, insights
+- **Parameters**:
+  - AI model selection
+  - Context depth
+  - Technical level adjustment
+  - Language preferences
+
+#### Intelligent Document Processing Block
+- **Purpose**: Extract and classify financial documents
+- **Inputs**: Unstructured documents
+- **Outputs**: Structured data, document classifications
+- **Parameters**:
+  - Document types
+  - Extraction templates
+  - Confidence thresholds
+  - Human-in-the-loop options
+
+### 16. Collaboration & Workflow Blocks
+
+#### Multi-Level Approval Block
+- **Purpose**: Route items through approval hierarchies
+- **Inputs**: Approval requests, routing rules
+- **Outputs**: Approval status, audit trail
+- **Parameters**:
+  - Approval matrices
+  - Delegation rules
+  - Escalation timers
+  - Mobile notifications
+
+#### Comment & Annotation Block
+- **Purpose**: Add contextual notes to any workflow step
+- **Inputs**: Workflow data, user comments
+- **Outputs**: Annotated data, comment threads
+- **Parameters**:
+  - Comment visibility
+  - @mention notifications
+  - Thread resolution tracking
+  - Version control
+
+## High-Performance Computing (HPC) Integration
+
+### HPC Batch Processing Block
+- **Purpose**: Offload intensive calculations to HPC clusters
+- **Inputs**: Computation parameters, data sets
+- **Outputs**: Calculation results, performance metrics
+- **Parameters**:
+  - Resource allocation (CPU/GPU cores)
+  - Job priority
+  - Timeout settings
+  - Cost limits
+
+### Distributed Simulation Block
+- **Purpose**: Run large-scale Monte Carlo and stress tests
+- **Inputs**: Simulation parameters, scenarios
+- **Outputs**: Aggregated results, confidence bands
+- **Parameters**:
+  - Simulation count
+  - Parallelization strategy
+  - Result aggregation method
+  - Resource scaling rules
+
+## Implementation Recommendations
+
+### For Corporate Finance Adoption
+1. **Pre-built Templates**: Provide ready-to-use workflows for common processes:
+   - Monthly financial close
+   - Budget consolidation
+   - Cash flow forecasting
+   - AP three-way match
+   - Compliance reporting
+
+2. **Security & Governance**:
+   - Role-based access control (RBAC)
+   - Data encryption at rest and in transit
+   - SOC 2 Type II compliance
+   - Detailed audit logging
+
+3. **User Experience**:
+   - No-code/low-code interface for finance users
+   - Contextual help and tutorials
+   - Workflow version control
+   - Testing sandbox environment
+
+4. **Integration Architecture**:
+   - REST API for custom integrations
+   - Webhook support for real-time events
+   - File-based integration options
+   - Database connection pooling
+
 ## Next Steps
 
-1. **Priority Blocks**: Start with data source and basic analysis blocks
+1. **Priority Blocks**: 
+   - For Quant Finance: Start with data source and portfolio analysis blocks
+   - For Corporate Finance: Begin with ERP connectors and process automation blocks
 2. **MVP Features**: Focus on sequential execution and simple connections
 3. **Integration Points**: Design API for custom block development
 4. **Performance**: Implement efficient execution engine with caching
 5. **Security**: Add authentication, encryption, and audit trails
+6. **Dual Market Approach**: Create separate workflow templates for each user segment
+7. **Quantum/HPC Integration**: Build abstraction layer for compute resource selection
+
+## Block Category Summary
+
+| Category | Quantitative Finance Focus | Corporate Finance Focus |
+|----------|---------------------------|------------------------|
+| **Data Integration** | Market data feeds, Alternative data | ERP connectors, Spreadsheet sync |
+| **Core Processing** | Portfolio optimization, Risk analysis | Invoice processing, Reconciliation |
+| **Advanced Analytics** | ML price prediction, Quantum optimization | Anomaly detection, NLP explanations |
+| **Compliance** | Trading regulations, Market risk | SOX, ESG, Internal audit |
+| **Automation** | Order routing, Rebalancing | Month-end close, Approval workflows |
+| **Reporting** | Performance attribution, Risk reports | Financial statements, Variance analysis |
+| **Key Pain Points** | Alpha generation, Risk management | Manual processes, Data fragmentation |
