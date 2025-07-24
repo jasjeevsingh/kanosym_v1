@@ -2043,18 +2043,18 @@ function App() {
   }) {
     const [form, setForm] = useState(params || {
       portfolio: {
-        assets: ['AAPL', 'GOOG', 'MSFT'],
+        assets: ['GLD', 'USO', 'CORN'],
         weights: [0.4, 0.3, 0.3],
-        volatility: [0.2, 0.18, 0.22],
+        volatility: [0.15, 0.35, 0.25],
         correlation_matrix: [
-          [1, 0.2, 0.1],
-          [0.2, 1, 0.15],
-          [0.1, 0.15, 1],
+          [1, 0.3, 0.15],
+          [0.3, 1, 0.2],
+          [0.15, 0.2, 1],
         ],
       },
       param: 'volatility',
-      asset: 'AAPL',
-      range: [0.15, 0.25],
+      asset: 'GLD',
+      range: [0.10, 0.20],
       steps: 6,
       use_noise_model: false, // Add noise model toggle for quantum blocks
       noise_model_type: 'fast', // Add noise model type selector
