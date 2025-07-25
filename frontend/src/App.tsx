@@ -18,6 +18,8 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import ResultsChart from './ResultsChart'; // Displays sensitivity analysis results
 import NoiraPanel from './NoiraPanel'; // AI assistant chat interface
 import ProjectExplorerPanel from './ProjectExplorerPanel'; // File manager sidebar
+import { blockDefinitions, blockCategories } from './blocks/blockDefinitions';
+import type { BlockDefinition } from './blocks/blockDefinitions';
 import { triggerProjectAutosave, autosaveManager } from './autosave'; // Auto-save functionality
 import { useProjectDeletion } from './hooks/useProjectDeletion'; // Monitors for project deletion
 
@@ -50,6 +52,17 @@ const blockModeStyles = {
   hybrid: 'bg-purple-700 text-white border-purple-400',
   quantum: 'bg-blue-700 text-white border-blue-400',
 };
+
+// Extended block interface for workflow blocks
+interface WorkflowBlockData {
+  id: string;
+  blockDefId: string;
+  position: { x: number; y: number };
+  connections?: {
+    inputs: { [portId: string]: { fromBlockId: string; fromPortId: string } };
+    outputs: { [portId: string]: Array<{ toBlockId: string; toPortId: string }> };
+  };
+}
 
 // ProjectTabs component renders the tabbed interface for switching between open projects
 // Similar to browser tabs, users can:
@@ -94,16 +107,32 @@ function ProjectTabs({ openProjects, currentProjectId, setCurrentProjectId, clos
 // - onContextMenu: Handler for right-click menu (edit/delete options)
 // - mode: Analysis type determines color scheme (classical=gray, hybrid=purple, quantum=blue)
 // - isSelected: Shows glow effect when block is selected for editing/moving
-function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'classical', isSelected = false }: { 
+function SensitivityTestBlock({ 
+  isDragging = false, 
+  onContextMenu, 
+  mode = 'classical', 
+  isSelected = false,
+  blockDef,
+  showPorts = false,
+  onPortClick,
+  connectingFrom
+}: { 
   isDragging?: boolean; 
   onContextMenu?: (e: React.MouseEvent) => void; 
   mode?: 'classical' | 'hybrid' | 'quantum'; 
-  isSelected?: boolean 
+  isSelected?: boolean;
+  blockDef?: BlockDefinition;
+  showPorts?: boolean;
+  onPortClick?: (blockId: string, portId: string, type: 'input' | 'output') => void;
+  connectingFrom?: { blockId: string; portId: string; type: 'input' | 'output' } | null;
 }) {
   // Determine glow color based on mode and selection state
   // Each mode has a unique glow color to match its theme
   const getGlowStyle = () => {
     if (!isSelected) return 'none';
+    if (blockDef) {
+      return `0 0 0 2px ${blockDef.color}, 0 0 8px 2px ${blockDef.color}66`;
+    }
     switch (mode) {
       case 'classical':
         return '0 0 0 2px white, 0 0 8px 2px rgba(255, 255, 255, 0.5)';
@@ -116,9 +145,132 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
     }
   };
 
+  // If it's a workflow block
+  if (blockDef) {
+    const blockContent = (
+      <div
+        style={{
+          position: 'relative',
+          resize: 'none',
+          minWidth: '180px',
+          maxWidth: '180px',
+          backgroundColor: blockDef.color,
+          border: `2px solid ${isSelected ? '#ffffff' : blockDef.color}`,
+          borderRadius: '6px',
+          boxShadow: isDragging 
+            ? '0 10px 30px rgba(0,0,0,0.3)' 
+            : isSelected 
+            ? `0 0 0 2px ${blockDef.color}40` 
+            : '0 2px 4px rgba(0,0,0,0.1)',
+          opacity: isDragging ? 0.8 : 1,
+          transform: isDragging ? 'scale(1.05)' : 'scale(1)',
+          transition: 'all 0.2s ease',
+          padding: '8px 12px',
+          color: 'white',
+          fontSize: '13px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          justifyContent: 'center',
+          cursor: showPorts ? (isDragging ? 'grabbing' : 'grab') : 'grab'
+        }}
+        onContextMenu={onContextMenu}
+      >
+        <span style={{ fontSize: '14px' }}>{(blockCategories as any)[blockDef.category]?.icon || '📦'}</span>
+        <span>{blockDef.name}</span>
+
+        {/* Ports (only show when placed on canvas) */}
+        {showPorts && (
+          <>
+            {/* Single Input Port - Extended with invisible hit area */}
+            <div
+              style={{
+                position: 'absolute',
+                width: '24px',
+                height: '24px',
+                left: '-16px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                cursor: 'crosshair',
+                zIndex: 100,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseDown={(e) => {
+                console.log('Input port mousedown');
+                e.stopPropagation();
+                e.preventDefault();
+                onPortClick?.(blockDef.id, 'input', 'input');
+              }}
+              title="Input"
+            >
+              <div
+                className="workflow-port-inner"
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  backgroundColor: connectingFrom && connectingFrom.type === 'output' ? '#4ECDC4' : '#ffffff',
+                  border: '2px solid ' + blockDef.color,
+                  borderRadius: '50%',
+                  boxShadow: connectingFrom && connectingFrom.type === 'output' ? '0 0 8px #4ECDC4' : 'none',
+                  pointerEvents: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              />
+            </div>
+
+            {/* Single Output Port - Extended with invisible hit area */}
+            <div
+              style={{
+                position: 'absolute',
+                width: '24px',
+                height: '24px',
+                right: '-16px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                cursor: 'crosshair',
+                zIndex: 100,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseDown={(e) => {
+                console.log('Output port mousedown');
+                e.stopPropagation();
+                e.preventDefault();
+                onPortClick?.(blockDef.id, 'output', 'output');
+              }}
+              title="Output"
+            >
+              <div
+                className="workflow-port-inner"
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  backgroundColor: connectingFrom && connectingFrom.type === 'input' ? '#FFD93D' : '#ffffff',
+                  border: '2px solid ' + blockDef.color,
+                  borderRadius: '50%',
+                  boxShadow: connectingFrom && connectingFrom.type === 'input' ? '0 0 8px #FFD93D' : 'none',
+                  pointerEvents: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
+    
+    return blockContent;
+  }
+
+  // Original sensitivity test block
   return (
     <div
       style={{
+        position: 'relative',
         resize: 'none',
         minWidth: '190px',
         maxWidth: '190px',
@@ -131,6 +283,85 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
       onContextMenu={onContextMenu}
     >
       Portfolio Sensitivity Test
+      
+      {/* Add ports to original blocks when on canvas */}
+      {showPorts && (
+        <>
+          {/* Input Port */}
+          <div
+            style={{
+              position: 'absolute',
+              width: '24px',
+              height: '24px',
+              left: '-16px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              cursor: 'crosshair',
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onMouseDown={(e) => {
+              console.log('Portfolio input port mousedown');
+              e.stopPropagation();
+              e.preventDefault();
+              onPortClick?.(mode, 'input', 'input');
+            }}
+            title="Input"
+          >
+            <div
+              style={{
+                width: '14px',
+                height: '14px',
+                backgroundColor: connectingFrom && connectingFrom.type === 'output' ? '#4ECDC4' : '#ffffff',
+                border: `2px solid ${mode === 'classical' ? '#6b7280' : mode === 'hybrid' ? '#a855f7' : '#3b82f6'}`,
+                borderRadius: '50%',
+                boxShadow: connectingFrom && connectingFrom.type === 'output' ? '0 0 8px #4ECDC4' : 'none',
+                pointerEvents: 'none',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </div>
+
+          {/* Output Port */}
+          <div
+            style={{
+              position: 'absolute',
+              width: '24px',
+              height: '24px',
+              right: '-16px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              cursor: 'crosshair',
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onMouseDown={(e) => {
+              console.log('Portfolio output port mousedown');
+              e.stopPropagation();
+              e.preventDefault();
+              onPortClick?.(mode, 'output', 'output');
+            }}
+            title="Output"
+          >
+            <div
+              style={{
+                width: '14px',
+                height: '14px',
+                backgroundColor: connectingFrom && connectingFrom.type === 'input' ? '#FFD93D' : '#ffffff',
+                border: `2px solid ${mode === 'classical' ? '#6b7280' : mode === 'hybrid' ? '#a855f7' : '#3b82f6'}`,
+                borderRadius: '50%',
+                boxShadow: connectingFrom && connectingFrom.type === 'input' ? '0 0 8px #FFD93D' : 'none',
+                pointerEvents: 'none',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -140,16 +371,42 @@ function SensitivityTestBlock({ isDragging = false, onContextMenu, mode = 'class
 // - Dragging blocks from the BlockBar to the main canvas
 // - Moving blocks already placed on the canvas
 // The id prop helps identify whether the block is from the BlockBar or already placed
-function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = false }: { 
+function DraggableBlock({ 
+  id, 
+  onContextMenu, 
+  mode = 'classical', 
+  isSelected = false,
+  blockDef,
+  showPorts = false,
+  onPortClick,
+  connectingFrom
+}: { 
   id: string; // Unique identifier (e.g., 'blockbar-classical' or 'main-classical')
   onContextMenu?: (e: React.MouseEvent) => void; 
   mode?: 'classical' | 'hybrid' | 'quantum'; 
-  isSelected?: boolean 
+  isSelected?: boolean;
+  blockDef?: BlockDefinition;
+  showPorts?: boolean;
+  onPortClick?: (blockId: string, portId: string, type: 'input' | 'output') => void;
+  connectingFrom?: { blockId: string; portId: string; type: 'input' | 'output' } | null;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ 
+    id
+  });
+  
+  // Regular draggable blocks (from block bar and original blocks)
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
-      <SensitivityTestBlock isDragging={isDragging} onContextMenu={onContextMenu} mode={mode} isSelected={isSelected} />
+      <SensitivityTestBlock 
+        isDragging={isDragging} 
+        onContextMenu={onContextMenu} 
+        mode={mode} 
+        isSelected={isSelected}
+        blockDef={blockDef}
+        showPorts={showPorts}
+        onPortClick={onPortClick}
+        connectingFrom={connectingFrom}
+      />
     </div>
   );
 }
@@ -161,7 +418,7 @@ function DraggableBlock({ id, onContextMenu, mode = 'classical', isSelected = fa
 // - Block positioning and movement after initial placement
 // - Run button appears when blocks are configured
 // - Handles both initial drag-drop placement and subsequent repositioning
-function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onDeselect, currentProjectId, projectBlockPositions, projectBlockModes, openProjects, projectBlocks, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, setProjectBlockPositions, setBlockMoveCount, triggerProjectAutosave }: {
+function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSelect, onDeselect, currentProjectId, projectBlockPositions, projectBlockModes, openProjects, projectBlocks, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, setProjectBlockPositions, setBlockMoveCount, triggerProjectAutosave, workflowBlocks, workflowConnections, setWorkflowBlocks, setWorkflowConnections, connectingFrom, setConnectingFrom, pointerPosition, setPointerPosition }: {
   onEditRequest: (e: React.MouseEvent, blockType?: 'classical' | 'hybrid' | 'quantum') => void;
   showRunButton?: boolean;
   onRunModel?: () => void;
@@ -190,6 +447,22 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
     resultsTabs: { [projectId: string]: Array<{ id: string; label: string; data: any }> },
     currentResultsTab: { [projectId: string]: string | null }
   ) => void;
+  workflowBlocks: { [projectId: string]: WorkflowBlockData[] };
+  workflowConnections: { [projectId: string]: Array<{
+    id: string;
+    from: { blockId: string; portId: string };
+    to: { blockId: string; portId: string };
+  }> };
+  setWorkflowBlocks: React.Dispatch<React.SetStateAction<{ [projectId: string]: WorkflowBlockData[] }>>;
+  setWorkflowConnections: React.Dispatch<React.SetStateAction<{ [projectId: string]: Array<{
+    id: string;
+    from: { blockId: string; portId: string };
+    to: { blockId: string; portId: string };
+  }> }>>;
+  connectingFrom: { blockId: string; portId: string; type: 'input' | 'output' } | null;
+  setConnectingFrom: React.Dispatch<React.SetStateAction<{ blockId: string; portId: string; type: 'input' | 'output' } | null>>;
+  pointerPosition: { x: number; y: number };
+  setPointerPosition: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
 }) {
   // Add CSS for hiding scrollbars while maintaining scroll functionality
   // This creates a cleaner UI by removing visual scrollbar clutter
@@ -212,6 +485,40 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
       }
     };
   }, []);
+
+  // Track mouse position for connection drawing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (connectingFrom) {
+        const dropzone = document.getElementById('main-dropzone');
+        if (dropzone) {
+          const rect = dropzone.getBoundingClientRect();
+          setPointerPosition({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+          });
+        }
+      }
+    };
+    
+    if (connectingFrom) {
+      document.addEventListener('mousemove', handleMouseMove);
+      return () => document.removeEventListener('mousemove', handleMouseMove);
+    }
+  }, [connectingFrom, setPointerPosition]);
+
+  // ESC key to cancel connection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && connectingFrom) {
+        setConnectingFrom(null);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [connectingFrom, setConnectingFrom]);
+
   // Set up the main canvas as a drop zone for blocks
   const { setNodeRef, isOver } = useDroppable({ id: 'center-dropzone' });
   
@@ -227,7 +534,7 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
 
   // Get all placed blocks for this project from global state
   const placedBlocks = projectBlockPositions[currentProjectId] || {};
-  const hasAnyBlocks = Object.keys(placedBlocks).length > 0;
+  const hasAnyBlocks = Object.keys(placedBlocks).length > 0 || (workflowBlocks[currentProjectId]?.length || 0) > 0;
   
   // Manual drag implementation for repositioning blocks after initial placement
   // This is separate from @dnd-kit and allows fine-grained control
@@ -235,6 +542,7 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 }); // Click offset within block
   const dragStart = useRef<{ mouseX: number; mouseY: number; blockX: number; blockY: number } | null>(null); // Initial drag state
   const [tempDragPosition, setTempDragPosition] = useState<{ [blockType: string]: { x: number; y: number } } | null>(null); // Preview position during drag
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // Track mouse for connection drawing
   
   // Handle mouse down for manual block dragging (after initial placement)
   // This captures the initial click position and calculates offsets to ensure
@@ -367,9 +675,51 @@ function MainPage({ onEditRequest, showRunButton, onRunModel, isSelected, onSele
     };
   }, [dragging, selectedBlockType, currentProjectId, openProjects, projectBlocks, projectBlockPositions, projectBlockModes, projectBlockParams, blockMoveCount, resultsTabs, currentResultsTab, dragOffset]);
 
+  // Track mouse position for connection drawing
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const dropzone = document.getElementById('kanosym-mbe-dropzone');
+      if (dropzone && connectingFrom) {
+        const rect = dropzone.getBoundingClientRect();
+        setMousePosition({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        });
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && connectingFrom) {
+        setConnectingFrom(null);
+      }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      // Cancel connection if clicking outside any port
+      // Use setTimeout to avoid canceling immediately after starting
+      setTimeout(() => {
+        const target = e.target as HTMLElement;
+        if (connectingFrom && !target.closest('[title="Input"], [title="Output"]')) {
+          setConnectingFrom(null);
+        }
+      }, 10);
+    };
+
+    if (connectingFrom) {
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('keydown', handleEscape);
+      window.addEventListener('click', handleClick);
+      return () => {
+        window.removeEventListener('mousemove', handleGlobalMouseMove);
+        window.removeEventListener('keydown', handleEscape);
+        window.removeEventListener('click', handleClick);
+      };
+    }
+  }, [connectingFrom]);
+
   return (
     <div
-      id="kanosym-mbe"
+      id="main-dropzone"
       ref={setNodeRef}
       className={`h-full w-full text-zinc-100 flex flex-col min-h-0 min-w-0 border-2 border-dashed transition relative ${isOver ? 'border-blue-400' : 'border-zinc-700'}`}
       style={{
@@ -433,6 +783,52 @@ style={{
               onContextMenu={(e) => handleContextMenu(e, blockType as 'classical' | 'hybrid' | 'quantum')} 
               mode={blockType as 'classical' | 'hybrid' | 'quantum'}
               isSelected={isSelected && selectedBlockType === blockType}
+              showPorts={true}
+              connectingFrom={connectingFrom}
+              onPortClick={(blockId, portId, type) => {
+                console.log('Portfolio block port clicked:', { blockId, portId, type });
+                // Handle port clicks for connections with portfolio blocks
+                if (!connectingFrom) {
+                  // Start connection
+                  setConnectingFrom({ blockId: blockType, portId, type });
+                } else {
+                  // Complete connection
+                  if (connectingFrom.type === 'output' && type === 'input') {
+                    // Connect output to input
+                    const newConnection = {
+                      id: `conn-${Date.now()}`,
+                      from: { blockId: connectingFrom.blockId, portId: connectingFrom.portId },
+                      to: { blockId: blockType, portId }
+                    };
+                    console.log('Creating portfolio connection:', newConnection);
+                    setWorkflowConnections(prev => {
+                      const updated = {
+                        ...prev,
+                        [currentProjectId]: [...(prev[currentProjectId] || []), newConnection]
+                      };
+                      console.log('Updated connections:', updated);
+                      return updated;
+                    });
+                  } else if (connectingFrom.type === 'input' && type === 'output') {
+                    // Connect input to output (reverse)
+                    const newConnection = {
+                      id: `conn-${Date.now()}`,
+                      from: { blockId: blockType, portId },
+                      to: { blockId: connectingFrom.blockId, portId: connectingFrom.portId }
+                    };
+                    console.log('Creating portfolio connection:', newConnection);
+                    setWorkflowConnections(prev => {
+                      const updated = {
+                        ...prev,
+                        [currentProjectId]: [...(prev[currentProjectId] || []), newConnection]
+                      };
+                      console.log('Updated connections:', updated);
+                      return updated;
+                    });
+                  }
+                  setConnectingFrom(null);
+                }
+              }}
             />
           </div>
         );
@@ -443,6 +839,219 @@ style={{
       <div className="text-zinc-400">(Drag the blocks here)</div>
     </div>
   )}
+
+  {/* Render workflow blocks */}
+  {workflowBlocks[currentProjectId]?.map((block) => {
+    const blockDef = blockDefinitions.find(b => b.id === block.blockDefId);
+    if (!blockDef) {
+      console.log('Block definition not found for:', block.blockDefId);
+      return null;
+    }
+    
+    return (
+      <div
+        key={block.id}
+        style={{ 
+          position: 'absolute', 
+          left: block.position.x, 
+          top: block.position.y,
+          zIndex: 20
+        }}
+      >
+        <DraggableBlock 
+          id={`workflow-${block.id}`}
+          blockDef={blockDef}
+          showPorts={true}
+          connectingFrom={connectingFrom}
+          onPortClick={(_, portId, type) => {
+            console.log('Port clicked:', { blockId: block.id, portId, type });
+            // Handle port clicks for connections
+            if (!connectingFrom) {
+              // Start connection
+              setConnectingFrom({ blockId: block.id, portId, type });
+            } else {
+              // Complete connection
+              if (connectingFrom.type === 'output' && type === 'input') {
+                // Connect output to input
+                const newConnection = {
+                  id: `conn-${Date.now()}`,
+                  from: { blockId: connectingFrom.blockId, portId: connectingFrom.portId },
+                  to: { blockId: block.id, portId }
+                };
+                console.log('Creating connection:', newConnection);
+                setWorkflowConnections(prev => {
+                  const updated = {
+                    ...prev,
+                    [currentProjectId]: [...(prev[currentProjectId] || []), newConnection]
+                  };
+                  console.log('Updated connections:', updated);
+                  return updated;
+                });
+              } else if (connectingFrom.type === 'input' && type === 'output') {
+                // Connect input to output (reverse)
+                const newConnection = {
+                  id: `conn-${Date.now()}`,
+                  from: { blockId: block.id, portId },
+                  to: { blockId: connectingFrom.blockId, portId: connectingFrom.portId }
+                };
+                console.log('Creating connection:', newConnection);
+                setWorkflowConnections(prev => {
+                  const updated = {
+                    ...prev,
+                    [currentProjectId]: [...(prev[currentProjectId] || []), newConnection]
+                  };
+                  console.log('Updated connections:', updated);
+                  return updated;
+                });
+              }
+              setConnectingFrom(null);
+            }
+          }}
+        />
+      </div>
+    );
+  })}
+
+  {/* Render connections */}
+  <svg
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+      zIndex: 5
+    }}
+  >
+    {/* Show connecting line while dragging */}
+    {connectingFrom && (
+      <line
+        x1={(() => {
+          // Check workflow blocks first
+          const workflowBlock = workflowBlocks[currentProjectId]?.find(b => b.id === connectingFrom.blockId);
+          if (workflowBlock) {
+            return connectingFrom.type === 'output' ? workflowBlock.position.x + 180 : workflowBlock.position.x;
+          }
+          // Check portfolio blocks
+          const portfolioPos = placedBlocks[connectingFrom.blockId];
+          if (portfolioPos) {
+            return connectingFrom.type === 'output' ? portfolioPos.x + 190 : portfolioPos.x;
+          }
+          return 0;
+        })()}
+        y1={(() => {
+          // Check workflow blocks first
+          const workflowBlock = workflowBlocks[currentProjectId]?.find(b => b.id === connectingFrom.blockId);
+          if (workflowBlock) {
+            return workflowBlock.position.y + 18;
+          }
+          // Check portfolio blocks
+          const portfolioPos = placedBlocks[connectingFrom.blockId];
+          if (portfolioPos) {
+            return portfolioPos.y + 22;
+          }
+          return 0;
+        })()}
+        x2={pointerPosition.x}
+        y2={pointerPosition.y}
+        stroke="#999"
+        strokeWidth="2"
+        strokeDasharray="5,5"
+      />
+    )}
+    
+    {(() => {
+      console.log('Rendering connections:', workflowConnections[currentProjectId]);
+      console.log('Placed blocks:', placedBlocks);
+      return null;
+    })()}
+    {workflowConnections[currentProjectId]?.map((connection) => {
+      // Handle both workflow blocks and portfolio blocks
+      let fromPos = null;
+      let toPos = null;
+      let fromColor = '#4A90E2';
+      
+      // Check if from block is a workflow block
+      const fromWorkflowBlock = workflowBlocks[currentProjectId]?.find(b => b.id === connection.from.blockId);
+      if (fromWorkflowBlock) {
+        const fromDef = blockDefinitions.find(b => b.id === fromWorkflowBlock.blockDefId);
+        if (fromDef) {
+          fromPos = { x: fromWorkflowBlock.position.x + 180, y: fromWorkflowBlock.position.y + 18 };
+          fromColor = fromDef.color;
+        }
+      } else {
+        // Check if it's a portfolio block
+        const fromPortfolioPos = placedBlocks[connection.from.blockId];
+        console.log('Portfolio from block:', connection.from.blockId, fromPortfolioPos);
+        if (fromPortfolioPos) {
+          fromPos = { x: fromPortfolioPos.x + 190, y: fromPortfolioPos.y + 22 };
+          fromColor = connection.from.blockId === 'classical' ? '#6b7280' : 
+                     connection.from.blockId === 'hybrid' ? '#a855f7' : '#3b82f6';
+        }
+      }
+      
+      // Check if to block is a workflow block
+      const toWorkflowBlock = workflowBlocks[currentProjectId]?.find(b => b.id === connection.to.blockId);
+      if (toWorkflowBlock) {
+        const toDef = blockDefinitions.find(b => b.id === toWorkflowBlock.blockDefId);
+        if (toDef) {
+          toPos = { x: toWorkflowBlock.position.x, y: toWorkflowBlock.position.y + 18 };
+        }
+      } else {
+        // Check if it's a portfolio block
+        const toPortfolioPos = placedBlocks[connection.to.blockId];
+        if (toPortfolioPos) {
+          toPos = { x: toPortfolioPos.x, y: toPortfolioPos.y + 22 };
+        }
+      }
+      
+      if (!fromPos || !toPos) return null;
+      
+      const fromX = fromPos.x;
+      const fromY = fromPos.y;
+      const toX = toPos.x;
+      const toY = toPos.y;
+      
+      // Create bezier curve
+      const cpOffset = Math.min(Math.abs(toX - fromX) * 0.5, 100);
+      const path = `M ${fromX} ${fromY} C ${fromX + cpOffset} ${fromY}, ${toX - cpOffset} ${toY}, ${toX} ${toY}`;
+      
+      return (
+        <g key={connection.id}>
+          <path
+            d={path}
+            fill="none"
+            stroke={fromColor}
+            strokeWidth="2"
+            opacity="0.8"
+          />
+          <circle cx={toX} cy={toY} r="3" fill={fromColor} />
+        </g>
+      );
+    })}
+    {/* Show connection being drawn */}
+    {connectingFrom && (
+      <line
+        x1={(() => {
+          const block = workflowBlocks[currentProjectId]?.find(b => b.id === connectingFrom.blockId);
+          if (!block) return 0;
+          return connectingFrom.type === 'output' ? block.position.x + 180 : block.position.x;
+        })()}
+        y1={(() => {
+          const block = workflowBlocks[currentProjectId]?.find(b => b.id === connectingFrom.blockId);
+          if (!block) return 0;
+          return block.position.y + 18;
+        })()}
+        x2={mousePosition.x}
+        y2={mousePosition.y}
+        stroke="#4A90E2"
+        strokeWidth="2"
+        strokeDasharray="5,5"
+        style={{ pointerEvents: 'none' }}
+      />
+    )}
+  </svg>
 </div>
 </div>
 
@@ -466,17 +1075,88 @@ function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: {
   isBlockTypePlaced: (projectId: string, blockType: 'classical' | 'hybrid' | 'quantum') => boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'blockbar-dropzone' });
+  const [showWorkflowBlocks, setShowWorkflowBlocks] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('dataSource');
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  
   return (
-    <div ref={setNodeRef} className={`w-full h-full bg-zinc-950 border-t border-zinc-800 flex items-center px-4 ${isOver ? 'bg-zinc-900' : ''}`}>      
-      <div className="flex gap-2">
-        {/* Only show block if it hasn't been placed in the current project */}
-        {!isBlockTypePlaced(currentProjectId, mode) && (
-          <DraggableBlock id={`blockbar-${mode}`} mode={mode} />
+    <div ref={setNodeRef} className={`w-full h-full bg-zinc-950 border-t border-zinc-800 ${isOver ? 'bg-zinc-900' : ''}`}>
+      <div className="h-full flex">
+        {/* Toggle button */}
+        <button
+          onClick={() => setShowWorkflowBlocks(!showWorkflowBlocks)}
+          className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold border-r border-zinc-700 transition-colors"
+          title="Toggle workflow blocks"
+        >
+          {showWorkflowBlocks ? '◀ Hide' : 'Show Workflow Blocks ▶'}
+        </button>
+        
+        {/* Workflow blocks palette */}
+        {showWorkflowBlocks && (
+          <div className="flex h-full items-center bg-zinc-900 border-r border-zinc-700 px-3" style={{ minWidth: '400px' }}>
+            {/* Category dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowCategoryMenu(!showCategoryMenu)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium rounded flex items-center gap-2 transition-colors"
+                style={{ borderColor: (blockCategories as any)[selectedCategory]?.color }}
+              >
+                <span>{(blockCategories as any)[selectedCategory]?.icon}</span>
+                <span>{(blockCategories as any)[selectedCategory]?.name}</span>
+                <span className="ml-2">▼</span>
+              </button>
+              
+              {/* Category dropdown menu */}
+              {showCategoryMenu && (
+                <div className="absolute bottom-full left-0 mb-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-50 min-w-[200px]">
+                  {Object.entries(blockCategories).map(([key, category]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setSelectedCategory(key);
+                        setShowCategoryMenu(false);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                    >
+                      <span style={{ color: category.color }}>{category.icon}</span>
+                      <span>{category.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Blocks in selected category */}
+            <div className="flex-1 h-full overflow-x-auto overflow-y-hidden px-4">
+              <div className="flex gap-2 h-full items-center">
+                {blockDefinitions
+                  .filter(block => block.category === selectedCategory)
+                  .map(block => (
+                    <div key={block.id} className="flex-shrink-0">
+                      <DraggableBlock 
+                        id={`blockbar-${block.id}`}
+                        blockDef={block}
+                      />
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
         )}
-      </div>
-      <div className="flex-1" />
-      <div className="flex gap-2 items-center">
-        <ModeToggle mode={mode} setMode={setMode} />
+        
+        {/* Original blocks section */}
+        <div className="flex-1 flex items-center px-4">
+          <div className="flex gap-2">
+            {/* Only show block if it hasn't been placed in the current project */}
+            {!isBlockTypePlaced(currentProjectId, mode) && (
+              <DraggableBlock id={`blockbar-${mode}`} mode={mode} />
+            )}
+          </div>
+          <div className="flex-1" />
+          <div className="flex gap-2 items-center">
+            <ModeToggle mode={mode} setMode={setMode} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -889,6 +1569,7 @@ function App() {
   const [showModal, setShowModal] = useState(false); // Legacy modal visibility
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; blockType?: 'classical' | 'hybrid' | 'quantum' } | null>(null);
   const [editingBlockType, setEditingBlockType] = useState<'classical' | 'hybrid' | 'quantum' | null>(null);
+  const [pointerPosition, setPointerPosition] = useState({ x: 0, y: 0 }); // Track mouse position for connection drawing
   
   // Layout state
   const [showNoira, setShowNoira] = useState(true); // AI assistant panel visibility
@@ -1022,10 +1703,19 @@ function App() {
   const [projectBlocks, setProjectBlocks] = useState<{ [projectId: string]: Set<'classical' | 'hybrid' | 'quantum'> }>({});
   const [projectBlockPositions, setProjectBlockPositions] = useState<{ [projectId: string]: { [blockType: string]: { x: number; y: number } } }>({});
   
+  // Workflow blocks state for n8n-style blocks
+  const [workflowBlocks, setWorkflowBlocks] = useState<{ [projectId: string]: WorkflowBlockData[] }>({});
+  const [workflowConnections, setWorkflowConnections] = useState<{ [projectId: string]: Array<{
+    id: string;
+    from: { blockId: string; portId: string };
+    to: { blockId: string; portId: string };
+  }> }>({});
+  const [connectingFrom, setConnectingFrom] = useState<{ blockId: string; portId: string; type: 'input' | 'output' } | null>(null);
+  
   // Helper function to check if any block is placed in a project
   // Used to determine when to show the Run button
   function hasAnyBlock(projectId: string): boolean {
-    return (projectBlocks[projectId]?.size || 0) > 0;
+    return (projectBlocks[projectId]?.size || 0) > 0 || (workflowBlocks[projectId]?.length || 0) > 0;
   }
   
   // Helper function to check if a specific block type is already placed
@@ -1186,6 +1876,8 @@ function App() {
         
         // Initialize project state if not exists
         setProjectBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || new Set() }));
+        setWorkflowBlocks(prev => ({ ...prev, [projectId]: prev[projectId] || [] }));
+        setWorkflowConnections(prev => ({ ...prev, [projectId]: prev[projectId] || [] }));
         
         // Load project configuration from .ksm file
         if (project.configuration) {
@@ -1425,10 +2117,92 @@ function App() {
     if (event.over) {
       if (event.over.id === 'center-dropzone') {
         // Get the dropzone element and ensure it's properly sized
-        const dropzoneElem = document.getElementById('kanosym-mbe');
+        const dropzoneElem = document.getElementById('main-dropzone');
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
         let dropX = 200, dropY = 120; // fallback default position
 
+        // Handle workflow blocks
+        if (activeId?.startsWith('blockbar-') && 
+            !['blockbar-classical', 'blockbar-hybrid', 'blockbar-quantum'].includes(activeId) &&
+            dropzoneRect) {
+          // Extract block definition ID
+          const blockDefId = activeId.replace('blockbar-', '');
+          const blockDef = blockDefinitions.find(b => b.id === blockDefId);
+          
+          if (blockDef) {
+            let pointerX: number | null = null, pointerY: number | null = null;
+
+            if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
+              pointerX = Number(event.activatorEvent.clientX);
+              pointerY = Number(event.activatorEvent.clientY);
+            } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
+              pointerX = Number(window.event.clientX);
+              pointerY = Number(window.event.clientY);
+            }
+
+            if (
+              pointerX !== null && pointerY !== null &&
+              pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
+              pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
+            ) {
+              dropX = pointerX - dropzoneRect.left;
+              dropY = pointerY - dropzoneRect.top;
+            } else {
+              const blockWidth = 220;
+              const blockHeight = 100;
+              dropX = dropzoneRect.width / 2 - blockWidth / 2;
+              dropY = dropzoneRect.height / 2 - blockHeight / 2;
+            }
+            
+            // Add the workflow block
+            const newBlock: WorkflowBlockData = {
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              blockDefId: blockDefId,
+              position: { x: dropX, y: dropY },
+              connections: {
+                inputs: {},
+                outputs: {}
+              }
+            };
+            
+            console.log('Adding workflow block:', newBlock);
+            console.log('Current project ID:', currentProjectId);
+            setWorkflowBlocks(prev => {
+              const updated = {
+                ...prev,
+                [currentProjectId]: [...(prev[currentProjectId] || []), newBlock]
+              };
+              console.log('Updated workflow blocks:', updated);
+              return updated;
+            });
+          }
+          return;
+        }
+        
+        // Handle moving existing workflow blocks
+        if (activeId?.startsWith('workflow-') && dropzoneRect) {
+          const blockId = activeId;  // The activeId already contains the full workflow-{id} format
+          const blockIndex = workflowBlocks[currentProjectId]?.findIndex(b => `workflow-${b.id}` === blockId);
+          
+          if (blockIndex !== undefined && blockIndex >= 0) {
+            const currentBlock = workflowBlocks[currentProjectId][blockIndex];
+            const newX = currentBlock.position.x + (event.delta?.x ?? 0);
+            const newY = currentBlock.position.y + (event.delta?.y ?? 0);
+            
+            setWorkflowBlocks(prev => {
+              const updated = { ...prev };
+              updated[currentProjectId] = [...updated[currentProjectId]];
+              updated[currentProjectId][blockIndex] = {
+                ...updated[currentProjectId][blockIndex],
+                position: { x: newX, y: newY }
+              };
+              return updated;
+            });
+          }
+          return;
+        }
+        
+        // Handle original sensitivity test blocks
         if (
           (activeId === 'blockbar-classical' ||
            activeId === 'blockbar-hybrid' ||
@@ -1953,6 +2727,10 @@ function App() {
         setProjects(prev => [...prev, newProject]);
         setShowNewProjectModal(false);
         setNewProjectName('');
+        
+        // Initialize workflow blocks for new project
+        setWorkflowBlocks(prev => ({ ...prev, [newProject.id]: [] }));
+        setWorkflowConnections(prev => ({ ...prev, [newProject.id]: [] }));
         // Trigger refresh of ProjectExplorerPanel with a small delay
         console.log('Triggering ProjectExplorerPanel refresh');
         setTimeout(() => {
@@ -3060,6 +3838,14 @@ function App() {
               setProjectBlockPositions={setProjectBlockPositions}
               setBlockMoveCount={setBlockMoveCount}
               triggerProjectAutosave={triggerProjectAutosave}
+              workflowBlocks={workflowBlocks}
+              workflowConnections={workflowConnections}
+              setWorkflowBlocks={setWorkflowBlocks}
+              setWorkflowConnections={setWorkflowConnections}
+              connectingFrom={connectingFrom}
+              setConnectingFrom={setConnectingFrom}
+              pointerPosition={pointerPosition}
+              setPointerPosition={setPointerPosition}
             />
             ) : (
               <div className="h-full w-full bg-zinc-800 text-zinc-100 flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 relative">
@@ -3098,15 +3884,41 @@ function App() {
         </SubtleResizableBorder>
         <DragOverlay>
           {activeId ? (
-            <SensitivityTestBlock 
-              isDragging 
-              mode={
-                activeId === 'blockbar-classical' || activeId === 'main-classical' ? 'classical' :
-                activeId === 'blockbar-hybrid' || activeId === 'main-hybrid' ? 'hybrid' :
-                activeId === 'blockbar-quantum' || activeId === 'main-quantum' ? 'quantum' :
-                'classical'
+            (() => {
+              // Check if it's a workflow block from blockbar
+              if (activeId.startsWith('blockbar-') && 
+                  !['blockbar-classical', 'blockbar-hybrid', 'blockbar-quantum'].includes(activeId)) {
+                const blockDefId = activeId.replace('blockbar-', '');
+                const blockDef = blockDefinitions.find(b => b.id === blockDefId);
+                if (blockDef) {
+                  return <SensitivityTestBlock isDragging blockDef={blockDef} />;
+                }
               }
-            />
+              
+              // Check if it's an existing workflow block being moved
+              if (activeId.startsWith('workflow-')) {
+                const block = workflowBlocks[currentProjectId]?.find(b => `workflow-${b.id}` === activeId);
+                if (block) {
+                  const blockDef = blockDefinitions.find(b => b.id === block.blockDefId);
+                  if (blockDef) {
+                    return <SensitivityTestBlock isDragging blockDef={blockDef} />;
+                  }
+                }
+              }
+              
+              // Original sensitivity test block
+              return (
+                <SensitivityTestBlock 
+                  isDragging 
+                  mode={
+                    activeId === 'blockbar-classical' || activeId === 'main-classical' ? 'classical' :
+                    activeId === 'blockbar-hybrid' || activeId === 'main-hybrid' ? 'hybrid' :
+                    activeId === 'blockbar-quantum' || activeId === 'main-quantum' ? 'quantum' :
+                    'classical'
+                  }
+                />
+              );
+            })()
           ) : null}
         </DragOverlay>
         {contextMenu && (

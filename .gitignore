@@ -106,3 +106,7 @@ projects/
 # Local files
 CLAUDE.md
 nohup.out
+
+# Manim videos and animations
+manim_videos/
+media/
