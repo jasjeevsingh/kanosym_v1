@@ -147,6 +147,14 @@ function SensitivityTestBlock({
 
   // If it's a workflow block
   if (blockDef) {
+    // Calculate font size based on text length
+    let fontSize = 13;
+    if (blockDef.name.length > 25) {
+      fontSize = 11;
+    } else if (blockDef.name.length > 20) {
+      fontSize = 12;
+    }
+    
     const blockContent = (
       <div
         style={{
@@ -167,17 +175,20 @@ function SensitivityTestBlock({
           transition: 'all 0.2s ease',
           padding: '8px 12px',
           color: 'white',
-          fontSize: '13px',
+          fontSize: `${fontSize}px`,
           fontWeight: '600',
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
           justifyContent: 'center',
-          cursor: showPorts ? (isDragging ? 'grabbing' : 'grab') : 'grab'
+          cursor: showPorts ? (isDragging ? 'grabbing' : 'grab') : 'grab',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }}
         onContextMenu={onContextMenu}
       >
-        <span>{blockDef.name}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{blockDef.name}</span>
 
         {/* Ports (only show when placed on canvas) */}
         {showPorts && (
