@@ -961,11 +961,6 @@ style={{
       />
     )}
     
-    {(() => {
-      console.log('Rendering connections:', workflowConnections[currentProjectId]);
-      console.log('Placed blocks:', placedBlocks);
-      return null;
-    })()}
     {workflowConnections[currentProjectId]?.map((connection) => {
       // Handle both workflow blocks and portfolio blocks
       let fromPos = null;
@@ -983,8 +978,8 @@ style={{
       } else {
         // Check if it's a portfolio block
         const fromPortfolioPos = placedBlocks[connection.from.blockId];
-        console.log('Portfolio from block:', connection.from.blockId, fromPortfolioPos);
-        if (fromPortfolioPos) {
+        if (fromPortfolioPos && typeof fromPortfolioPos.x === 'number' && typeof fromPortfolioPos.y === 'number') {
+          // Portfolio blocks are 190px wide, output port is on the right edge
           fromPos = { x: fromPortfolioPos.x + 190, y: fromPortfolioPos.y + 22 };
           fromColor = connection.from.blockId === 'classical' ? '#6b7280' : 
                      connection.from.blockId === 'hybrid' ? '#a855f7' : '#3b82f6';
@@ -1001,12 +996,15 @@ style={{
       } else {
         // Check if it's a portfolio block
         const toPortfolioPos = placedBlocks[connection.to.blockId];
-        if (toPortfolioPos) {
+        if (toPortfolioPos && typeof toPortfolioPos.x === 'number' && typeof toPortfolioPos.y === 'number') {
+          // Input port is on the left edge of the block
           toPos = { x: toPortfolioPos.x, y: toPortfolioPos.y + 22 };
         }
       }
       
-      if (!fromPos || !toPos) return null;
+      if (!fromPos || !toPos) {
+        return null;
+      }
       
       const fromX = fromPos.x;
       const fromY = fromPos.y;
@@ -1030,27 +1028,6 @@ style={{
         </g>
       );
     })}
-    {/* Show connection being drawn */}
-    {connectingFrom && (
-      <line
-        x1={(() => {
-          const block = workflowBlocks[currentProjectId]?.find(b => b.id === connectingFrom.blockId);
-          if (!block) return 0;
-          return connectingFrom.type === 'output' ? block.position.x + 180 : block.position.x;
-        })()}
-        y1={(() => {
-          const block = workflowBlocks[currentProjectId]?.find(b => b.id === connectingFrom.blockId);
-          if (!block) return 0;
-          return block.position.y + 18;
-        })()}
-        x2={mousePosition.x}
-        y2={mousePosition.y}
-        stroke="#4A90E2"
-        strokeWidth="2"
-        strokeDasharray="5,5"
-        style={{ pointerEvents: 'none' }}
-      />
-    )}
   </svg>
 </div>
 </div>
