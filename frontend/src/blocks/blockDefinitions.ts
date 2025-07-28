@@ -23,47 +23,47 @@ export const blockCategories = {
   dataSource: {
     name: 'Data Sources',
     color: '#4A90E2',
-    icon: '📊'
+    icon: ''
   },
   portfolio: {
     name: 'Portfolio Construction',
     color: '#7B68EE',
-    icon: '💼'
+    icon: ''
   },
   risk: {
     name: 'Risk Analysis',
     color: '#FF6B6B',
-    icon: '⚠️'
+    icon: ''
   },
   ml: {
     name: 'Machine Learning',
     color: '#4ECDC4',
-    icon: '🤖'
+    icon: ''
   },
   execution: {
     name: 'Execution',
     color: '#FFD93D',
-    icon: '⚡'
+    icon: ''
   },
   analysis: {
     name: 'Analysis & Reporting',
     color: '#95E1D3',
-    icon: '📈'
+    icon: ''
   },
   integration: {
     name: 'Integration',
     color: '#F38181',
-    icon: '🔗'
+    icon: ''
   },
   corporate: {
     name: 'Corporate Finance',
     color: '#AA96DA',
-    icon: '🏢'
+    icon: ''
   },
   quantum: {
     name: 'Quantum Computing',
     color: '#2D3436',
-    icon: '⚛️'
+    icon: ''
   }
 };
 

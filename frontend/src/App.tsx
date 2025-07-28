@@ -177,7 +177,6 @@ function SensitivityTestBlock({
         }}
         onContextMenu={onContextMenu}
       >
-        <span style={{ fontSize: '14px' }}>{(blockCategories as any)[blockDef.category]?.icon || '📦'}</span>
         <span>{blockDef.name}</span>
 
         {/* Ports (only show when placed on canvas) */}
@@ -1078,7 +1077,6 @@ function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: {
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium rounded flex items-center gap-2 transition-colors"
                 style={{ borderColor: (blockCategories as any)[selectedCategory]?.color }}
               >
-                <span>{(blockCategories as any)[selectedCategory]?.icon}</span>
                 <span>{(blockCategories as any)[selectedCategory]?.name}</span>
                 <span className="ml-2">▼</span>
               </button>
@@ -1095,7 +1093,6 @@ function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: {
                       }}
                       className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 text-zinc-300 hover:bg-zinc-700 hover:text-white"
                     >
-                      <span style={{ color: category.color }}>{category.icon}</span>
                       <span>{category.name}</span>
                     </button>
                   ))}
