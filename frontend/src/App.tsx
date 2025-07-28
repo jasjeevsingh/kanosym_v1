@@ -799,6 +799,13 @@ style={{
                 if (!connectingFrom) {
                   // Start connection
                   setConnectingFrom({ blockId: blockType, portId, type });
+                  // Set initial pointer position to the port location
+                  const blockPos = placedBlocks[blockType];
+                  if (blockPos) {
+                    const portX = type === 'output' ? blockPos.x + 190 : blockPos.x;
+                    const portY = blockPos.y + 22;
+                    setPointerPosition({ x: portX, y: portY });
+                  }
                 } else {
                   // Complete connection
                   if (connectingFrom.type === 'output' && type === 'input') {
@@ -877,6 +884,10 @@ style={{
             if (!connectingFrom) {
               // Start connection
               setConnectingFrom({ blockId: block.id, portId, type });
+              // Set initial pointer position to the port location
+              const portX = type === 'output' ? block.position.x + 180 : block.position.x;
+              const portY = block.position.y + 18;
+              setPointerPosition({ x: portX, y: portY });
             } else {
               // Complete connection
               if (connectingFrom.type === 'output' && type === 'input') {
