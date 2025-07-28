@@ -2106,7 +2106,7 @@ function App() {
         // Get the dropzone element and ensure it's properly sized
         const dropzoneElem = document.getElementById('main-dropzone');
         const dropzoneRect = dropzoneElem?.getBoundingClientRect();
-        let dropX = 200, dropY = 120; // fallback default position
+        let dropX = 100, dropY = 100; // fallback default position
 
         // Handle workflow blocks
         if (activeId?.startsWith('blockbar-') && 
@@ -2117,26 +2117,34 @@ function App() {
           const blockDef = blockDefinitions.find(b => b.id === blockDefId);
           
           if (blockDef) {
-            let pointerX: number | null = null, pointerY: number | null = null;
-
-            if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
-              pointerX = Number(event.activatorEvent.clientX);
-              pointerY = Number(event.activatorEvent.clientY);
-            } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
-              pointerX = Number(window.event.clientX);
-              pointerY = Number(window.event.clientY);
-            }
-
-            if (
-              pointerX !== null && pointerY !== null &&
-              pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
-              pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
-            ) {
-              dropX = pointerX - dropzoneRect.left;
-              dropY = pointerY - dropzoneRect.top;
+            // Try to get the drop position from the active pointer event
+            let pointerX: number | null = null;
+            let pointerY: number | null = null;
+            
+            // Check if we have active pointer info from dnd-kit
+            const activeNodeRect = event.active.rect.current.translated;
+            if (activeNodeRect) {
+              // Calculate drop position based on the translated position
+              const dropzoneOffset = dropzoneElem.getBoundingClientRect();
+              pointerX = activeNodeRect.left + (activeNodeRect.width / 2);
+              pointerY = activeNodeRect.top + (activeNodeRect.height / 2);
+              
+              // Convert to dropzone-relative coordinates
+              dropX = pointerX - dropzoneOffset.left;
+              dropY = pointerY - dropzoneOffset.top;
+              
+              // Clamp to dropzone bounds
+              const blockWidth = 180;
+              const blockHeight = 40;
+              dropX = Math.max(0, Math.min(dropX - blockWidth/2, dropzoneRect.width - blockWidth));
+              dropY = Math.max(0, Math.min(dropY - blockHeight/2, dropzoneRect.height - blockHeight));
+              
+              console.log('Workflow block drop position:', { dropX, dropY, activeNodeRect });
             } else {
-              const blockWidth = 220;
-              const blockHeight = 100;
+              // Fallback to center if we can't determine position
+              console.log('No active node rect, centering block');
+              const blockWidth = 180;
+              const blockHeight = 40;
               dropX = dropzoneRect.width / 2 - blockWidth / 2;
               dropY = dropzoneRect.height / 2 - blockHeight / 2;
             }
@@ -2196,25 +2204,29 @@ function App() {
            activeId === 'blockbar-quantum') &&
           dropzoneRect
         ) {
-          let pointerX: number | null = null, pointerY: number | null = null;
-
-          if (event.activatorEvent && 'clientX' in event.activatorEvent && 'clientY' in event.activatorEvent) {
-            pointerX = Number(event.activatorEvent.clientX);
-            pointerY = Number(event.activatorEvent.clientY);
-          } else if (window.event && 'clientX' in window.event && 'clientY' in window.event) {
-            pointerX = Number(window.event.clientX);
-            pointerY = Number(window.event.clientY);
-          }
-
-          if (
-            pointerX !== null && pointerY !== null &&
-            pointerX >= dropzoneRect.left && pointerX <= dropzoneRect.right &&
-            pointerY >= dropzoneRect.top && pointerY <= dropzoneRect.bottom
-          ) {
-            dropX = pointerX - dropzoneRect.left;
-            dropY = pointerY - dropzoneRect.top;
+          // Use the same improved positioning logic as workflow blocks
+          const activeNodeRect = event.active.rect.current.translated;
+          if (activeNodeRect) {
+            // Calculate drop position based on the translated position
+            const dropzoneOffset = dropzoneElem.getBoundingClientRect();
+            const pointerX = activeNodeRect.left + (activeNodeRect.width / 2);
+            const pointerY = activeNodeRect.top + (activeNodeRect.height / 2);
+            
+            // Convert to dropzone-relative coordinates
+            dropX = pointerX - dropzoneOffset.left;
+            dropY = pointerY - dropzoneOffset.top;
+            
+            // Clamp to dropzone bounds
+            const blockWidth = 190; // portfolio block width
+            const blockHeight = 44;
+            dropX = Math.max(0, Math.min(dropX - blockWidth/2, dropzoneRect.width - blockWidth));
+            dropY = Math.max(0, Math.min(dropY - blockHeight/2, dropzoneRect.height - blockHeight));
+            
+            console.log('Portfolio block drop position:', { dropX, dropY, activeNodeRect });
           } else {
-            const blockWidth = 203; // match your block width
+            // Fallback to center if we can't determine position
+            console.log('No active node rect, centering portfolio block');
+            const blockWidth = 190;
             const blockHeight = 44;
             dropX = dropzoneRect.width / 2 - blockWidth / 2;
             dropY = dropzoneRect.height / 2 - blockHeight / 2;
@@ -3869,7 +3881,7 @@ function App() {
             />
           </div>
         </SubtleResizableBorder>
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeId ? (
             (() => {
               // Check if it's a workflow block from blockbar
