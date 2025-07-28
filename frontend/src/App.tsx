@@ -182,9 +182,7 @@ function SensitivityTestBlock({
           gap: '6px',
           justifyContent: 'center',
           cursor: showPorts ? (isDragging ? 'grabbing' : 'grab') : 'grab',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
+          whiteSpace: 'nowrap'
         }}
         onContextMenu={onContextMenu}
       >
@@ -222,9 +220,9 @@ function SensitivityTestBlock({
                   width: '14px',
                   height: '14px',
                   backgroundColor: connectingFrom && connectingFrom.type === 'output' ? '#4ECDC4' : '#ffffff',
-                  border: '2px solid ' + blockDef.color,
+                  border: '2px solid #ffffff',
                   borderRadius: '50%',
-                  boxShadow: connectingFrom && connectingFrom.type === 'output' ? '0 0 8px #4ECDC4' : 'none',
+                  boxShadow: connectingFrom && connectingFrom.type === 'output' ? '0 0 8px #4ECDC4' : '0 0 0 2px rgba(0,0,0,0.3)',
                   pointerEvents: 'none',
                   transition: 'all 0.2s ease',
                 }}
@@ -260,9 +258,9 @@ function SensitivityTestBlock({
                   width: '14px',
                   height: '14px',
                   backgroundColor: connectingFrom && connectingFrom.type === 'input' ? '#FFD93D' : '#ffffff',
-                  border: '2px solid ' + blockDef.color,
+                  border: '2px solid #ffffff',
                   borderRadius: '50%',
-                  boxShadow: connectingFrom && connectingFrom.type === 'input' ? '0 0 8px #FFD93D' : 'none',
+                  boxShadow: connectingFrom && connectingFrom.type === 'input' ? '0 0 8px #FFD93D' : '0 0 0 2px rgba(0,0,0,0.3)',
                   pointerEvents: 'none',
                   transition: 'all 0.2s ease',
                 }}
