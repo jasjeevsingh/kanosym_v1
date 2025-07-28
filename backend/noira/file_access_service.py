@@ -174,7 +174,11 @@ class NoiraFileAccessService:
         return {
             "success": True,
             "data": formatted_data,
-            "summary": f"Loaded test run {test_run_id} ({formatted_data['block_type']} - {formatted_data['asset']})"
+            "summary": f"Loaded test run {test_run_id} ({formatted_data['block_type']} - {formatted_data['asset']})",
+            "frontend_action": {
+                "type": "open_test_run",
+                "test_run_id": test_run_id
+            }
         }
     
     def _handle_search_test_runs(self, arguments: dict) -> dict:
