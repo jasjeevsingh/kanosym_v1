@@ -1089,7 +1089,11 @@ function BlockBar({ mode, setMode, currentProjectId, isBlockTypePlaced }: {
                 style={{ borderColor: (blockCategories as any)[selectedCategory]?.color }}
               >
                 <span>{(blockCategories as any)[selectedCategory]?.name}</span>
-                <span className="ml-2">▼</span>
+                <span className="ml-2" style={{ 
+                  display: 'inline-block',
+                  transform: showCategoryMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}>▼</span>
               </button>
               
               {/* Category dropdown menu */}
