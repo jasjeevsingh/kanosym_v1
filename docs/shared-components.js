@@ -70,17 +70,14 @@ function renderFooter() {
                         <li><a href="features" class="text-gray-400 hover:text-white transition-colors">Features</a></li>
                         <li><a href="pricing" class="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
                         <li><a href="use-cases" class="text-gray-400 hover:text-white transition-colors">Use Cases</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Integrations</a></li>
                     </ul>
                 </div>
                 
                 <div>
                     <h3 class="text-white font-semibold mb-4">Company</h3>
                     <ul class="space-y-2">
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">About</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Careers</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+                        <li><a href="./#team" class="text-gray-400 hover:text-white transition-colors">Team</a></li>
+                        <li><a href="./#contact" class="text-gray-400 hover:text-white transition-colors">Contact</a></li>
                     </ul>
                 </div>
             </div>
