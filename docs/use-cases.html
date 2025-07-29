@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%236366F1' rx='4'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='JetBrains Mono, monospace' font-size='20' font-weight='bold'%3EK%3C/text%3E%3C/svg%3E">
     <title>Use Cases - Kanosym | Quantum-Enhanced AI Copilot for Finance</title>
     <meta name="description" content="Discover real-world applications of Kanosym's quantum-enhanced platform across portfolio management, risk analysis, and financial optimization.">
     <meta name="keywords" content="portfolio optimization, risk management, sensitivity analysis, quantum finance, asset management">
@@ -44,10 +45,10 @@
     
     <!-- Custom CSS -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
         
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Saira', sans-serif;
         }
         
         .gradient-bg {
@@ -89,50 +90,8 @@
     </style>
 </head>
 <body class="bg-dark-bg text-white">
-    <!-- Navigation -->
-    <nav class="fixed top-0 w-full z-50 bg-dark-bg/80 backdrop-blur-md border-b border-dark-border">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo -->
-                <div class="flex items-center">
-                    <a href="index.html" class="text-2xl font-bold font-mono">
-                        <span class="text-quantum-purple">K</span><span class="text-white">anosym</span>
-                    </a>
-                </div>
-                
-                <!-- Desktop Navigation -->
-                <div class="hidden md:block">
-                    <div class="ml-10 flex items-baseline space-x-8">
-                        <a href="index.html#product" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Product</a>
-                        <a href="index.html#technology" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Technology</a>
-                        <a href="index.html#team" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Team</a>
-                        <a href="index.html#docs" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Docs</a>
-                        <a href="index.html#contact" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Contact</a>
-                    </div>
-                </div>
-                
-                <!-- Mobile menu button -->
-                <div class="md:hidden">
-                    <button type="button" id="mobile-menu-button" class="text-gray-400 hover:text-white">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Mobile Navigation -->
-        <div id="mobile-menu" class="hidden md:hidden bg-dark-card border-t border-dark-border">
-            <div class="px-2 pt-2 pb-3 space-y-1">
-                <a href="index.html#product" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Product</a>
-                <a href="index.html#technology" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Technology</a>
-                <a href="index.html#team" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Team</a>
-                <a href="index.html#docs" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Docs</a>
-                <a href="index.html#contact" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Contact</a>
-            </div>
-        </div>
-    </nav>
+    <!-- Header placeholder -->
+    <div id="header-placeholder"></div>
 
     <!-- Hero Section -->
     <section class="relative pt-20 pb-16 gradient-bg">
@@ -580,7 +539,7 @@
                     <button class="quantum-gradient hover:opacity-90 text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all hover-lift">
                         Schedule a Demo
                     </button>
-                    <a href="features.html" class="border border-quantum-purple text-quantum-purple hover:bg-quantum-purple hover:text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all">
+                    <a href="features" class="border border-quantum-purple text-quantum-purple hover:bg-quantum-purple hover:text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all">
                         Explore Features
                     </a>
                 </div>
@@ -588,87 +547,11 @@
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="bg-dark-card border-t border-dark-border py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid md:grid-cols-4 gap-8">
-                <div class="col-span-2">
-                    <div class="text-2xl font-bold font-mono mb-4">
-                        <span class="text-quantum-purple">K</span><span class="text-white">anosym</span>
-                    </div>
-                    <p class="text-gray-400 mb-4 max-w-md">
-                        Where intuition meets quantitative power. Revolutionizing corporate finance with next-gen technical capabilities.
-                    </p>
-                </div>
-                
-                <div>
-                    <h3 class="text-white font-semibold mb-4">Product</h3>
-                    <ul class="space-y-2">
-                        <li><a href="features.html" class="text-gray-400 hover:text-white transition-colors">Features</a></li>
-                        <li><a href="pricing.html" class="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
-                        <li><a href="use-cases.html" class="text-gray-400 hover:text-white transition-colors">Use Cases</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Integrations</a></li>
-                    </ul>
-                </div>
-                
-                <div>
-                    <h3 class="text-white font-semibold mb-4">Company</h3>
-                    <ul class="space-y-2">
-                        <li><a href="index.html#team" class="text-gray-400 hover:text-white transition-colors">About</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Careers</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="border-t border-dark-border mt-12 pt-8 text-center">
-                <p class="text-gray-500">
-                    © 2025 Kanosym. All rights reserved. Where intuition meets quantitative power.
-                </p>
-            </div>
-        </div>
-    </footer>
+    <!-- Footer placeholder -->
+    <div id="footer-placeholder"></div>
+    
+    <!-- Shared Components -->
+    <script src="shared-components.js"></script>
 
-    <!-- JavaScript -->
-    <script>
-        // Mobile menu toggle
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        
-        mobileMenuButton.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
-        
-        // Intersection Observer for fade-in animations
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-        
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                }
-            });
-        }, observerOptions);
-        
-        // Observe all fade-in elements
-        document.querySelectorAll('.fade-in').forEach(el => {
-            observer.observe(el);
-        });
-        
-        // Demo button interactions
-        document.querySelectorAll('button').forEach(button => {
-            if (button.textContent.includes('Demo')) {
-                button.addEventListener('click', () => {
-                    const subject = encodeURIComponent('Interest in Booking Kanosym Demo');
-                    const body = encodeURIComponent('Hi,\n\nI am interested in booking a demo of Kanosym. Please let me know your availability.\n\nBest regards');
-                    window.location.href = `mailto:jasjeev@upenn.edu?subject=${subject}&body=${body}`;
-                });
-            }
-        });
-    </script>
 </body>
 </html>

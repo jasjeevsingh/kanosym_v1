@@ -1,0 +1,7 @@
+# Netlify redirects for clean URLs
+/features    /features.html    200
+/pricing     /pricing.html     200
+/use-cases   /use-cases.html   200
+
+# 404 page
+/*           /404.html         404
