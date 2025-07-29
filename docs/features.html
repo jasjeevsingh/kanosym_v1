@@ -23,6 +23,18 @@
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    
     <!-- Custom Tailwind Config -->
     <script>
         tailwind.config = {
@@ -182,7 +194,7 @@
                                 </p>
                                 <p class="text-gray-400">
                                     <span class="text-green-400 font-semibold">Noira:</span> 
-                                    "The Sharpe ratio measures risk-adjusted returns: $$\text{Sharpe} = \frac{E[R_p] - R_f}{\sigma_p}$$..."
+                                    "The Sharpe ratio measures risk-adjusted returns: $$\text{Sharpe} = \frac{E[R_p] - R_f}{\sigma_p}$$ where E[R_p] is your expected portfolio return, R_f is the risk-free rate, and σ_p is portfolio volatility..."
                                 </p>
                             </div>
                         </div>
