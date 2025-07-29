@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Use Cases - Kanosym | Quantum-Enhanced AI Copilot for Finance</title>
+    <meta name="description" content="Discover real-world applications of Kanosym's quantum-enhanced platform across portfolio management, risk analysis, and financial optimization.">
+    <meta name="keywords" content="portfolio optimization, risk management, sensitivity analysis, quantum finance, asset management">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://jasjeevsingh.github.io/kanosym_test1/use-cases.html">
+    <meta property="og:title" content="Use Cases - Kanosym | Quantum-Enhanced AI Copilot for Finance">
+    <meta property="og:description" content="Explore how leading financial institutions use Kanosym for portfolio optimization and risk analysis.">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://jasjeevsingh.github.io/kanosym_test1/use-cases.html">
+    <meta property="twitter:title" content="Use Cases - Kanosym | Quantum-Enhanced AI Copilot for Finance">
+    <meta property="twitter:description" content="Explore how leading financial institutions use Kanosym for portfolio optimization and risk analysis.">
+    
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'quantum-blue': '#0066FF',
+                        'quantum-purple': '#6366F1',
+                        'dark-bg': '#0F0F0F',
+                        'dark-card': '#1A1A1A',
+                        'dark-border': '#333333',
+                    },
+                    fontFamily: {
+                        'mono': ['JetBrains Mono', 'Monaco', 'Consolas', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom CSS -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%);
+        }
+        
+        .quantum-gradient {
+            background: linear-gradient(135deg, #0066FF 0%, #6366F1 100%);
+        }
+        
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease-out;
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .hover-lift {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .use-case-icon {
+            background: linear-gradient(135deg, #0066FF 0%, #6366F1 100%);
+        }
+        
+        .metric-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(0, 102, 255, 0.1) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-white">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 bg-dark-bg/80 backdrop-blur-md border-b border-dark-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <a href="index.html" class="text-2xl font-bold font-mono">
+                        <span class="text-quantum-purple">K</span><span class="text-white">anosym</span>
+                    </a>
+                </div>
+                
+                <!-- Desktop Navigation -->
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="index.html#product" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Product</a>
+                        <a href="index.html#technology" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Technology</a>
+                        <a href="index.html#team" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Team</a>
+                        <a href="index.html#docs" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Docs</a>
+                        <a href="index.html#contact" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Contact</a>
+                    </div>
+                </div>
+                
+                <!-- Mobile menu button -->
+                <div class="md:hidden">
+                    <button type="button" id="mobile-menu-button" class="text-gray-400 hover:text-white">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Navigation -->
+        <div id="mobile-menu" class="hidden md:hidden bg-dark-card border-t border-dark-border">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="index.html#product" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Product</a>
+                <a href="index.html#technology" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Technology</a>
+                <a href="index.html#team" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Team</a>
+                <a href="index.html#docs" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Docs</a>
+                <a href="index.html#contact" class="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-20 pb-16 gradient-bg">
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16">
+            <div class="text-center fade-in">
+                <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                    <span class="text-white">Real-World</span>
+                    <span class="quantum-gradient bg-clip-text text-transparent">Use Cases</span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
+                    Discover how leading financial institutions leverage Kanosym's quantum-enhanced platform to transform their portfolio optimization and risk management workflows.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Primary Use Cases -->
+    <section class="py-20 bg-dark-bg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-6">
+                    <span class="quantum-gradient bg-clip-text text-transparent">Core Applications</span>
+                </h2>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+                    From sensitivity testing to portfolio optimization, see how Kanosym addresses critical challenges in quantitative finance.
+                </p>
+            </div>
+            
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Portfolio Sensitivity Analysis -->
+                <div class="bg-dark-card border border-dark-border rounded-xl p-8 hover-lift fade-in">
+                    <div class="use-case-icon w-16 h-16 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-semibold mb-4">Portfolio Sensitivity Testing</h3>
+                    <p class="text-gray-400 mb-6">
+                        Analyze how portfolio performance changes when key parameters like asset volatility, correlations, or expected returns are perturbed.
+                    </p>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Analysis Speed</span>
+                            <span class="text-quantum-purple font-semibold">25% faster</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Confidence Level</span>
+                            <span class="text-quantum-purple font-semibold">95% intervals</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Parameter Range</span>
+                            <span class="text-quantum-purple font-semibold">Custom steps</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Risk Management -->
+                <div class="bg-dark-card border border-dark-border rounded-xl p-8 hover-lift fade-in" style="animation-delay: 0.1s;">
+                    <div class="use-case-icon w-16 h-16 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-semibold mb-4">Advanced Risk Analytics</h3>
+                    <p class="text-gray-400 mb-6">
+                        Comprehensive risk assessment using quantum-enhanced Monte Carlo simulations for VaR, expected shortfall, and stress testing.
+                    </p>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">VaR Accuracy</span>
+                            <span class="text-quantum-purple font-semibold">99.5%</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Simulation Paths</span>
+                            <span class="text-quantum-purple font-semibold">1M+ paths</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Stress Scenarios</span>
+                            <span class="text-quantum-purple font-semibold">Custom tests</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quantum Optimization -->
+                <div class="bg-dark-card border border-dark-border rounded-xl p-8 hover-lift fade-in" style="animation-delay: 0.2s;">
+                    <div class="use-case-icon w-16 h-16 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-semibold mb-4">Quantum Portfolio Optimization</h3>
+                    <p class="text-gray-400 mb-6">
+                        Leverage quantum algorithms for complex optimization problems that classical methods struggle to solve efficiently.
+                    </p>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Quantum Advantage</span>
+                            <span class="text-quantum-purple font-semibold">2.34% boost</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Circuit Efficiency</span>
+                            <span class="text-quantum-purple font-semibold">62.5 cps</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 metric-box rounded-lg">
+                            <span class="text-gray-300">Problem Scale</span>
+                            <span class="text-quantum-purple font-semibold">100+ assets</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Industry Applications -->
+    <section class="py-20 bg-dark-card">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-6">
+                    <span class="text-white">Industry</span>
+                    <span class="quantum-gradient bg-clip-text text-transparent">Applications</span>
+                </h2>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+                    Kanosym serves diverse financial sectors with specialized quantum-enhanced solutions.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Asset Management -->
+                <div class="bg-dark-bg border border-dark-border rounded-xl p-8 fade-in">
+                    <div class="flex items-start">
+                        <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mr-6 flex-shrink-0">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4">Asset Management Firms</h3>
+                            <p class="text-gray-400 mb-6">
+                                Large asset managers use Kanosym to optimize multi-asset portfolios, conduct stress tests, and enhance risk-adjusted returns through quantum-enhanced sensitivity analysis.
+                            </p>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Portfolio Size:</span>
+                                    <p class="text-gray-300">$1B+ AUM</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Asset Classes:</span>
+                                    <p class="text-gray-300">Equities, Bonds, Alternatives</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Rebalancing:</span>
+                                    <p class="text-gray-300">Daily optimization</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Risk Metrics:</span>
+                                    <p class="text-gray-300">VaR, CVaR, Sharpe</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hedge Funds -->
+                <div class="bg-dark-bg border border-dark-border rounded-xl p-8 fade-in" style="animation-delay: 0.1s;">
+                    <div class="flex items-start">
+                        <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mr-6 flex-shrink-0">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4">Quantitative Hedge Funds</h3>
+                            <p class="text-gray-400 mb-6">
+                                Quant funds leverage Kanosym's hybrid quantum-classical algorithms for alpha generation, risk parity strategies, and high-frequency portfolio rebalancing.
+                            </p>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Strategy Type:</span>
+                                    <p class="text-gray-300">Market Neutral, Long/Short</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Frequency:</span>
+                                    <p class="text-gray-300">Intraday rebalancing</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Alpha Source:</span>
+                                    <p class="text-gray-300">Quantum correlation detection</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Leverage:</span>
+                                    <p class="text-gray-300">Dynamic risk budgeting</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Investment Banks -->
+                <div class="bg-dark-bg border border-dark-border rounded-xl p-8 fade-in" style="animation-delay: 0.2s;">
+                    <div class="flex items-start">
+                        <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mr-6 flex-shrink-0">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4">Investment Banks</h3>
+                            <p class="text-gray-400 mb-6">
+                                Investment banks utilize Kanosym for derivatives pricing, counterparty risk assessment, and regulatory capital optimization with quantum-enhanced stress testing.
+                            </p>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Use Case:</span>
+                                    <p class="text-gray-300">CVA/DVA calculations</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Regulations:</span>
+                                    <p class="text-gray-300">Basel III compliance</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Products:</span>
+                                    <p class="text-gray-300">Exotic derivatives</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Reporting:</span>
+                                    <p class="text-gray-300">Real-time risk metrics</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Insurance Companies -->
+                <div class="bg-dark-bg border border-dark-border rounded-xl p-8 fade-in" style="animation-delay: 0.3s;">
+                    <div class="flex items-start">
+                        <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mr-6 flex-shrink-0">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4">Insurance Companies</h3>
+                            <p class="text-gray-400 mb-6">
+                                Insurance firms employ Kanosym for asset-liability matching, solvency testing, and catastrophic risk modeling using quantum-enhanced Monte Carlo methods.
+                            </p>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Asset Matching:</span>
+                                    <p class="text-gray-300">Duration hedging</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Solvency:</span>
+                                    <p class="text-gray-300">Solvency II capital</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Cat Modeling:</span>
+                                    <p class="text-gray-300">Tail risk analysis</p>
+                                </div>
+                                <div>
+                                    <span class="text-quantum-purple font-semibold">Reserving:</span>
+                                    <p class="text-gray-300">Claims prediction</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Case Study -->
+    <section class="py-20 bg-dark-bg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="bg-dark-card border border-dark-border rounded-2xl p-8 md:p-12 fade-in">
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <div class="text-sm font-semibold text-quantum-purple mb-2">CASE STUDY</div>
+                        <h2 class="text-3xl font-bold mb-6">
+                            Multi-Asset Portfolio Sensitivity Analysis
+                        </h2>
+                        <p class="text-gray-400 mb-8">
+                            A leading asset management firm used Kanosym to analyze sensitivity of a $2.5B multi-asset portfolio to volatility changes across AAPL, MSFT, and NVDA holdings.
+                        </p>
+                        
+                        <div class="space-y-6">
+                            <div class="flex items-start">
+                                <div class="use-case-icon w-8 h-8 rounded flex-shrink-0 mr-4 mt-1 flex items-center justify-center">
+                                    <span class="text-white text-sm font-bold">1</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2">Challenge</h4>
+                                    <p class="text-gray-400 text-sm">Traditional Monte Carlo methods were taking 45+ minutes for comprehensive sensitivity analysis across multiple volatility scenarios.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-start">
+                                <div class="use-case-icon w-8 h-8 rounded flex-shrink-0 mr-4 mt-1 flex items-center justify-center">
+                                    <span class="text-white text-sm font-bold">2</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2">Solution</h4>
+                                    <p class="text-gray-400 text-sm">Implemented Kanosym's hybrid quantum-classical approach with Gaussian Process regression and quantum-enhanced interpolation.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-start">
+                                <div class="use-case-icon w-8 h-8 rounded flex-shrink-0 mr-4 mt-1 flex items-center justify-center">
+                                    <span class="text-white text-sm font-bold">3</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2">Results</h4>
+                                    <p class="text-gray-400 text-sm">Reduced analysis time to 12 minutes with 25% improvement in accuracy, enabling real-time risk monitoring.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="bg-dark-bg border border-dark-border rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-6 text-center">Key Performance Metrics</h3>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center p-4 metric-box rounded-lg">
+                                    <div class="text-2xl font-bold text-quantum-purple mb-1">73%</div>
+                                    <div class="text-sm text-gray-400">Time Reduction</div>
+                                </div>
+                                
+                                <div class="text-center p-4 metric-box rounded-lg">
+                                    <div class="text-2xl font-bold text-quantum-purple mb-1">25%</div>
+                                    <div class="text-sm text-gray-400">Accuracy Gain</div>
+                                </div>
+                                
+                                <div class="text-center p-4 metric-box rounded-lg">
+                                    <div class="text-2xl font-bold text-quantum-purple mb-1">95%</div>
+                                    <div class="text-sm text-gray-400">Confidence Level</div>
+                                </div>
+                                
+                                <div class="text-center p-4 metric-box rounded-lg">
+                                    <div class="text-2xl font-bold text-quantum-purple mb-1">1.15x</div>
+                                    <div class="text-sm text-gray-400">Synergy Factor</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6 p-4 bg-gradient-to-r from-quantum-blue/10 to-quantum-purple/10 rounded-lg border border-quantum-purple/20">
+                                <div class="text-sm text-gray-400 mb-2">Portfolio Details:</div>
+                                <div class="text-xs text-gray-500 space-y-1">
+                                    <div>• Assets: AAPL (40%), MSFT (35%), NVDA (25%)</div>
+                                    <div>• Analysis Range: 15%-25% volatility</div>
+                                    <div>• Simulation Steps: 10,000+ paths</div>
+                                    <div>• Risk Metrics: Sharpe, VaR, Beta analysis</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Integration -->
+    <!-- <section class="py-20 bg-dark-card">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-6">
+                    <span class="text-white">Seamless</span>
+                    <span class="quantum-gradient bg-clip-text text-transparent">Workflow Integration</span>
+                </h2>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+                    Kanosym integrates into existing financial workflows with minimal disruption, providing APIs and SDKs for popular platforms.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8"> -->
+                <!-- Python Integration -->
+                <!-- <div class="bg-dark-bg border border-dark-border rounded-xl p-6 hover-lift fade-in">
+                    <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-3">Python SDK</h3>
+                    <p class="text-gray-400 text-sm mb-4">
+                        Native Python integration for quantitative analysts and researchers.
+                    </p>
+                    <div class="bg-dark-card p-3 rounded text-xs font-mono text-gray-300">
+                        <div class="text-quantum-purple">import</div> kanosym<br>
+                        <div class="text-quantum-purple">result =</div> kanosym.quantum_sensitivity(<br>
+                        &nbsp;&nbsp;portfolio, volatility_range<br>
+                        )
+                    </div>
+                </div> -->
+                
+                <!-- R Integration -->
+                <!-- <div class="bg-dark-bg border border-dark-border rounded-xl p-6 hover-lift fade-in" style="animation-delay: 0.1s;">
+                    <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-3">R Package</h3>
+                    <p class="text-gray-400 text-sm mb-4">
+                        Comprehensive R package for statistical analysis and visualization.
+                    </p>
+                    <div class="bg-dark-card p-3 rounded text-xs font-mono text-gray-300">
+                        <div class="text-quantum-purple">library</div>(kanosym)<br>
+                        <div class="text-quantum-purple">result</div> <- quantum_analysis(<br>
+                        &nbsp;&nbsp;portfolio_data, params<br>
+                        )
+                    </div>
+                </div> -->
+                
+                <!-- REST API -->
+                <!-- <div class="bg-dark-bg border border-dark-border rounded-xl p-6 hover-lift fade-in" style="animation-delay: 0.2s;">
+                    <div class="use-case-icon w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-3">REST API</h3>
+                    <p class="text-gray-400 text-sm mb-4">
+                        Platform-agnostic HTTP API for any programming language or system.
+                    </p>
+                    <div class="bg-dark-card p-3 rounded text-xs font-mono text-gray-300">
+                        <div class="text-quantum-purple">POST</div> /api/quantum_sensitivity<br>
+                        <div class="text-quantum-purple">Content-Type:</div> application/json<br>
+                        <div class="text-quantum-purple">Authorization:</div> Bearer token
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section> -->
+
+    <!-- CTA Section -->
+    <section class="py-20 bg-dark-bg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center fade-in">
+                <h2 class="text-4xl font-bold mb-6">
+                    <span class="text-white">Ready to Transform</span><br>
+                    <span class="quantum-gradient bg-clip-text text-transparent">Your Financial Workflows?</span>
+                </h2>
+                <p class="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+                    Join leading firms already using Kanosym to enhance their modeling and risk management capabilities.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button class="quantum-gradient hover:opacity-90 text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all hover-lift">
+                        Schedule a Demo
+                    </button>
+                    <a href="features.html" class="border border-quantum-purple text-quantum-purple hover:bg-quantum-purple hover:text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all">
+                        Explore Features
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-dark-card border-t border-dark-border py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="col-span-2">
+                    <div class="text-2xl font-bold font-mono mb-4">
+                        <span class="text-quantum-purple">K</span><span class="text-white">anosym</span>
+                    </div>
+                    <p class="text-gray-400 mb-4 max-w-md">
+                        Where intuition meets quantitative power. Revolutionizing corporate finance with next-gen technical capabilities.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="text-white font-semibold mb-4">Product</h3>
+                    <ul class="space-y-2">
+                        <li><a href="features.html" class="text-gray-400 hover:text-white transition-colors">Features</a></li>
+                        <li><a href="pricing.html" class="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
+                        <li><a href="use-cases.html" class="text-gray-400 hover:text-white transition-colors">Use Cases</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Integrations</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-white font-semibold mb-4">Company</h3>
+                    <ul class="space-y-2">
+                        <li><a href="index.html#team" class="text-gray-400 hover:text-white transition-colors">About</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Careers</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-dark-border mt-12 pt-8 text-center">
+                <p class="text-gray-500">
+                    © 2025 Kanosym. All rights reserved. Where intuition meets quantitative power.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile menu toggle
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+        
+        // Observe all fade-in elements
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+        
+        // Demo button interactions
+        document.querySelectorAll('button').forEach(button => {
+            if (button.textContent.includes('Demo')) {
+                button.addEventListener('click', () => {
+                    const subject = encodeURIComponent('Interest in Booking Kanosym Demo');
+                    const body = encodeURIComponent('Hi,\n\nI am interested in booking a demo of Kanosym. Please let me know your availability.\n\nBest regards');
+                    window.location.href = `mailto:jasjeev@upenn.edu?subject=${subject}&body=${body}`;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
