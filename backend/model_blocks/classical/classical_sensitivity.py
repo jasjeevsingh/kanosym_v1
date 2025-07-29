@@ -151,24 +151,22 @@ def run_monte_carlo_volatility(portfolio_state: Dict[str, Any]) -> dict:
     """
     Monte Carlo-based volatility estimator.
     Returns both daily and annualized portfolio volatility.
+    FIXED: Now uses correct theoretical portfolio volatility calculation.
     """
     weights = np.array(portfolio_state['weights'])
     volatility = np.array(portfolio_state['volatility'])
     correlation_matrix = np.array(portfolio_state['correlation_matrix'])
     assert weights.shape == volatility.shape, "Weights and volatility must align"
     assert correlation_matrix.shape == (len(weights), len(weights)), "Correlation matrix must be square"
-    num_simulations = 10000
-    time_periods = 252
-    np.random.seed(42)
+    
+    # Build covariance matrix
     covariance_matrix = np.outer(volatility, volatility) * correlation_matrix
-    returns = np.random.multivariate_normal(
-        mean=np.zeros(len(weights)),
-        cov=covariance_matrix,
-        size=(num_simulations, time_periods)
-    )
-    portfolio_returns = np.sum(returns * weights, axis=1)
-    daily_vol = float(np.std(portfolio_returns))
+    
+    # Use correct theoretical portfolio volatility formula: sqrt(w^T * Σ * w)
+    portfolio_variance = np.dot(weights, np.dot(covariance_matrix, weights))
+    daily_vol = float(np.sqrt(portfolio_variance))
     annualized_vol = daily_vol * np.sqrt(252)
+    
     return {
         'portfolio_volatility_daily': daily_vol,
         'portfolio_volatility_annualized': annualized_vol
