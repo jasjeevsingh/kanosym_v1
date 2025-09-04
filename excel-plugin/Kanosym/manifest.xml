@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" 
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" 
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
+           xsi:type="TaskPaneApp">
+
+  <Id>e4c1b4c3-56d1-48cc-bf96-040278cf5aee</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Kanosym</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Kanosym"/>
+  <Description DefaultValue="Hybrid financial reasoning tools inside Excel"/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://www.kanosym.com/help"/>
+
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
+                    xsi:type="VersionOverridesV1_0">
+
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <!-- Custom Kanosym Tab -->
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <CustomTab id="KanosymTab">
+              <Group id="KanosymGroup">
+                <Label resid="KanosymGroup.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+
+                <!-- Open Noira Task Pane -->
+                <Control xsi:type="Button" id="NoiraTaskpaneButton">
+                  <Label resid="NoiraTaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="NoiraTaskpaneButton.Label"/>
+                    <Description resid="NoiraTaskpaneButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>NoiraPane</TaskpaneId>
+                    <SourceLocation resid="NoiraTaskpane.Url"/>
+                  </Action>
+                </Control>
+
+                <!-- Analytics Panel -->
+                <Control xsi:type="Button" id="AnalyticsTaskpaneButton">
+                  <Label resid="AnalyticsTaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="AnalyticsTaskpaneButton.Label"/>
+                    <Description resid="AnalyticsTaskpaneButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>AnalyticsPane</TaskpaneId>
+                    <SourceLocation resid="AnalyticsTaskpane.Url"/>
+                  </Action>
+                </Control>
+
+                <!-- Custom Functions Help -->
+                <Control xsi:type="Button" id="FunctionsHelpButton">
+                  <Label resid="FunctionsHelpButton.Label"/>
+                  <Supertip>
+                    <Title resid="FunctionsHelpButton.Label"/>
+                    <Description resid="FunctionsHelpButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>showFunctionsHelp</FunctionName>
+                  </Action>
+                </Control>
+
+              </Group>
+              <Label resid="KanosymTab.Label"/>
+            </CustomTab>
+          </ExtensionPoint>
+
+          <!-- Link to commands.js -->
+          <FunctionFile resid="Commands.Url"/>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <!-- Resources -->
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+      </bt:Images>
+
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/commands.html"/>
+        <bt:Url id="NoiraTaskpane.Url" DefaultValue="https://localhost:3000/noira.html"/>
+        <bt:Url id="AnalyticsTaskpane.Url" DefaultValue="https://localhost:3000/analytics.html"/>
+      </bt:Urls>
+
+      <bt:ShortStrings>
+        <bt:String id="KanosymTab.Label" DefaultValue="Kanosym"/>
+        <bt:String id="KanosymGroup.Label" DefaultValue="Kanosym Tools"/>
+        <bt:String id="NoiraTaskpaneButton.Label" DefaultValue="Open Noira"/>
+        <bt:String id="AnalyticsTaskpaneButton.Label" DefaultValue="Analytics"/>
+        <bt:String id="FunctionsHelpButton.Label" DefaultValue="Functions Help"/>
+      </bt:ShortStrings>
+
+      <bt:LongStrings>
+        <bt:String id="NoiraTaskpaneButton.Tooltip" DefaultValue="Open the Noira AI copilot side panel"/>
+        <bt:String id="AnalyticsTaskpaneButton.Tooltip" DefaultValue="Open financial analytics dashboard"/>
+        <bt:String id="FunctionsHelpButton.Tooltip" DefaultValue="See how to use Kanosym custom functions"/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
