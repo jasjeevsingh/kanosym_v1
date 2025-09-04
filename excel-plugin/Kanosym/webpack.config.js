@@ -32,6 +32,10 @@ module.exports = async (env, options) => {
         import: ["./src/analytics/index.tsx", "./src/analytics/analytics.html"],
         dependOn: "react",
       },
+      "classical-test": {
+        import: ["./src/dialogs/classical-test.tsx", "./src/dialogs/classical-test.html"],
+        dependOn: "react",
+      },
       commands: "./src/commands/commands.ts",
     },
     output: {
@@ -84,6 +88,11 @@ module.exports = async (env, options) => {
         template: "./src/analytics/analytics.html",
         chunks: ["polyfill", "analytics", "react"],
       }),
+      new HtmlWebpackPlugin({
+        filename: "dialogs/classical-test.html",
+        template: "./src/dialogs/classical-test.html",
+        chunks: ["polyfill", "classical-test", "react"],
+      }),
       new CopyWebpackPlugin({
         patterns: [
           {
@@ -100,6 +109,10 @@ module.exports = async (env, options) => {
                 return content.toString().replace(new RegExp(urlDev, "g"), urlProd);
               }
             },
+          },
+          {
+            from: "src/dialogs/error.html",
+            to: "dialogs/error.html",
           },
         ],
       }),
