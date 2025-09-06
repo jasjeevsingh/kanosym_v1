@@ -114,6 +114,18 @@ module.exports = async (env, options) => {
             from: "src/dialogs/error.html",
             to: "dialogs/error.html",
           },
+          {
+            from: "src/dialogs/portfolio-import.html",
+            to: "dialogs/portfolio-import.html",
+          },
+          {
+            from: "src/dialogs/success.html",
+            to: "dialogs/success.html",
+          },
+          {
+            from: "src/dialogs/results.html",
+            to: "dialogs/results.html",
+          },
         ],
       }),
       new HtmlWebpackPlugin({

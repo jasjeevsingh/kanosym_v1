@@ -4,30 +4,1184 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Classical Sensitivity Analysis</title>
+    <title>Classical Portfolio Sensitivity Test</title>
     
     <!-- Office.js API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     
-    <!-- Microsoft Fabric Icons -->
-    <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/1.0.0/css/fabric.min.css">
+    <!-- Backup Office.js from CDN -->
+    <script>
+        // Fallback Office.js loading
+        window.addEventListener('load', function() {
+            if (typeof Office === 'undefined') {
+                console.warn('Office.js not loaded from primary source, trying fallback...');
+                var script = document.createElement('script');
+                script.src = 'https://appsforoffice.microsoft.com/lib/beta/hosted/office.js';
+                script.onload = function() {
+                    console.log('Office.js loaded from fallback source');
+                };
+                script.onerror = function() {
+                    console.error('Failed to load Office.js from fallback source');
+                };
+                document.head.appendChild(script);
+            }
+        });
+    </script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            50: '#fafafa',
+                            100: '#f4f4f5',
+                            200: '#e4e4e7',
+                            300: '#d4d4d8',
+                            400: '#a1a1aa',
+                            500: '#71717a',
+                            600: '#52525b',
+                            700: '#3f3f46',
+                            800: '#27272a',
+                            900: '#18181b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     
     <style>
         body {
             margin: 0;
-            padding: 20px;
+            padding: 0;
             font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
-            background-color: #faf9f8;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        #container {
-            max-width: 600px;
-            margin: 0 auto;
+        .modal-container {
+            background: #18181b; /* zinc-900 */
+            border: 1px solid #3f3f46; /* zinc-700 */
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            padding: 24px;
+            min-width: 800px;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+        
+        /* Custom scrollbar */
+        .modal-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .modal-container::-webkit-scrollbar-track {
+            background: #27272a;
+        }
+        .modal-container::-webkit-scrollbar-thumb {
+            background: #52525b;
+            border-radius: 4px;
+        }
+        .modal-container::-webkit-scrollbar-thumb:hover {
+            background: #71717a;
+        }
+        
+        /* Focus styles */
+        .focus-ring:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 2px #3b82f6 !important;
+        }
+        
+        /* Button transitions */
+        .btn-transition {
+            transition: all 0.2s ease;
+        }
+        
+        /* Grid auto-sizing */
+        .correlation-grid {
+            display: grid;
+            gap: 4px;
+        }
+        
+        /* Hide number input arrows */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
+        /* Loading states */
+        .loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        /* Error states */
+        .error-border {
+            border-color: #dc2626 !important;
+        }
+        
+        /* Success states */
+        .success-border {
+            border-color: #16a34a !important;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <!-- React app will be mounted here -->
+    <div class="modal-container">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-xl font-semibold text-zinc-100">Classical Portfolio Sensitivity Test</h2>
+                <p class="text-sm text-zinc-400 mt-1">Configure portfolio parameters and sensitivity analysis</p>
+            </div>
+            <button
+                class="text-zinc-400 hover:text-zinc-200 btn-transition p-2 rounded-lg hover:bg-zinc-800"
+                onclick="closeDialog()"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <form id="sensitivityForm" class="space-y-6">
+            <!-- Portfolio Configuration Section -->
+            <div class="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+                <h3 class="text-lg font-medium text-zinc-100 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    Portfolio Configuration
+                </h3>
+                
+                <!-- Assets Management -->
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-zinc-300 text-sm font-medium">Assets (<span id="assetCount">3</span>/5)</label>
+                        <button
+                            type="button"
+                            onclick="addAsset()"
+                            id="addAssetBtn"
+                            class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-zinc-600 disabled:cursor-not-allowed btn-transition flex items-center"
+                        >
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            Add Asset
+                        </button>
+                    </div>
+                    
+                    <div id="assetsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Asset cards will be dynamically generated here -->
+                    </div>
+                </div>
+
+                <!-- Correlation Matrix -->
+                <div class="mb-4">
+                    <div class="flex items-center mb-2">
+                        <label class="block text-zinc-300 text-sm font-medium">Correlation Matrix</label>
+                        <button
+                            type="button"
+                            class="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 btn-transition"
+                            onclick="estimateCorrelationMatrix()"
+                            id="estimateBtn"
+                            title="Left click: estimate. Right click: custom fetch."
+                        >
+                            <span id="estimateBtnText">Estimate</span>
+                        </button>
+                        <div id="correlationError" class="text-xs text-red-400 ml-2" style="display: none;"></div>
+                    </div>
+                    <div class="bg-zinc-700 rounded-lg p-3 border border-zinc-600 overflow-x-auto">
+                        <div id="correlationMatrix" class="correlation-grid">
+                            <!-- Correlation matrix will be dynamically generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sensitivity Analysis Section -->
+            <div class="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+                <h3 class="text-lg font-medium text-zinc-100 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Sensitivity Analysis Parameters
+                </h3>
+                
+                <!-- Correlation-specific explanation -->
+                <div id="correlationExplanation" class="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-4" style="display: none;">
+                    <div class="text-sm text-blue-300 font-medium mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Correlation Delta Perturbation
+                    </div>
+                    <div class="text-xs text-blue-200 leading-relaxed">
+                        When you perturb correlation for <strong id="selectedAssetName">this asset</strong>, you're shifting 
+                        <strong> ALL correlations</strong> between this asset and every other asset by the specified delta. 
+                        This preserves relative relationships while simulating how market stress affects correlation levels.
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-zinc-300 text-sm font-medium mb-2">Parameter to Perturb</label>
+                        <select 
+                            id="parameterSelect" 
+                            class="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus-ring focus:ring-blue-500" 
+                            onchange="handleParameterChange()"
+                        >
+                            <option value="volatility">Volatility</option>
+                            <option value="weight">Weight</option>
+                            <option value="correlation">Correlation</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-zinc-300 text-sm font-medium mb-2">Target Asset</label>
+                        <select 
+                            id="assetSelect" 
+                            class="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus-ring focus:ring-blue-500" 
+                            onchange="handleAssetChange()"
+                        >
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-zinc-300 text-sm font-medium mb-2">
+                            <span id="rangeMinLabel">Range Min</span>
+                        </label>
+                        <input
+                            type="number"
+                            id="rangeMin"
+                            step="0.0001"
+                            class="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus-ring focus:ring-blue-500"
+                            value="0.10"
+                            onchange="validateRange()"
+                            required
+                        />
+                        <div id="rangeMinError" class="text-xs text-red-500 mt-1" style="display: none;"></div>
+                        <div id="rangeMinHelp" class="text-xs text-zinc-400 mt-1" style="display: none;"></div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-zinc-300 text-sm font-medium mb-2">
+                            <span id="rangeMaxLabel">Range Max</span>
+                        </label>
+                        <input
+                            type="number"
+                            id="rangeMax"
+                            step="0.0001"
+                            class="w-full h-10 bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus-ring focus:ring-blue-500"
+                            value="0.20"
+                            onchange="validateRange()"
+                            required
+                        />
+                        <div id="rangeMaxError" class="text-xs text-red-500 mt-1" style="display: none;"></div>
+                        <div id="rangeMaxHelp" class="text-xs text-zinc-400 mt-1" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <label class="block text-zinc-300 text-sm font-medium mb-2">Number of Steps</label>
+                    <input
+                        id="stepsInput"
+                        type="number"
+                        min="2"
+                        max="20"
+                        class="w-full bg-zinc-600 border border-zinc-500 rounded px-3 py-2 text-zinc-100 focus-ring focus:ring-blue-500"
+                        value="6"
+                        required
+                    />
+                    <p class="text-xs text-zinc-400 mt-1">Number of points to test in the range (2-20)</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-3 pt-4 border-t border-zinc-700">
+                <button
+                    type="button"
+                    class="px-6 py-2 bg-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-600 btn-transition font-medium"
+                    onclick="closeDialog()"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 btn-transition font-medium flex items-center"
+                    onclick="console.log('Button clicked!'); console.log('Office available:', typeof Office); runSensitivityTest();"
+                    id="runTestBtn"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span id="runTestBtnText">Run Test</span>
+                </button>
+            </div>
+        </form>
     </div>
+
+    <script>
+        let portfolioData = {
+            assets: ['GLD', 'USO', 'CORN'],
+            weights: [0.4, 0.3, 0.3],
+            volatility: [0.15, 0.35, 0.25],
+            correlation_matrix: [
+                [1, 0.3, 0.15],
+                [0.3, 1, 0.2],
+                [0.15, 0.2, 1],
+            ]
+        };
+        
+        let sensitivityParams = {
+            param: 'volatility',
+            asset: 'GLD',
+            range: [0.10, 0.20],
+            steps: 6
+        };
+        
+        let fetchingStates = {};
+        let fetchErrors = {};
+        
+        // Test Office.js communication immediately when dialog loads
+        Office.onReady(() => {
+            console.log('Dialog Office.js ready');
+            
+            // Send a simple test message to verify communication works
+            setTimeout(() => {
+                if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+                    try {
+                        const testMessage = JSON.stringify({
+                            action: 'test',
+                            message: 'Dialog loaded successfully'
+                        });
+                        Office.context.ui.messageParent(testMessage);
+                        console.log('Test message sent to parent');
+                        showError('Test message sent to Excel parent', 'success');
+                    } catch (e) {
+                        console.log('Test message failed:', e);
+                        showError(`Test message failed: ${e.message}`, 'error');
+                    }
+                } else {
+                    showError('Office.js messageParent not available for testing', 'error');
+                }
+            }, 1000);
+        });
+        
+        async function loadPortfolioFromExcel() {
+            try {
+                await Excel.run(async (context) => {
+                    const worksheet = context.workbook.worksheets.getActiveWorksheet();
+                    const dataRange = worksheet.getUsedRange();
+                    if (dataRange) {
+                        dataRange.load("values");
+                        await context.sync();
+                        
+                        const values = dataRange.values;
+                        const assets = [];
+                        const weights = [];
+                        
+                        // Parse portfolio data (skip header row if exists)
+                        let startRow = values[0] && (values[0][0] === 'Symbol' || values[0][0] === 'Asset') ? 1 : 0;
+                        
+                        for (let i = startRow; i < values.length; i++) {
+                            const symbol = values[i][0];
+                            const weight = values[i][1];
+                            
+                            if (symbol && typeof symbol === 'string' && symbol.trim() !== '') {
+                                assets.push(symbol.toString().trim().toUpperCase());
+                                weights.push(typeof weight === 'number' ? weight : parseFloat(weight?.toString() || '0'));
+                            }
+                        }
+                        
+                        if (assets.length > 0) {
+                            // Normalize weights
+                            const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+                            const normalizedWeights = weights.map(w => w / totalWeight);
+                            
+                            portfolioData = {
+                                assets: assets,
+                                weights: normalizedWeights,
+                                volatility: assets.map(() => 0.2), // Default volatility
+                                correlation_matrix: generateDefaultCorrelationMatrix(assets.length)
+                            };
+                            
+                            sensitivityParams.asset = assets[0];
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading portfolio from Excel:', error);
+                // Keep default portfolio data
+            }
+        }
+        
+        function generateDefaultCorrelationMatrix(size) {
+            const matrix = [];
+            for (let i = 0; i < size; i++) {
+                const row = [];
+                for (let j = 0; j < size; j++) {
+                    if (i === j) {
+                        row.push(1);
+                    } else {
+                        row.push(0.1); // Default correlation
+                    }
+                }
+                matrix.push(row);
+            }
+            return matrix;
+        }
+        
+        function renderPortfolio() {
+            const container = document.getElementById('assetsContainer');
+            container.innerHTML = '';
+            
+            portfolioData.assets.forEach((asset, idx) => {
+                const assetCard = document.createElement('div');
+                assetCard.className = 'bg-zinc-700 rounded-lg p-3 border border-zinc-600';
+                assetCard.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-zinc-400 font-medium">Asset ${idx + 1}</span>
+                        ${portfolioData.assets.length > 1 ? `
+                            <button type="button" onclick="removeAsset(${idx})" class="text-red-400 hover:text-red-300 btn-transition p-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1">Symbol</label>
+                            <input class="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus-ring focus:ring-blue-500" 
+                                   value="${asset}" onchange="updateAsset(${idx}, this.value)" placeholder="AAPL">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1">Weight</label>
+                            <input type="number" step="0.01" min="0" max="1" 
+                                   class="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus-ring focus:ring-blue-500" 
+                                   value="${portfolioData.weights[idx].toFixed(3)}" onchange="updateWeight(${idx}, this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1">Volatility</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" step="0.0001" min="0" 
+                                       class="w-full bg-zinc-600 border border-zinc-500 rounded px-2 py-1 text-zinc-100 text-sm focus-ring focus:ring-blue-500" 
+                                       value="${portfolioData.volatility[idx].toFixed(4)}" onchange="updateVolatility(${idx}, this.value)">
+                                <button type="button" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 btn-transition" 
+                                        onclick="fetchVolatility(${idx})" ${fetchingStates[idx] ? 'disabled' : ''} 
+                                        title="Fetch historical volatility">
+                                    ${fetchingStates[idx] ? 'Fetching...' : 'Fetch'}
+                                </button>
+                            </div>
+                            ${fetchErrors[idx] ? `<div class="text-xs text-red-400 mt-1">${fetchErrors[idx]}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(assetCard);
+            });
+            
+            // Update asset count
+            document.getElementById('assetCount').textContent = portfolioData.assets.length;
+            
+            // Update add button state
+            const addBtn = document.getElementById('addAssetBtn');
+            addBtn.disabled = portfolioData.assets.length >= 5;
+        }
+        
+        function renderCorrelationMatrix() {
+            const container = document.getElementById('correlationMatrix');
+            const size = portfolioData.assets.length;
+            
+            container.style.gridTemplateColumns = `repeat(${size + 1}, minmax(60px, 1fr))`;
+            container.innerHTML = '';
+            
+            // Header row
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'text-xs text-zinc-400 font-medium p-1';
+            container.appendChild(emptyCell);
+            
+            portfolioData.assets.forEach(asset => {
+                const headerCell = document.createElement('div');
+                headerCell.className = 'text-xs text-zinc-400 font-medium p-1 text-center';
+                headerCell.textContent = asset;
+                container.appendChild(headerCell);
+            });
+            
+            // Data rows
+            portfolioData.correlation_matrix.forEach((row, i) => {
+                // Row header
+                const rowHeader = document.createElement('div');
+                rowHeader.className = 'text-xs text-zinc-400 font-medium p-1';
+                rowHeader.textContent = portfolioData.assets[i];
+                container.appendChild(rowHeader);
+                
+                // Data cells
+                row.forEach((val, j) => {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.step = '0.0001';
+                    input.min = '-1';
+                    input.max = '1';
+                    input.className = 'w-full bg-zinc-600 border border-zinc-500 rounded px-1 py-1 text-zinc-100 text-xs text-center focus-ring focus:ring-blue-500';
+                    input.value = val.toFixed(4);
+                    input.disabled = i === j; // Diagonal elements are always 1
+                    input.onchange = () => updateCorrelation(i, j, input.value);
+                    container.appendChild(input);
+                });
+            });
+        }
+        
+        function updateAssetSelect() {
+            const select = document.getElementById('assetSelect');
+            select.innerHTML = '';
+            
+            portfolioData.assets.forEach(asset => {
+                const option = document.createElement('option');
+                option.value = asset;
+                option.textContent = asset;
+                if (asset === sensitivityParams.asset) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+        
+        function addAsset() {
+            if (portfolioData.assets.length >= 5) return;
+            
+            const newAssetName = `ASSET${portfolioData.assets.length + 1}`;
+            portfolioData.assets.push(newAssetName);
+            portfolioData.weights.push(0.1);
+            portfolioData.volatility.push(0.2);
+            
+            // Expand correlation matrix
+            const newSize = portfolioData.assets.length;
+            portfolioData.correlation_matrix.forEach(row => row.push(0.1));
+            const newRow = new Array(newSize).fill(0.1);
+            newRow[newSize - 1] = 1; // Diagonal
+            portfolioData.correlation_matrix.push(newRow);
+            
+            // Normalize weights
+            const totalWeight = portfolioData.weights.reduce((sum, w) => sum + w, 0);
+            portfolioData.weights = portfolioData.weights.map(w => w / totalWeight);
+            
+            renderPortfolio();
+            renderCorrelationMatrix();
+            updateAssetSelect();
+        }
+        
+        function removeAsset(index) {
+            if (portfolioData.assets.length <= 1) return;
+            
+            const removedAsset = portfolioData.assets[index];
+            portfolioData.assets.splice(index, 1);
+            portfolioData.weights.splice(index, 1);
+            portfolioData.volatility.splice(index, 1);
+            
+            // Remove from correlation matrix
+            portfolioData.correlation_matrix.splice(index, 1);
+            portfolioData.correlation_matrix.forEach(row => row.splice(index, 1));
+            
+            // Normalize weights
+            const totalWeight = portfolioData.weights.reduce((sum, w) => sum + w, 0);
+            portfolioData.weights = portfolioData.weights.map(w => w / totalWeight);
+            
+            // Update selected asset if needed
+            if (sensitivityParams.asset === removedAsset) {
+                sensitivityParams.asset = portfolioData.assets[0];
+            }
+            
+            renderPortfolio();
+            renderCorrelationMatrix();
+            updateAssetSelect();
+        }
+        
+        function updateAsset(index, value) {
+            const oldAsset = portfolioData.assets[index];
+            portfolioData.assets[index] = value.toUpperCase();
+            
+            if (sensitivityParams.asset === oldAsset) {
+                sensitivityParams.asset = value.toUpperCase();
+            }
+            
+            updateAssetSelect();
+            renderCorrelationMatrix();
+        }
+        
+        function updateWeight(index, value) {
+            portfolioData.weights[index] = parseFloat(value) || 0;
+            updateRangeForParameter();
+        }
+        
+        function updateVolatility(index, value) {
+            portfolioData.volatility[index] = parseFloat(value) || 0;
+            updateRangeForParameter();
+        }
+        
+        function updateCorrelation(i, j, value) {
+            const val = parseFloat(value) || 0;
+            portfolioData.correlation_matrix[i][j] = val;
+            portfolioData.correlation_matrix[j][i] = val; // Symmetric
+        }
+        
+        function handleParameterChange() {
+            sensitivityParams.param = document.getElementById('parameterSelect').value;
+            updateParameterLabels();
+            updateRangeForParameter();
+        }
+        
+        function handleAssetChange() {
+            sensitivityParams.asset = document.getElementById('assetSelect').value;
+            document.getElementById('selectedAssetName').textContent = sensitivityParams.asset;
+            updateRangeForParameter();
+        }
+        
+        function updateParameterLabels() {
+            const param = sensitivityParams.param;
+            const isCorrelation = param === 'correlation';
+            
+            document.getElementById('rangeMinLabel').textContent = isCorrelation ? 'Correlation Delta Min' : 'Range Min';
+            document.getElementById('rangeMaxLabel').textContent = isCorrelation ? 'Correlation Delta Max' : 'Range Max';
+            
+            // Show/hide correlation explanation
+            document.getElementById('correlationExplanation').style.display = isCorrelation ? 'block' : 'none';
+            document.getElementById('selectedAssetName').textContent = sensitivityParams.asset;
+            
+            // Update help text
+            const minHelp = document.getElementById('rangeMinHelp');
+            const maxHelp = document.getElementById('rangeMaxHelp');
+            
+            if (isCorrelation) {
+                minHelp.textContent = 'Delta range: -0.5 to +0.5 (shifts existing correlations)';
+                maxHelp.textContent = 'Delta range: -0.5 to +0.5 (shifts existing correlations)';
+                minHelp.style.display = 'block';
+                maxHelp.style.display = 'block';
+                
+                // Set constraints
+                document.getElementById('rangeMin').min = '-0.5';
+                document.getElementById('rangeMin').max = '0.5';
+                document.getElementById('rangeMax').min = '-0.5';
+                document.getElementById('rangeMax').max = '0.5';
+            } else {
+                minHelp.style.display = 'none';
+                maxHelp.style.display = 'none';
+                
+                // Remove constraints
+                document.getElementById('rangeMin').removeAttribute('min');
+                document.getElementById('rangeMin').removeAttribute('max');
+                document.getElementById('rangeMax').removeAttribute('min');
+                document.getElementById('rangeMax').removeAttribute('max');
+            }
+        }
+        
+        function updateRangeForParameter() {
+            const assetIndex = portfolioData.assets.indexOf(sensitivityParams.asset);
+            if (assetIndex === -1) return;
+            
+            let newMin, newMax;
+            
+            switch (sensitivityParams.param) {
+                case 'volatility':
+                    const vol = portfolioData.volatility[assetIndex];
+                    newMin = Math.max(0, vol - 0.05);
+                    newMax = vol + 0.05;
+                    break;
+                case 'weight':
+                    const weight = portfolioData.weights[assetIndex];
+                    newMin = Math.max(0, weight - 0.1);
+                    newMax = Math.min(1, weight + 0.1);
+                    break;
+                case 'correlation':
+                    newMin = -0.5;
+                    newMax = 0.5;
+                    break;
+                default:
+                    return;
+            }
+            
+            document.getElementById('rangeMin').value = newMin.toFixed(4);
+            document.getElementById('rangeMax').value = newMax.toFixed(4);
+            sensitivityParams.range = [newMin, newMax];
+        }
+        
+        function validateRange() {
+            console.log('validateRange() called');
+            
+            const rangeMinEl = document.getElementById('rangeMin');
+            const rangeMaxEl = document.getElementById('rangeMax');
+            
+            if (!rangeMinEl || !rangeMaxEl) {
+                console.log('Range elements not found:', {rangeMin: !!rangeMinEl, rangeMax: !!rangeMaxEl});
+                return false;
+            }
+            
+            const min = parseFloat(rangeMinEl.value);
+            const max = parseFloat(rangeMaxEl.value);
+            
+            console.log('Range values:', {min, max});
+            
+            const minError = document.getElementById('rangeMinError');
+            const maxError = document.getElementById('rangeMaxError');
+            
+            if (minError) minError.style.display = 'none';
+            if (maxError) maxError.style.display = 'none';
+            
+            if (isNaN(min) || isNaN(max)) {
+                console.log('Range values are NaN');
+                if (maxError) {
+                    maxError.textContent = 'Please enter valid numbers';
+                    maxError.style.display = 'block';
+                }
+                return false;
+            }
+            
+            if (min >= max) {
+                console.log('Min >= Max validation failed');
+                if (maxError) {
+                    maxError.textContent = 'Max must be greater than min';
+                    maxError.style.display = 'block';
+                }
+                return false;
+            }
+            
+            sensitivityParams.range = [min, max];
+            console.log('Range validation passed:', sensitivityParams.range);
+            return true;
+        }
+        
+        async function fetchVolatility(index) {
+            const asset = portfolioData.assets[index];
+            if (!asset) return;
+            
+            fetchingStates[index] = true;
+            delete fetchErrors[index];
+            renderPortfolio();
+            
+            try {
+                // Mock API call - replace with actual endpoint
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const mockVol = (Math.random() * 0.3 + 0.1);
+                portfolioData.volatility[index] = mockVol;
+                renderPortfolio();
+                updateRangeForParameter();
+            } catch (error) {
+                fetchErrors[index] = 'Error fetching volatility';
+                renderPortfolio();
+            } finally {
+                fetchingStates[index] = false;
+            }
+        }
+        
+        async function estimateCorrelationMatrix() {
+            const btn = document.getElementById('estimateBtn');
+            const btnText = document.getElementById('estimateBtnText');
+            const errorDiv = document.getElementById('correlationError');
+            
+            btn.disabled = true;
+            btnText.textContent = 'Estimating...';
+            errorDiv.style.display = 'none';
+            
+            try {
+                // Mock API call - replace with actual endpoint
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Generate mock correlation matrix
+                const size = portfolioData.assets.length;
+                for (let i = 0; i < size; i++) {
+                    for (let j = i + 1; j < size; j++) {
+                        const corr = (Math.random() - 0.5) * 0.6; // -0.3 to 0.3
+                        portfolioData.correlation_matrix[i][j] = corr;
+                        portfolioData.correlation_matrix[j][i] = corr;
+                    }
+                }
+                
+                renderCorrelationMatrix();
+            } catch (error) {
+                errorDiv.textContent = 'Error estimating correlation matrix';
+                errorDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Estimate';
+            }
+        }
+        
+        async function runSensitivityTest() {
+            console.log('=== runSensitivityTest called ===');
+            console.log('portfolioData exists:', typeof portfolioData !== 'undefined');
+            console.log('sensitivityParams exists:', typeof sensitivityParams !== 'undefined');
+            console.log('portfolioData value:', portfolioData);
+            console.log('sensitivityParams value:', sensitivityParams);
+            
+            // Show debug info to user
+            showError('Debug: Function called. Check if portfolio data exists...', 'info');
+            
+            if (!validateRange()) {
+                console.log('validateRange() failed - stopping execution');
+                showError('Validation failed: Range validation error');
+                return;
+            }
+            
+            showError('Debug: Range validation passed', 'info');
+            
+            const stepsEl = document.getElementById('stepsInput');
+            if (!stepsEl) {
+                showError('Error: stepsInput element not found');
+                return;
+            }
+            
+            const steps = parseInt(stepsEl.value);
+            showError(`Debug: Steps value is ${steps}`, 'info');
+            
+            if (steps < 2 || steps > 20) {
+                console.log('Steps validation failed:', steps);
+                showError('Steps must be between 2 and 20');
+                return;
+            }
+            
+            showError('Debug: Steps validation passed', 'info');
+
+            try {
+                showError('Debug: Entering try block', 'info');
+                console.log('Starting test execution...');
+                const runBtn = document.getElementById('runTestBtn');
+                const btnText = document.getElementById('runTestBtnText');
+                
+                if (!runBtn || !btnText) {
+                    showError('Error: Button elements not found');
+                    return;
+                }
+                
+                showError('Debug: Button elements found', 'info');
+                
+                // Show loading state
+                runBtn.disabled = true;
+                btnText.textContent = 'Running Test...';
+                showError('Debug: Button state updated to running', 'info');
+                
+                const configuration = {
+                    portfolio: portfolioData,
+                    param: sensitivityParams.param,
+                    asset: sensitivityParams.asset,
+                    range: sensitivityParams.range,
+                    steps: steps,
+                    shockSize: 0.05, // Default for classical
+                    confidenceLevel: 0.95, // Default
+                    timeHorizon: 252 // Default
+                };
+                
+                showError('Debug: Configuration created', 'info');
+                console.log('Running classical sensitivity test with config:', configuration);
+                
+                // Send test request to Excel add-in using multiple communication methods
+                showError('Debug: Starting communication attempts', 'info');
+                console.log('Attempting to send message...');
+                console.log('Office available:', typeof Office !== 'undefined');
+                console.log('Office.context available:', typeof Office !== 'undefined' && Office.context);
+                console.log('Office.context.ui available:', typeof Office !== 'undefined' && Office.context && Office.context.ui);
+                
+                const messageData = {
+                    action: 'run_analysis',
+                    type: 'classical',
+                    config: configuration
+                };
+                
+                let messageSent = false;
+                showError('Debug: Trying communication methods...', 'info');
+                
+                // Wait a moment to ensure parent dialog handler is set up
+                setTimeout(() => {
+                    // Method 1: Try Office.js messageParent
+                    if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+                        try {
+                            showError('Debug: Attempting Office.js messageParent', 'info');
+                            
+                            // Try sending as simple string first (this is what most Office.js examples expect)
+                            const messageString = JSON.stringify(messageData);
+                            console.log('Sending message string:', messageString);
+                            console.log('Message string length:', messageString.length);
+                            
+                            // Try multiple times with delays to ensure parent is ready
+                            let attempts = 0;
+                            const maxAttempts = 5;
+                            
+                            const sendMessage = () => {
+                                attempts++;
+                                try {
+                                    Office.context.ui.messageParent(messageString);
+                                    console.log(`Message sent via Office.context.ui.messageParent (attempt ${attempts})`);
+                                    showError(`Debug: Office.js message sent successfully! (attempt ${attempts})`, 'success');
+                                    messageSent = true;
+                                    
+                                    // Show message but don't auto-close - let parent handle it
+                                    setTimeout(() => {
+                                        showError('Message sent to Excel. Processing analysis...', 'info');
+                                    }, 1000);
+                                } catch (e) {
+                                    console.log(`Office.context.ui.messageParent failed (attempt ${attempts}):`, e);
+                                    showError(`Debug: Office.js failed (attempt ${attempts}): ${e.message}`, 'error');
+                                    
+                                    if (attempts < maxAttempts) {
+                                        setTimeout(sendMessage, 2000); // Try again after 2 seconds
+                                    }
+                                }
+                            };
+                            
+                            sendMessage();
+                            
+                        } catch (e) {
+                            console.log('Office.context.ui.messageParent setup failed:', e);
+                            showError(`Debug: Office.js setup failed: ${e.message}`, 'error');
+                        }
+                    } else {
+                        showError('Debug: Office.js messageParent not available', 'info');
+                    }
+                }, 2000); // Wait 2 seconds for parent to set up event handler
+                
+                // Method 2: Try window.external (Excel VBA bridge)
+                if (!messageSent && typeof window.external !== 'undefined' && window.external.notify) {
+                    try {
+                        showError('Debug: Attempting window.external.notify', 'info');
+                        window.external.notify(JSON.stringify(messageData));
+                        console.log('Message sent via window.external.notify');
+                        showError('Debug: window.external message sent!', 'success');
+                        messageSent = true;
+                    } catch (e) {
+                        console.log('window.external.notify failed:', e);
+                        showError(`Debug: window.external failed: ${e.message}`, 'error');
+                    }
+                } else if (!messageSent) {
+                    showError('Debug: window.external not available', 'info');
+                }
+                
+                // Method 3: Try postMessage to parent
+                if (!messageSent && window.parent && window.parent !== window) {
+                    try {
+                        window.parent.postMessage(messageData, '*');
+                        console.log('Message sent via window.parent.postMessage');
+                        messageSent = true;
+                    } catch (e) {
+                        console.log('window.parent.postMessage failed:', e);
+                    }
+                }
+                
+                // Method 4: Direct Excel interop (for testing)
+                if (!messageSent && typeof window.chrome !== 'undefined' && window.chrome.webview) {
+                    try {
+                        window.chrome.webview.postMessage(messageData);
+                        console.log('Message sent via chrome.webview.postMessage');
+                        messageSent = true;
+                    } catch (e) {
+                        console.log('chrome.webview.postMessage failed:', e);
+                    }
+                }
+                
+                if (!messageSent) {
+                    // If all methods fail, simulate the analysis for testing
+                    console.log('All communication methods failed, simulating analysis...');
+                    showError('Communication failed. Running test simulation...', 'info');
+                    
+                    // Simulate analysis completion after 3 seconds
+                    setTimeout(() => {
+                        const mockResults = {
+                            id: 'test-' + Date.now(),
+                            analysis_type: 'Classical',
+                            portfolio: configuration.portfolio,
+                            max_sensitivity: 0.15,
+                            min_sensitivity: -0.12,
+                            avg_sensitivity: 0.02,
+                            portfolio_var: 0.08,
+                            sensitivity_data: Array.from({length: configuration.steps}, (_, i) => ({
+                                parameter_value: 0.1 + (i * 0.02),
+                                sensitivity: Math.random() * 0.2 - 0.1
+                            }))
+                        };
+                        
+                        // Show results directly
+                        showMockResults(mockResults);
+                    }, 3000);
+                }
+                
+                console.log('Message sent to parent');
+                
+            } catch (error) {
+                console.error('Error running sensitivity test:', error);
+                showError(`Test failed: ${error.message}`);
+            } finally {
+                // Reset button state
+                console.log('Resetting button state');
+                const runBtn = document.getElementById('runTestBtn');
+                const btnText = document.getElementById('runTestBtnText');
+                if (runBtn && btnText) {
+                    runBtn.disabled = false;
+                    btnText.textContent = 'Run Test';
+                }
+            }
+        }
+        
+        function showMockResults(results) {
+            // Create a simple results display in the current dialog
+            const resultsHtml = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-zinc-800 p-6 rounded-lg max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+                        <h3 class="text-xl font-bold text-white mb-4">Analysis Results (Simulation)</h3>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="bg-zinc-700 p-3 rounded">
+                                <div class="text-blue-400 text-lg font-bold">${(results.max_sensitivity * 100).toFixed(2)}%</div>
+                                <div class="text-zinc-400 text-sm">Max Sensitivity</div>
+                            </div>
+                            <div class="bg-zinc-700 p-3 rounded">
+                                <div class="text-blue-400 text-lg font-bold">${(results.min_sensitivity * 100).toFixed(2)}%</div>
+                                <div class="text-zinc-400 text-sm">Min Sensitivity</div>
+                            </div>
+                            <div class="bg-zinc-700 p-3 rounded">
+                                <div class="text-blue-400 text-lg font-bold">${(results.avg_sensitivity * 100).toFixed(2)}%</div>
+                                <div class="text-zinc-400 text-sm">Avg Sensitivity</div>
+                            </div>
+                            <div class="bg-zinc-700 p-3 rounded">
+                                <div class="text-blue-400 text-lg font-bold">${(results.portfolio_var * 100).toFixed(2)}%</div>
+                                <div class="text-zinc-400 text-sm">Portfolio VaR</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h4 class="text-white font-semibold mb-2">Sensitivity Data Points:</h4>
+                            <div class="text-zinc-300 text-sm max-h-32 overflow-y-auto">
+                                ${results.sensitivity_data.map((point, i) => 
+                                    `<div>Step ${i+1}: ${point.parameter_value.toFixed(3)} → ${(point.sensitivity * 100).toFixed(2)}%</div>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button 
+                                onclick="document.querySelector('.fixed.inset-0').remove()" 
+                                class="px-4 py-2 bg-zinc-600 text-white rounded hover:bg-zinc-500"
+                            >
+                                Close
+                            </button>
+                            <button 
+                                onclick="closeDialog()" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', resultsHtml);
+        }
+        
+        function showError(message, type = 'error') {
+            // Create or update error display
+            let errorContainer = document.getElementById('errorContainer');
+            if (!errorContainer) {
+                errorContainer = document.createElement('div');
+                errorContainer.id = 'errorContainer';
+                errorContainer.className = 'fixed top-4 left-4 right-4 z-50';
+                document.body.appendChild(errorContainer);
+            }
+            
+            const errorClass = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+            errorContainer.innerHTML = `
+                <div class="${errorClass} text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            ${type === 'success' ? 
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' :
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.863-.833-2.633 0L4.183 16.5c-.77.833.192 2.5 1.732 2.5z"></path>'
+                            }
+                        </svg>
+                        <span>${message}</span>
+                    </div>
+                    <button onclick="document.getElementById('errorContainer').style.display='none'" class="ml-4 text-white hover:text-gray-200">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            // Auto-hide after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (errorContainer) {
+                        errorContainer.style.display = 'none';
+                    }
+                }, 5000);
+            }
+        }
+        
+        function closeDialog() {
+            try {
+                // Method 1: Try the modern Office.js dialog close
+                if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.closeContainer) {
+                    Office.context.ui.closeContainer();
+                    return;
+                }
+                
+                // Method 2: Try the legacy dialog close method
+                if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.close) {
+                    Office.context.ui.close();
+                    return;
+                }
+                
+                // Method 3: Try sending close message to parent
+                if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+                    Office.context.ui.messageParent(JSON.stringify({ action: 'close_dialog' }));
+                    return;
+                }
+                
+                // Method 4: Try window close
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ action: 'close_dialog' }, '*');
+                } else {
+                    window.close();
+                }
+            } catch (error) {
+                console.error('Error closing dialog:', error);
+                // Final fallback - try to hide the window
+                try {
+                    window.close();
+                } catch (e) {
+                    console.error('Could not close window:', e);
+                }
+            }
+        }
+        
+        // Initialize Office.js and setup
+        let officeInitialized = false;
+        
+        function initializeOffice() {
+            if (typeof Office !== 'undefined') {
+                Office.onReady(() => {
+                    console.log('Office.js is ready');
+                    officeInitialized = true;
+                    handleParameterChange(); // Initialize UI after Office is ready
+                });
+            } else {
+                console.log('Office.js not available - running in browser mode');
+                handleParameterChange(); // Initialize UI anyway for browser testing
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', initializeOffice);
+    </script>
 </body>
 </html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results</title>
+    
+    <!-- Office.js -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    
+    <!-- Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'zinc': {
+                            900: '#18181b',
+                            800: '#27272a',
+                            700: '#3f3f46',
+                            600: '#52525b',
+                            500: '#71717a',
+                            400: '#a1a1aa',
+                            300: '#d4d4d8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #18181b;
+            color: #d4d4d8;
+            min-height: 100vh;
+        }
+        
+        .btn-transition {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            background: #27272a;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: #a1a1aa;
+            margin-top: 0.25rem;
+        }
+        
+        .loading-spinner {
+            border: 2px solid #3f3f46;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            background: #dc2626;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body class="bg-zinc-900 text-zinc-300">
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Sensitivity Analysis Results</h1>
+                <p class="text-zinc-400 mt-1" id="analysisInfo">Classical Sensitivity Analysis</p>
+            </div>
+            <button 
+                onclick="closeDialog()" 
+                class="px-4 py-2 bg-zinc-700 text-white rounded-lg hover:bg-zinc-600 btn-transition"
+            >
+                Close
+            </button>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="loading-spinner"></div>
+            <p class="mt-4 text-zinc-400">Processing results...</p>
+        </div>
+        
+        <!-- Error State -->
+        <div id="errorState" class="hidden">
+            <div class="error-message">
+                <h3 class="font-bold">Error Loading Results</h3>
+                <p id="errorMessage">Failed to load analysis results</p>
+            </div>
+        </div>
+        
+        <!-- Results Content -->
+        <div id="resultsContent" class="hidden">
+            <!-- Key Metrics -->
+            <div class="results-grid" id="metricsGrid">
+                <!-- Metrics will be populated dynamically -->
+            </div>
+            
+            <!-- Main Chart -->
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-white mb-4">Sensitivity Analysis</h2>
+                <div class="chart-container">
+                    <canvas id="sensitivityChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Additional Analysis -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Risk Metrics -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-semibold text-white mb-3">Risk Metrics</h3>
+                    <div id="riskMetrics" class="space-y-2">
+                        <!-- Risk metrics will be populated -->
+                    </div>
+                </div>
+                
+                <!-- Portfolio Summary -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-semibold text-white mb-3">Portfolio Summary</h3>
+                    <div id="portfolioSummary" class="space-y-2">
+                        <!-- Portfolio summary will be populated -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Raw Data Export -->
+            <div class="mt-6">
+                <button 
+                    onclick="exportToExcel()" 
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 btn-transition mr-3"
+                >
+                    Export to Excel Sheet
+                </button>
+                <button 
+                    onclick="downloadData()" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 btn-transition"
+                >
+                    Download Raw Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let analysisResults = null;
+        let sensitivityChart = null;
+        
+        // Initialize Office.js
+        Office.onReady(() => {
+            loadResults();
+        });
+        
+        function loadResults() {
+            try {
+                // Get data from URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const dataParam = urlParams.get('data');
+                
+                if (dataParam) {
+                    analysisResults = JSON.parse(decodeURIComponent(dataParam));
+                    displayResults();
+                } else {
+                    showError('No results data provided');
+                }
+            } catch (error) {
+                console.error('Error loading results:', error);
+                showError('Failed to parse results data');
+            }
+        }
+        
+        function displayResults() {
+            if (!analysisResults) {
+                showError('No results to display');
+                return;
+            }
+            
+            // Hide loading state
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('resultsContent').classList.remove('hidden');
+            
+            // Update analysis info
+            document.getElementById('analysisInfo').textContent = 
+                `${analysisResults.analysis_type || 'Classical'} Sensitivity Analysis - ${new Date().toLocaleString()}`;
+            
+            // Display key metrics
+            displayMetrics();
+            
+            // Create sensitivity chart
+            createSensitivityChart();
+            
+            // Display additional analysis
+            displayRiskMetrics();
+            displayPortfolioSummary();
+        }
+        
+        function displayMetrics() {
+            const metricsGrid = document.getElementById('metricsGrid');
+            const results = analysisResults;
+            
+            // Key metrics to display
+            const metrics = [
+                {
+                    label: 'Max Sensitivity',
+                    value: results.max_sensitivity ? (results.max_sensitivity * 100).toFixed(2) + '%' : 'N/A'
+                },
+                {
+                    label: 'Min Sensitivity',
+                    value: results.min_sensitivity ? (results.min_sensitivity * 100).toFixed(2) + '%' : 'N/A'
+                },
+                {
+                    label: 'Average Sensitivity',
+                    value: results.avg_sensitivity ? (results.avg_sensitivity * 100).toFixed(2) + '%' : 'N/A'
+                },
+                {
+                    label: 'Portfolio VaR',
+                    value: results.portfolio_var ? (results.portfolio_var * 100).toFixed(2) + '%' : 'N/A'
+                }
+            ];
+            
+            metricsGrid.innerHTML = metrics.map(metric => `
+                <div class="metric-card">
+                    <div class="metric-value">${metric.value}</div>
+                    <div class="metric-label">${metric.label}</div>
+                </div>
+            `).join('');
+        }
+        
+        function createSensitivityChart() {
+            const ctx = document.getElementById('sensitivityChart').getContext('2d');
+            
+            // Prepare chart data
+            let chartData = [];
+            let labels = [];
+            
+            if (analysisResults.sensitivity_data && Array.isArray(analysisResults.sensitivity_data)) {
+                chartData = analysisResults.sensitivity_data.map(d => d.sensitivity * 100);
+                labels = analysisResults.sensitivity_data.map((d, i) => `Step ${i + 1}`);
+            } else if (analysisResults.parameter_values && analysisResults.portfolio_values) {
+                chartData = analysisResults.portfolio_values.map(v => v * 100);
+                labels = analysisResults.parameter_values.map(v => v.toFixed(3));
+            } else {
+                // Fallback: create sample data
+                chartData = Array.from({length: 10}, (_, i) => Math.random() * 10 - 5);
+                labels = Array.from({length: 10}, (_, i) => `Point ${i + 1}`);
+            }
+            
+            sensitivityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Portfolio Sensitivity (%)',
+                        data: chartData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#d4d4d8'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#a1a1aa'
+                            },
+                            grid: {
+                                color: '#3f3f46'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#a1a1aa'
+                            },
+                            grid: {
+                                color: '#3f3f46'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displayRiskMetrics() {
+            const riskMetrics = document.getElementById('riskMetrics');
+            const results = analysisResults;
+            
+            const metrics = [
+                { label: 'Volatility', value: results.volatility ? (results.volatility * 100).toFixed(2) + '%' : 'N/A' },
+                { label: 'Sharpe Ratio', value: results.sharpe_ratio ? results.sharpe_ratio.toFixed(3) : 'N/A' },
+                { label: 'Max Drawdown', value: results.max_drawdown ? (results.max_drawdown * 100).toFixed(2) + '%' : 'N/A' },
+                { label: 'Beta', value: results.beta ? results.beta.toFixed(3) : 'N/A' }
+            ];
+            
+            riskMetrics.innerHTML = metrics.map(metric => `
+                <div class="flex justify-between">
+                    <span class="text-zinc-400">${metric.label}:</span>
+                    <span class="text-white font-medium">${metric.value}</span>
+                </div>
+            `).join('');
+        }
+        
+        function displayPortfolioSummary() {
+            const portfolioSummary = document.getElementById('portfolioSummary');
+            const results = analysisResults;
+            
+            const summary = [
+                { label: 'Assets', value: results.portfolio?.assets?.length || 'N/A' },
+                { label: 'Total Weight', value: results.portfolio?.weights ? (results.portfolio.weights.reduce((a, b) => a + b, 0) * 100).toFixed(1) + '%' : 'N/A' },
+                { label: 'Analysis Type', value: results.analysis_type || 'Classical' },
+                { label: 'Time Horizon', value: results.time_horizon ? `${results.time_horizon} days` : 'N/A' }
+            ];
+            
+            portfolioSummary.innerHTML = summary.map(item => `
+                <div class="flex justify-between">
+                    <span class="text-zinc-400">${item.label}:</span>
+                    <span class="text-white font-medium">${item.value}</span>
+                </div>
+            `).join('');
+        }
+        
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+        }
+        
+        async function exportToExcel() {
+            try {
+                await Excel.run(async (context) => {
+                    // Create a new worksheet for results
+                    const worksheets = context.workbook.worksheets;
+                    const resultsSheet = worksheets.add("Sensitivity Results");
+                    
+                    // Add headers
+                    resultsSheet.getRange("A1").values = [["Sensitivity Analysis Results"]];
+                    resultsSheet.getRange("A1").format.font.bold = true;
+                    resultsSheet.getRange("A1").format.font.size = 16;
+                    
+                    // Add analysis data
+                    if (analysisResults.sensitivity_data) {
+                        resultsSheet.getRange("A3").values = [["Parameter Value", "Portfolio Sensitivity"]];
+                        resultsSheet.getRange("A3:B3").format.font.bold = true;
+                        
+                        const data = analysisResults.sensitivity_data.map(d => [d.parameter_value, d.sensitivity]);
+                        resultsSheet.getRange("A4").getResizedRange(data.length - 1, 1).values = data;
+                    }
+                    
+                    // Auto-fit columns
+                    resultsSheet.getUsedRange().format.autofitColumns();
+                    
+                    await context.sync();
+                    
+                    showMessage('Results exported to Excel sheet successfully!', 'success');
+                });
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                showMessage('Failed to export to Excel: ' + error.message, 'error');
+            }
+        }
+        
+        function downloadData() {
+            try {
+                const dataStr = JSON.stringify(analysisResults, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(dataBlob);
+                link.download = `sensitivity_analysis_${new Date().toISOString().slice(0,10)}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(link.href);
+            } catch (error) {
+                console.error('Error downloading data:', error);
+                showMessage('Failed to download data: ' + error.message, 'error');
+            }
+        }
+        
+        function showMessage(message, type = 'info') {
+            // Create temporary notification
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white max-w-sm ${
+                type === 'success' ? 'bg-green-600' : 
+                type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+            }`;
+            notification.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        function closeDialog() {
+            Office.context.ui.closeContainer();
+        }
+    </script>
+</body>
+</html>
