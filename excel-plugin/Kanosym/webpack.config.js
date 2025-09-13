@@ -7,6 +7,7 @@ const webpack = require("webpack");
 
 const urlDev = "https://localhost:3000/";
 const urlProd = "https://www.contoso.com/"; // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
+console.log('>>> USING THIS WEBPACK CONFIG (with /api proxy to 5001)');
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
@@ -133,20 +134,41 @@ module.exports = async (env, options) => {
         template: "./src/commands/commands.html",
         chunks: ["polyfill", "commands"],
       }),
+      new HtmlWebpackPlugin({
+        filename: "dialogs/historical-prices.html",
+        template: "./src/dialogs/historical-prices.html",
+        chunks: ["polyfill"],
+      }),
       new webpack.ProvidePlugin({
         Promise: ["es6-promise", "Promise"],
       }),
     ],
     devServer: {
       hot: true,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
+  headers: { "Access-Control-Allow-Origin": "*" },
+  server: {
+    type: "https",
+    options: env.WEBPACK_BUILD || options.https !== undefined ? options.https : await getHttpsOptions(),
+  },
+  port: process.env.npm_package_config_dev_server_port || 3000,
+
+  proxy: [
+    {
+      context: ["/api"],                 // <— what to proxy
+      target: "https://localhost:5001",  // <— your backend
+      changeOrigin: true,
+      secure: false,                     // dev only (self-signed)
+      logLevel: "debug",
+      onProxyReq(proxyReq, req) {
+        console.log("[proxy] ->", req.method, req.url);
       },
-      server: {
-        type: "https",
-        options: env.WEBPACK_BUILD || options.https !== undefined ? options.https : await getHttpsOptions(),
+      onProxyRes(proxyRes, req) {
+        console.log("[proxy] <-", req.method, req.url, proxyRes.statusCode, proxyRes.headers["content-type"]);
       },
-      port: process.env.npm_package_config_dev_server_port || 3000,
+      // If your backend DOESN'T include the /api prefix, uncomment:
+      // pathRewrite: { "^/api": "" },
+    },
+  ],
     },
   };
 

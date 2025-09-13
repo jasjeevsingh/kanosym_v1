@@ -35,6 +35,9 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     padding: tokens.spacingVerticalXL,
   },
+  cardPreview: {
+    // Add any specific styling for card preview if needed
+  },
 });
 
 interface AnalyticsAppProps {
@@ -71,6 +74,7 @@ export default function AnalyticsApp({ title }: AnalyticsAppProps) {
     <div className={styles.container}>
       <div className={styles.header}>
         <Text as="h1" size={600}>{title}</Text>
+        <br></br>
         <Text>Financial analytics and sensitivity analysis tools</Text>
       </div>
 
@@ -87,12 +91,15 @@ export default function AnalyticsApp({ title }: AnalyticsAppProps) {
               </Button>
             }
           />
+          <div className={`${styles.cardPreview}`}>
           <CardPreview>
             <Text>
               Import data from your Excel worksheet to run Kanosym analysis.
               Select your data range and click Import to get started.
             </Text>
           </CardPreview>
+          </div>
+          
         </Card>
 
         <Card className={styles.card}>
@@ -108,12 +115,15 @@ export default function AnalyticsApp({ title }: AnalyticsAppProps) {
               </Button>
             }
           />
+          <div className={`${styles.cardPreview}`}>
           <CardPreview>
             <Text>
               Run quantum, hybrid, or classical sensitivity analysis on your 
               financial models using Kanosym's advanced algorithms.
             </Text>
           </CardPreview>
+          </div>
+          
         </Card>
 
         <Card className={styles.card}>

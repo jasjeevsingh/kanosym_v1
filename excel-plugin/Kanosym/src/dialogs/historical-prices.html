@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Historical Prices</title>
+    
+    <!-- Office.js API -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    
+    <!-- Backup Office.js from CDN -->
+    <script>
+        // Fallback Office.js loading
+        window.addEventListener('load', function() {
+            if (typeof Office === 'undefined') {
+                console.warn('Office.js not loaded from primary source, trying fallback...');
+                var script = document.createElement('script');
+                script.src = 'https://appsforoffice.microsoft.com/lib/beta/hosted/office.js';
+                script.onload = function() {
+                    console.log('Office.js loaded from fallback source');
+                };
+                script.onerror = function() {
+                    console.error('Failed to load Office.js from fallback source');
+                };
+                document.head.appendChild(script);
+            }
+        });
+    </script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            50: '#fafafa',
+                            100: '#f4f4f5',
+                            200: '#e4e4e7',
+                            300: '#d4d4d8',
+                            400: '#a1a1aa',
+                            500: '#71717a',
+                            600: '#52525b',
+                            700: '#3f3f46',
+                            800: '#27272a',
+                            900: '#18181b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .form-section {
+            padding: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .success {
+            color: #10b981;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1 class="text-2xl font-bold">Historical Prices</h1>
+                <p class="text-sm opacity-90 mt-2">Load historical price data for your selected assets</p>
+            </div>
+            
+            <div class="form-section">
+                <form id="historicalPricesForm">
+                    <div class="form-group">
+                        <label class="form-label" for="symbols">Asset Symbols</label>
+                        <input 
+                            type="text" 
+                            id="symbols" 
+                            class="form-input" 
+                            placeholder="AAPL, MSFT, GOOGL" 
+                            value="AAPL, MSFT, GOOGL"
+                            required
+                        >
+                        <div class="text-sm text-gray-500 mt-1">Enter symbols separated by commas</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="startDate">Start Date</label>
+                        <input 
+                            type="date" 
+                            id="startDate" 
+                            class="form-input" 
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="endDate">End Date</label>
+                        <input 
+                            type="date" 
+                            id="endDate" 
+                            class="form-input" 
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="window">Volatility Window (days)</label>
+                        <input 
+                            type="number" 
+                            id="window" 
+                            class="form-input" 
+                            value="252" 
+                            min="1" 
+                            max="1000"
+                        >
+                        <div class="text-sm text-gray-500 mt-1">Number of trading days for volatility calculation</div>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="loadPricesBtn">
+                        Load Historical Prices
+                    </button>
+                    
+                    <button type="button" class="btn btn-secondary" onclick="cancelAction()">
+                        Cancel
+                    </button>
+                </form>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Loading historical prices...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set default dates
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(today.getFullYear() - 1);
+            
+            document.getElementById('startDate').value = oneYearAgo.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+        });
+        
+        // Form submission
+        document.getElementById('historicalPricesForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            loadHistoricalPrices();
+        });
+        
+        function loadHistoricalPrices() {
+            const symbols = document.getElementById('symbols').value.trim();
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const window = parseInt(document.getElementById('window').value);
+            
+            if (!symbols || !startDate || !endDate) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loadPricesBtn').disabled = true;
+            
+            // Parse symbols
+            const symbolList = symbols.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            
+            const message = {
+                action: 'load_historical_prices',
+                config: {
+                    symbols: symbolList,
+                    start_date: startDate,
+                    end_date: endDate,
+                    window: window
+                }
+            };
+            
+            console.log('Sending message:', message);
+            
+            // Send message back to parent add-in
+            Office.context.ui.messageParent(JSON.stringify(message));
+        }
+        
+        function cancelAction() {
+            Office.context.ui.closeContainer();
+        }
+        
+        // Test function for debugging
+        function testConnection() {
+            const message = {
+                action: 'test',
+                message: 'Historical prices dialog test'
+            };
+            
+            Office.context.ui.messageParent(JSON.stringify(message));
+        }
+        
+        // Add test button for debugging (remove in production)
+        if (window.location.hostname === 'localhost') {
+            const testBtn = document.createElement('button');
+            testBtn.textContent = 'Test Connection';
+            testBtn.className = 'btn btn-secondary';
+            testBtn.style.marginTop = '10px';
+            testBtn.onclick = testConnection;
+            document.querySelector('.form-section').appendChild(testBtn);
+        }
+    </script>
+</body>
+</html>

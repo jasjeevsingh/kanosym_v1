@@ -17,6 +17,7 @@
 
   <AppDomains>
     <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>http://localhost:5001</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -94,7 +95,7 @@
                 </Icon>
 
                 <!-- Import Portfolio Data -->
-                <Control xsi:type="Button" id="ImportPortfolioButton">
+                <!-- <Control xsi:type="Button" id="ImportPortfolioButton">
                   <Label resid="ImportPortfolioButton.Label"/>
                   <Supertip>
                     <Title resid="ImportPortfolioButton.Label"/>
@@ -108,7 +109,7 @@
                   <Action xsi:type="ExecuteFunction">
                     <FunctionName>importPortfolioData</FunctionName>
                   </Action>
-                </Control>
+                </Control> -->
 
                 <!-- Get Data from Salesforce -->
                 <Control xsi:type="Button" id="SalesforceButton">
