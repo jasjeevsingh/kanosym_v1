@@ -43,7 +43,7 @@ interface ChatStatus {
 
 // Simplified API service for Excel
 class ExcelChatApiService {
-  public baseUrl = 'http://localhost:5001/api/chat';
+  public baseUrl = 'https://localhost:5001/api/chat';
 
   async setApiKey(apiKey: string): Promise<ApiResponse> {
     try {

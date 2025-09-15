@@ -17,7 +17,7 @@ def test_autosave_functionality():
     print("Testing Autosave Functionality...")
     print("=" * 50)
     
-    base_url = "http://localhost:5001"
+    base_url = "https://localhost:5001"
     
     # Test 1: Create a project
     print("\n1. Creating a test project...")

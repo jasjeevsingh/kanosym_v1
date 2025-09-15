@@ -21,7 +21,7 @@ export interface AnalysisResponse {
 export class AnalysisService {
   private static instance: AnalysisService;
   private excelService: ExcelDataService;
-  private backendBaseUrl: string = 'http://localhost:5001';
+  private backendBaseUrl: string = 'https://localhost:5001';
 
   public static getInstance(): AnalysisService {
     if (!AnalysisService.instance) {

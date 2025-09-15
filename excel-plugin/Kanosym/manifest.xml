@@ -17,7 +17,7 @@
 
   <AppDomains>
     <AppDomain>https://localhost:3000</AppDomain>
-    <AppDomain>http://localhost:5001</AppDomain>
+    <AppDomain>https://localhost:5001</AppDomain>
   </AppDomains>
 
   <Hosts>

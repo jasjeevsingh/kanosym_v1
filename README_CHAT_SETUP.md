@@ -13,7 +13,7 @@
    cd backend
    python api.py
    ```
-   The backend will run on `http://localhost:5001`
+   The backend will run on `https://localhost:5001`
 
 ## Frontend Setup
 

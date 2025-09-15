@@ -586,7 +586,7 @@ function FloatingModal({ onClose, blockMode }: { onClose: () => void; blockMode:
     setFetchError('');
     const { start, end } = getDefaultDates();
     try {
-      const res = await fetch('http://localhost:5001/api/fetch_volatility', {
+      const res = await fetch('https://localhost:5001/api/fetch_volatility', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbols: [asset], start, end, window: 60 }),
@@ -962,7 +962,7 @@ function App() {
   useEffect(() => {
     async function loadProjects() {
       try {
-        const response = await fetch('http://localhost:5001/api/projects');
+        const response = await fetch('https://localhost:5001/api/projects');
         const data = await response.json();
         if (data.success) {
           // Projects API returns flat structure with project_id and name
@@ -1090,7 +1090,7 @@ function App() {
         // Just reload the project configuration without re-opening it
         // The project is already open, we just need to refresh its data
         try {
-          const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(currentProject.name)}`);
+          const response = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(currentProject.name)}`);
           const data = await response.json();
           if (data.success) {
             const project = data.project;
@@ -1157,7 +1157,7 @@ function App() {
   // - UI state (current mode, etc.)
   async function handleOpenProject(projectName: string) {
     try {
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
+      const response = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
       const data = await response.json();
       if (data.success) {
         const project = data.project;
@@ -1242,7 +1242,7 @@ function App() {
   // 3. Creates a results tab to display the analysis
   async function handleOpenTestRun(testRunId: string) {
     try {
-      const response = await fetch(`http://localhost:5001/api/test-runs/${testRunId}`);
+      const response = await fetch(`https://localhost:5001/api/test-runs/${testRunId}`);
       const data = await response.json();
       if (data.success) {
         const testRun = data.test_run;
@@ -1260,7 +1260,7 @@ function App() {
           // If not found in cache, fetch fresh project list
           if (!project) {
             console.log('Project not in cache, fetching fresh project list...');
-            const projectsResponse = await fetch('http://localhost:5001/api/projects');
+            const projectsResponse = await fetch('https://localhost:5001/api/projects');
             const projectsData = await projectsResponse.json();
             if (projectsData.success) {
               const freshProject = projectsData.projects.find((p: any) => p.project_id === projectId);
@@ -1679,16 +1679,16 @@ function App() {
     let endpoint;
     switch (blockMode) {
       case 'classical':
-        endpoint = 'http://localhost:5001/api/classical_sensitivity_test';
+        endpoint = 'https://localhost:5001/api/classical_sensitivity_test';
         break;
       case 'hybrid':
-        endpoint = 'http://localhost:5001/api/hybrid_sensitivity_test';
+        endpoint = 'https://localhost:5001/api/hybrid_sensitivity_test';
         break;
       case 'quantum':
-        endpoint = 'http://localhost:5001/api/quantum_sensitivity_test';
+        endpoint = 'https://localhost:5001/api/quantum_sensitivity_test';
         break;
       default:
-        endpoint = 'http://localhost:5001/api/classical_sensitivity_test';
+        endpoint = 'https://localhost:5001/api/classical_sensitivity_test';
     }
     
     setIsRunningModel(true);
@@ -1937,7 +1937,7 @@ function App() {
     if (!newProjectName.trim()) return;
     
     try {
-      const response = await fetch('http://localhost:5001/api/projects', {
+      const response = await fetch('https://localhost:5001/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newProjectName.trim() })
@@ -1979,7 +1979,7 @@ function App() {
     if (!projectToDelete) return;
     
     try {
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectToDelete.name)}`, {
+      const response = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectToDelete.name)}`, {
         method: 'DELETE'
       });
       
@@ -2072,7 +2072,7 @@ function App() {
           setCorrelationValidity({ invalid_min: 0, invalid_max: 0, loading: false, error: 'Selected asset not found.' });
           return;
         }
-        fetch('http://localhost:5001/api/check_correlation_validity', {
+        fetch('https://localhost:5001/api/check_correlation_validity', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2323,7 +2323,7 @@ function App() {
       const symbol = form.portfolio.assets[idx];
       const { start, end, window, frequency } = params || { ...getDefaultDates(), window: 60, frequency: '1d' };
       try {
-        const res = await fetch('http://localhost:5001/api/fetch_volatility', {
+        const res = await fetch('https://localhost:5001/api/fetch_volatility', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbols: [symbol], start, end, window, frequency }),
@@ -2441,7 +2441,7 @@ function App() {
       const symbols = form.portfolio.assets;
       const { start, end, frequency } = params || { ...getDefaultDates(), frequency: '1d' };
       try {
-        const res = await fetch('http://localhost:5001/api/fetch_correlation_matrix', {
+        const res = await fetch('https://localhost:5001/api/fetch_correlation_matrix', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbols, start, end, frequency }),

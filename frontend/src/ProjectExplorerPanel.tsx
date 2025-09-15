@@ -73,7 +73,7 @@ export default function ProjectExplorerPanel({
     console.log('Loading projects...');
     setError(null);
     try {
-      const response = await fetch('http://localhost:5001/api/projects');
+      const response = await fetch('https://localhost:5001/api/projects');
       const data = await response.json();
       console.log('Loaded projects:', data);
       if (data.success) {
@@ -91,7 +91,7 @@ export default function ProjectExplorerPanel({
     console.log('Loading test runs...');
     setError(null);
     try {
-      const response = await fetch('http://localhost:5001/api/test-runs');
+      const response = await fetch('https://localhost:5001/api/test-runs');
       const data = await response.json();
       console.log('Test runs API response:', data);
       if (data.success) {
@@ -111,7 +111,7 @@ export default function ProjectExplorerPanel({
     
     setError(null);
     try {
-      const response = await fetch('http://localhost:5001/api/projects', {
+      const response = await fetch('https://localhost:5001/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newProjectName.trim() })
@@ -150,7 +150,7 @@ export default function ProjectExplorerPanel({
       // Get the project ID before deletion
       const projectToDelete = projects.find(p => p.name === projectName);
       
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`, {
+      const response = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}`, {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -172,7 +172,7 @@ export default function ProjectExplorerPanel({
   const handleDeleteTestRun = async (testRunId: string) => {
     setError(null);
     try {
-      const response = await fetch(`http://localhost:5001/api/test-runs/${testRunId}`, {
+      const response = await fetch(`https://localhost:5001/api/test-runs/${testRunId}`, {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -228,7 +228,7 @@ export default function ProjectExplorerPanel({
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`, {
+      const res = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`, {
         method: 'POST',
         body: formData,
       });
@@ -239,7 +239,7 @@ export default function ProjectExplorerPanel({
     //     setShowUploadSuccessModal(true);
         
     //     // Refresh the file tree to show the new file
-    //     const fileTreeRes = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+    //     const fileTreeRes = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
     //     const fileTreeData = await fileTreeRes.json();
     //     setFileTrees(prev => ({ ...prev, [projectId]: fileTreeData }));
         
@@ -265,7 +265,7 @@ export default function ProjectExplorerPanel({
     }
     // Always fetch fresh file tree data instead of using cache
     try {
-      const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+      const res = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
       const data = await res.json();
       setFileTrees(prev => ({ ...prev, [projectId]: data }));
     } catch {
@@ -281,14 +281,14 @@ export default function ProjectExplorerPanel({
   const handleFileDelete = async (projectId: string, projectName: string, filePath: string) => {
     console.log('Deleting file:', { projectId, projectName, filePath });
     try {
-      const res = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`, {
+      const res = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: filePath })
       });
       if (res.ok) {
         // Refresh file tree
-        const res2 = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
+        const res2 = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}/files`);
         const data2 = await res2.json();
         setFileTrees(prev => ({ ...prev, [projectId]: data2 }));
       }
@@ -624,7 +624,7 @@ export default function ProjectExplorerPanel({
               if (!editProjectName.trim()) return;
               // Call backend to rename project
               try {
-                const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(editProject.name)}/rename`, {
+                const response = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(editProject.name)}/rename`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ new_name: editProjectName.trim() })

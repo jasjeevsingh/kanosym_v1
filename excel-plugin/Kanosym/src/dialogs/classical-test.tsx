@@ -100,7 +100,7 @@ function ClassicalTestDialog() {
 
     try {
       // Call the Kanosym backend API
-      const response = await fetch('http://localhost:5001/api/analysis/classical', {
+      const response = await fetch('https://localhost:5001/api/analysis/classical', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

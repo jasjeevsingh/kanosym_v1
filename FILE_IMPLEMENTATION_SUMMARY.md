@@ -286,12 +286,12 @@ curl -X POST http://localhost:5001/api/projects \
 
 ### Loading a Project
 ```bash
-curl http://localhost:5001/api/projects/My%20Portfolio%20Analysis
+curl https://localhost:5001/api/projects/My%20Portfolio%20Analysis
 ```
 
 ### Saving Test Run Results
 ```bash
-curl -X POST http://localhost:5001/api/test-runs \
+curl -X POST https://localhost:5001/api/test-runs \
   -H "Content-Type: application/json" \
   -d '{
     "project_id": "proj-1234567890",
@@ -306,7 +306,7 @@ curl -X POST http://localhost:5001/api/test-runs \
 
 ### Getting Complete Project State
 ```bash
-curl http://localhost:5001/api/projects/My%20Portfolio%20Analysis/state
+curl https://localhost:5001/api/projects/My%20Portfolio%20Analysis/state
 ```
 
 ## 5. Integration with Frontend

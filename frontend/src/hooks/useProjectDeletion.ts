@@ -28,7 +28,7 @@ export function useProjectDeletion({
   const checkIfProjectExists = useCallback(async () => {
     try {
       // Try to fetch the specific project
-      const response = await fetch(`http://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
+      const response = await fetch(`https://localhost:5001/api/projects/${encodeURIComponent(projectName)}`);
       
       if (!response.ok || response.status === 404) {
         // Project not found - it's been deleted!

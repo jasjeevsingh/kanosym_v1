@@ -878,7 +878,7 @@ class NoiraFileAccessService:
             # Use existing API endpoint
             import requests
             response = requests.post(
-                "http://localhost:5001/api/fetch_volatility",
+                "https://localhost:5001/api/fetch_volatility",
                 json={
                     "symbols": symbols,
                     "start": start_date,
@@ -933,7 +933,7 @@ class NoiraFileAccessService:
             # Use existing API endpoint
             import requests
             response = requests.post(
-                "http://localhost:5001/api/fetch_correlation_matrix",
+                "https://localhost:5001/api/fetch_correlation_matrix",
                 json={
                     "symbols": symbols,
                     "start": start_date,
@@ -991,7 +991,7 @@ class NoiraFileAccessService:
                 return {"success": False, "error": f"{block_type.capitalize()} block has no parameters configured"}
             
             # Prepare API request
-            api_endpoint = f"http://localhost:5001/api/{block_type}_sensitivity_test"
+            api_endpoint = f"https://localhost:5001/api/{block_type}_sensitivity_test"
             
             # Build request data
             request_data = {

@@ -8,7 +8,7 @@ import requests
 import json
 import numpy as np
 
-BASE_URL = "http://localhost:5001"
+BASE_URL = "https://localhost:5001"
 
 def create_test_portfolio(num_assets):
     """Create a test portfolio with the specified number of assets."""

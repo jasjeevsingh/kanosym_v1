@@ -63,7 +63,7 @@ source venv/bin/activate  # On macOS/Linux
 # Start the Flask API server
 python api.py
 ```
-**Expected output:** Flask server running on `http://localhost:5001`
+**Expected output:** Flask server running on `https://localhost:5001`
 
 ### Step 2: Start Frontend Dev Server (Terminal 2)
 ```bash
@@ -115,7 +115,7 @@ npm run electron
 
 ## Port Configuration
 
-- **Flask Backend**: `http://localhost:5001`
+- **Flask Backend**: `https://localhost:5001`
 - **Vite Frontend**: `http://localhost:5173`
 - **Electron**: Loads frontend from `http://localhost:5173`
 

@@ -21,7 +21,7 @@ export function useProjectPolling({
 
     try {
       const response = await fetch(
-        `http://localhost:5001/api/projects/${encodeURIComponent(projectName)}/last-modified`
+        `https://localhost:5001/api/projects/${encodeURIComponent(projectName)}/last-modified`
       );
       
       if (!response.ok) return;
@@ -94,7 +94,7 @@ export function useProjectListPolling({
     if (!enabled) return;
 
     try {
-      const response = await fetch('http://localhost:5001/api/projects');
+      const response = await fetch('https://localhost:5001/api/projects');
       
       if (!response.ok) return;
       
@@ -163,7 +163,7 @@ export function useTestRunPolling({
     if (!enabled) return;
 
     try {
-      const response = await fetch('http://localhost:5001/api/test-runs');
+      const response = await fetch('https://localhost:5001/api/test-runs');
       
       if (!response.ok) return;
       

@@ -15,11 +15,10 @@ from model_blocks.quantum.quantum_sensitivity import quantum_sensitivity_test
 from model_blocks.classical.classical_sensitivity import classical_sensitivity_test
 from model_blocks.hybrid.hybrid_sensitivity import hybrid_sensitivity_test
 from file_manager import FileManager
+from price_data import get_asset_volatility, fetch_correlation_matrix
 import numpy as np
 from datetime import datetime
 import math
-from price_data import get_asset_volatility
-from price_data import fetch_correlation_matrix
 from utils import check_correlation_perturbation_validity
 
 # Load environment variables
@@ -1171,5 +1170,35 @@ if __name__ == '__main__':
     werkzeug_logger = logging.getLogger('werkzeug')
     werkzeug_logger.addFilter(WerkzeugFilter())
     
-    # Run the app
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    # Add test endpoint for debugging
+    @app.route('/api/test', methods=['GET', 'POST'])
+    def test_endpoint():
+        return jsonify({"status": "success", "message": "Backend is working", "method": request.method}), 200
+    
+    # Add logging endpoint for Excel plugin errors
+    @app.route('/api/log-error', methods=['POST'])
+    def log_error():
+        try:
+            data = request.get_json()
+            error_message = data.get('message', 'Unknown error')
+            error_type = data.get('type', 'Error')
+            timestamp = data.get('timestamp', 'Unknown time')
+            
+            print(f"\n EXCEL PLUGIN ERROR [{timestamp}]")
+            print(f"Type: {error_type}")
+            print(f"Message: {error_message}")
+            print("=" * 50)
+            
+            return jsonify({"status": "logged"}), 200
+        except Exception as e:
+            print(f"Error logging Excel plugin error: {e}")
+            return jsonify({"error": "Failed to log error"}), 500
+    
+    # Run the app with HTTPS support
+    # For development, we'll use adhoc SSL (self-signed certificate)
+    try:
+        print("Starting HTTPS server on port 5001...")
+        app.run(debug=True, host='0.0.0.0', port=5001, ssl_context='adhoc')
+    except Exception as e:
+        print(f"HTTPS failed, falling back to HTTP: {e}")
+        app.run(debug=True, host='0.0.0.0', port=5001)

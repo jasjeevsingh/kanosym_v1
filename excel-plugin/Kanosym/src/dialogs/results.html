@@ -205,6 +205,7 @@
                 
                 if (dataParam) {
                     analysisResults = JSON.parse(decodeURIComponent(dataParam));
+                    console.log('Parsed analysis results:', analysisResults);
                     displayResults();
                 } else {
                     showError('No results data provided');
@@ -244,23 +245,42 @@
             const metricsGrid = document.getElementById('metricsGrid');
             const results = analysisResults;
             
+            // Calculate metrics from the actual data structure
+            let maxSensitivity = 'N/A';
+            let minSensitivity = 'N/A';
+            let avgSensitivity = 'N/A';
+            let baselineVolatility = 'N/A';
+            
+            if (results.results && Array.isArray(results.results)) {
+                const volatilities = results.results.map(r => r.portfolio_volatility_daily || r.volatility);
+                if (volatilities.length > 0) {
+                    maxSensitivity = (Math.max(...volatilities) * 100).toFixed(2) + '%';
+                    minSensitivity = (Math.min(...volatilities) * 100).toFixed(2) + '%';
+                    avgSensitivity = (volatilities.reduce((a, b) => a + b, 0) / volatilities.length * 100).toFixed(2) + '%';
+                }
+            }
+            
+            if (results.baseline_portfolio_volatility_daily) {
+                baselineVolatility = (results.baseline_portfolio_volatility_daily * 100).toFixed(2) + '%';
+            }
+            
             // Key metrics to display
             const metrics = [
                 {
                     label: 'Max Sensitivity',
-                    value: results.max_sensitivity ? (results.max_sensitivity * 100).toFixed(2) + '%' : 'N/A'
+                    value: maxSensitivity
                 },
                 {
                     label: 'Min Sensitivity',
-                    value: results.min_sensitivity ? (results.min_sensitivity * 100).toFixed(2) + '%' : 'N/A'
+                    value: minSensitivity
                 },
                 {
                     label: 'Average Sensitivity',
-                    value: results.avg_sensitivity ? (results.avg_sensitivity * 100).toFixed(2) + '%' : 'N/A'
+                    value: avgSensitivity
                 },
                 {
-                    label: 'Portfolio VaR',
-                    value: results.portfolio_var ? (results.portfolio_var * 100).toFixed(2) + '%' : 'N/A'
+                    label: 'Baseline Volatility',
+                    value: baselineVolatility
                 }
             ];
             
@@ -279,7 +299,10 @@
             let chartData = [];
             let labels = [];
             
-            if (analysisResults.sensitivity_data && Array.isArray(analysisResults.sensitivity_data)) {
+            if (analysisResults.results && Array.isArray(analysisResults.results)) {
+                chartData = analysisResults.results.map(r => (r.portfolio_volatility_daily || r.volatility) * 100);
+                labels = analysisResults.results.map((r, i) => `${(r.perturbed_value || i).toFixed(3)}`);
+            } else if (analysisResults.sensitivity_data && Array.isArray(analysisResults.sensitivity_data)) {
                 chartData = analysisResults.sensitivity_data.map(d => d.sensitivity * 100);
                 labels = analysisResults.sensitivity_data.map((d, i) => `Step ${i + 1}`);
             } else if (analysisResults.parameter_values && analysisResults.portfolio_values) {
@@ -342,10 +365,10 @@
             const results = analysisResults;
             
             const metrics = [
-                { label: 'Volatility', value: results.volatility ? (results.volatility * 100).toFixed(2) + '%' : 'N/A' },
-                { label: 'Sharpe Ratio', value: results.sharpe_ratio ? results.sharpe_ratio.toFixed(3) : 'N/A' },
-                { label: 'Max Drawdown', value: results.max_drawdown ? (results.max_drawdown * 100).toFixed(2) + '%' : 'N/A' },
-                { label: 'Beta', value: results.beta ? results.beta.toFixed(3) : 'N/A' }
+                { label: 'Baseline Volatility', value: results.baseline_portfolio_volatility_daily ? (results.baseline_portfolio_volatility_daily * 100).toFixed(2) + '%' : 'N/A' },
+                { label: 'Annualized Volatility', value: results.baseline_portfolio_volatility_annualized ? (results.baseline_portfolio_volatility_annualized * 100).toFixed(2) + '%' : 'N/A' },
+                { label: 'Range Tested', value: results.range_tested ? `${(results.range_tested[0] * 100).toFixed(1)}% - ${(results.range_tested[results.range_tested.length-1] * 100).toFixed(1)}%` : 'N/A' },
+                { label: 'Description', value: results.description ? results.description.split('.')[0] : 'N/A' }
             ];
             
             riskMetrics.innerHTML = metrics.map(metric => `
@@ -361,10 +384,10 @@
             const results = analysisResults;
             
             const summary = [
-                { label: 'Assets', value: results.portfolio?.assets?.length || 'N/A' },
-                { label: 'Total Weight', value: results.portfolio?.weights ? (results.portfolio.weights.reduce((a, b) => a + b, 0) * 100).toFixed(1) + '%' : 'N/A' },
-                { label: 'Analysis Type', value: results.analysis_type || 'Classical' },
-                { label: 'Time Horizon', value: results.time_horizon ? `${results.time_horizon} days` : 'N/A' }
+                { label: 'Asset Analyzed', value: results.asset || 'N/A' },
+                { label: 'Parameter', value: results.perturbation || 'N/A' },
+                { label: 'Analysis Type', value: results.processing_mode || 'Classical' },
+                { label: 'Steps', value: results.range_tested?.length || 'N/A' }
             ];
             
             portfolioSummary.innerHTML = summary.map(item => `

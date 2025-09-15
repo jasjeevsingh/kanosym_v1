@@ -65,7 +65,7 @@ interface DebugInfo {
 
 // API service class - UPDATED TO PORT 5001
 class ChatApiService {
-  public baseUrl = 'http://localhost:5001/api/chat';  // Changed from 5000 to 5001
+  public baseUrl = 'https://localhost:5001/api/chat';  // Changed from 5000 to 5001
 
   async setApiKey(apiKey: string): Promise<ApiResponse> {
     try {
@@ -442,7 +442,7 @@ function DebugPanel({
     setMessage('Testing backend connection...');
     
     try {
-      const response = await fetch('http://localhost:5001/api/chat/status');  // Updated to 5001
+      const response = await fetch('https://localhost:5001/api/chat/status');  // Updated to 5001
       if (response.ok) {
         setMessage('✅ Backend is running and accessible');
       } else {

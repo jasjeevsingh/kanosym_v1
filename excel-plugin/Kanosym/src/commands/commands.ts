@@ -102,7 +102,7 @@ async function loadHistoricalPrices(event: Office.AddinCommands.Event) {
                   
                   try {
                     // Call backend API for historical prices
-                    const response = await fetch('http://localhost:5001/api/historical_prices', {
+                    const response = await fetch('https://localhost:5001/api/historical_prices', {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -431,7 +431,10 @@ async function runClassicalTest(event: Office.AddinCommands.Event) {
                     
                     // Close the current dialog
                     result.value.close();
-                    setTimeout(() => {
+                    
+                    
+                    console.log('Closing dialog...');
+                    setTimeout(async () => {
                       
                     // Mark that we're about to show results dialog
                     Excel.run(async (context) => {
@@ -440,8 +443,24 @@ async function runClassicalTest(event: Office.AddinCommands.Event) {
                       await context.sync();
                     });
                     
+                    
                     // Show results in a new dialog with the actual data
-                    const resultsUrl = `localhost:3000/dialogs/results.html?data=${encodeURIComponent(JSON.stringify(testResult))}`;
+                    
+                    const resultsUrl = `https://localhost:3000/dialogs/results.html?data=${encodeURIComponent(JSON.stringify(testResult))}`;
+                    
+                    // Save testResult to a JSON file via Excel
+                    const jsonData = JSON.stringify(testResult, null, 2);
+                    
+                    // Write JSON data to Excel cells (starting from AA1)
+                    await Excel.run(async (context) => {
+                      const worksheet = context.workbook.worksheets.getActiveWorksheet();
+                      const lines = jsonData.split('\n');
+                      const range = worksheet.getRange(`AA1:AA${lines.length}`);
+                      range.values = lines.map(line => [line]);
+                      await context.sync();
+                    });
+                    console.log('Test result saved to Excel cells AA1:AA' + JSON.stringify(testResult, null, 2).split('\n').length);
+
                     Office.context.ui.displayDialogAsync(resultsUrl, { 
                       height: 80, 
                       width: 80, 
@@ -494,7 +513,8 @@ async function runClassicalTest(event: Office.AddinCommands.Event) {
               
               // Close current dialog and show error
               try {
-               result.value.close();
+                // we are starting here 9/13 everything above should be working; only thing wrong is not parsing json file i believe
+                result.value.close();
               } catch (closeError) {
                 console.error('Error closing dialog:', closeError);
               }
